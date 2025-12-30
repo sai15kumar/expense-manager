@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Personal Expense Tracker - Track your daily expenses with ease">
+    <title>Expense Manager</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER SECTION -->
+        <header class="app-header">
+            <h1 class="app-title">💰 Expense Manager</h1>
+            <p class="app-subtitle">Track your spending, one day at a time</p>
+        </header>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="main-content">
+
+            <!-- CALENDAR SECTION -->
+            <section class="calendar-section">
+                <div class="calendar-header">
+                    <button class="btn btn-nav" id="prevMonth" aria-label="Previous month">❮</button>
+                    <h2 id="monthYear" class="month-year">December 2025</h2>
+                    <button class="btn btn-nav" id="nextMonth" aria-label="Next month">❯</button>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div class="calendar-container">
+                    <!-- Day headers (Mon-Sun) -->
+                    <div class="calendar-grid">
+                        <div class="day-header">Sun</div>
+                        <div class="day-header">Mon</div>
+                        <div class="day-header">Tue</div>
+                        <div class="day-header">Wed</div>
+                        <div class="day-header">Thu</div>
+                        <div class="day-header">Fri</div>
+                        <div class="day-header">Sat</div>
+
+                        <!-- Calendar dates will be inserted here by JavaScript -->
+                        <div id="calendarDates" class="calendar-dates"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- EXPENSE ENTRY SECTION (Initially hidden) -->
+            <section id="expenseForm" class="expense-form hidden">
+                <div class="form-header">
+                    <button class="btn btn-close" id="closeForm" aria-label="Close form">✕</button>
+                    <h2>Enter Expenses</h2>
+                    <p id="selectedDateDisplay" class="selected-date">Date: -</p>
+                </div>
+
+                <!-- Expense Entry Form -->
+                <form id="expenseEntryForm" class="form-content">
+                    <!-- Entry Type Tabs -->
+                    <div class="entry-tabs" role="tablist">
+                        <button type="button" class="entry-tab active" data-type="Expense" role="tab" aria-selected="true">Expenses</button>
+                        <button type="button" class="entry-tab" data-type="Income" role="tab" aria-selected="false">Income</button>
+                        <button type="button" class="entry-tab" data-type="Payoff" role="tab" aria-selected="false">Payoffs</button>
+                    </div>
+
+                    <!-- Expense Table -->
+                    <table class="expense-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Notes</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseRows">
+                            <!-- Dynamically populated rows -->
+                        </tbody>
+                    </table>
+
+                    <!-- Add More Button -->
+                    <button type="button" class="btn btn-add" id="addExpenseBtn">+ Add Row</button>
+
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="saveBtn">Submit</button>
+                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                    </div>
+                </form>
+
+                <!-- Status Messages -->
+                <div id="statusMessage" class="status-message hidden"></div>
+            </section>
+
+            <!-- VIEW EXPENSES SECTION (Initially hidden) -->
+            <section id="viewExpenses" class="view-expenses hidden">
+                <div class="view-header">
+                    <button class="btn btn-close" id="closeViewBtn" aria-label="Close view">✕</button>
+                    <h2>Expenses for <span id="viewDateDisplay">-</span></h2>
+                </div>
+                <div class="view-content">
+                    <table class="view-expenses-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Notes</th>
+                                <th>Date</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="expensesList">
+                            <!-- Expenses will be displayed here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- FOOTER SECTION -->
+        <footer class="app-footer">
+            <p>Powered by Expense Manager • Version 1.0</p>
+        </footer>
+
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/app.js"></script>
+</body>
+</html>

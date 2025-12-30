@@ -1,0 +1,85 @@
+# ====================================================
+# EXPENSE MANAGER - GIT IGNORE
+# ====================================================
+
+# Environment and Configuration
+.env
+.env.local
+.env.*.local
+config.local.js
+
+# API Keys and Secrets
+*.key
+*.pem
+.credentials
+oauth*.json
+
+# Node modules (if adding npm dependencies in future)
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.log
+
+# Build and Dist
+dist/
+build/
+.cache/
+
+# Testing
+.nyc_output/
+coverage/
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*~
+
+# OS-specific
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Google Apps Script Deployment IDs (keep local, don't commit)
+.clasp.json
+appsscript.json
+
+# Local development
+local/
+private/
+secrets/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Optional npm cache
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Documentation (local copies)
+docs/local/
+
+# IDE workspace settings
+.vscode/settings.json
+.vscode/extensions.json

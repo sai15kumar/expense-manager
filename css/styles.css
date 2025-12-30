@@ -1,0 +1,908 @@
+/* ==============================================
+   EXPENSE MANAGER - MOBILE-FIRST CSS
+   ============================================== */
+
+/* RESET & BASE STYLES */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+
+/* CONTAINER & LAYOUT */
+.container {
+    max-width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+}
+
+.main-content {
+    flex: 1;
+    padding: 0;
+}
+
+/* ==============================================
+   HEADER STYLES
+   ============================================== */
+.app-header {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(196, 30, 58, 0.3);
+}
+
+.app-title {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.5px;
+}
+
+.app-subtitle {
+    font-size: 0.95rem;
+    opacity: 0.95;
+    font-weight: 300;
+}
+
+/* ==============================================
+   CALENDAR SECTION - MOBILE FIRST
+   ============================================== */
+.calendar-section {
+    padding: 2rem 1.5rem;
+    background-color: white;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.month-year {
+    font-size: 1.5rem;
+    font-weight: 700;
+    flex: 1;
+    text-align: center;
+    color: #333;
+    letter-spacing: -0.5px;
+}
+
+/* Navigation Buttons */
+.btn-nav {
+    background-color: #667eea;
+    color: white;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.btn-nav:active {
+    transform: scale(0.95);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+}
+
+.btn-nav:hover {
+    background-color: #764ba2;
+}
+
+/* Calendar Grid */
+.calendar-container {
+    width: 100%;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+    background-color: transparent;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.day-header {
+    background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
+    padding: 1rem 0.5rem;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #c41e3a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.calendar-dates {
+    display: contents;
+}
+
+/* Calendar Date Cells */
+.calendar-date {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #333;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.calendar-date:hover {
+    border-color: #c41e3a;
+    box-shadow: 0 4px 12px rgba(196, 30, 58, 0.15);
+}
+
+.calendar-date:active {
+    transform: scale(0.95);
+}
+
+.calendar-date.other-month {
+    color: #adb5bd;
+    background-color: #f8f9fa;
+    border-color: #e9ecef;
+}
+
+.calendar-date.today {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+    font-weight: 700;
+    border-color: #c41e3a;
+    box-shadow: 0 4px 15px rgba(196, 30, 58, 0.3);
+}
+
+.calendar-date.has-expense {
+    /* Add indicator dot for dates with expenses */
+}
+
+.calendar-date.has-expense::after {
+    content: '';
+    position: absolute;
+    bottom: 6px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #ff6b6b;
+    box-shadow: 0 2px 4px rgba(255, 107, 107, 0.3);
+}
+
+.calendar-date.today.has-expense::after {
+    background-color: #ffd43b;
+    box-shadow: 0 2px 4px rgba(255, 212, 59, 0.5);
+}
+
+.calendar-date.selected {
+    background: linear-gradient(135deg, #51cf66 0%, #37b24d 100%);
+    color: white;
+    border-color: #2f9e44;
+    box-shadow: 0 6px 20px rgba(81, 207, 102, 0.4);
+}
+
+/* ==============================================
+   EXPENSE FORM - MODAL STYLE
+   ============================================== */
+.expense-form {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 1000;
+    animation: slideUp 0.3s ease-out;
+}
+
+.expense-form.hidden {
+    display: none;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.form-header {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.form-header h2 {
+    font-size: 1.5rem;
+    flex: 1;
+    min-width: 150px;
+    margin: 0;
+    font-weight: 700;
+}
+
+.selected-date {
+    font-size: 0.9rem;
+    opacity: 0.95;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.form-content {
+    background-color: white;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 1.25rem 1rem 1.5rem;
+}
+
+.entry-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.entry-tab {
+    flex: 1;
+    border: 1px solid #e4e7ed;
+    background: #f6f7fb;
+    color: #2e3038;
+    padding: 0.65rem 0.5rem;
+    border-radius: 8px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.entry-tab.active {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+    border-color: #b21d32;
+    box-shadow: 0 4px 12px rgba(196, 30, 58, 0.18);
+}
+
+.entry-tab:active {
+    transform: scale(0.98);
+}
+
+/* Expense Table */
+/* Flatter, desktop-like tabular look */
+.expense-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 2rem;
+    background-color: white;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: none;
+}
+
+.expense-table thead {
+    background: #f3f4f8;
+    color: #2e3038;
+}
+
+.expense-table th {
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.88rem;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+}
+
+.expense-table th:first-child { width: 34%; }
+.expense-table th:nth-child(2) { width: 22%; }
+.expense-table th:nth-child(3) { width: 36%; }
+.expense-table th:last-child { width: 8%; text-align: center; }
+
+.expense-table tbody tr {
+    border-bottom: 1px solid #eceff4;
+    transition: background-color 0.12s ease;
+    height: auto;
+    display: table-row;
+    background: #fff;
+    box-shadow: none;
+}
+
+.expense-table tbody tr:hover {
+    background-color: #fafbff;
+}
+
+.expense-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.expense-table td {
+    padding: 0.4rem 0.55rem;
+    vertical-align: middle;
+    display: table-cell;
+}
+
+.expense-table td:first-child { width: 34%; }
+.expense-table td:nth-child(2) { width: 22%; }
+.expense-table td:nth-child(3) { width: 36%; }
+.expense-table td:last-child { width: 8%; text-align: center; }
+
+.expense-table input,
+.expense-table select,
+.expense-table textarea {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #d3d8e0;
+    border-radius: 6px;
+    font-size: 0.92rem;
+    font-family: inherit;
+    background: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+    box-sizing: border-box;
+    margin: 0;
+    height: 36px;
+}
+
+.expense-table input:focus,
+.expense-table select:focus,
+.expense-table textarea:focus {
+    outline: none;
+    border-color: #c41e3a;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(196, 30, 58, 0.12);
+}
+
+.expense-table input::placeholder,
+.expense-table textarea::placeholder {
+    color: #adb5bd;
+    font-size: 0.9rem;
+}
+
+.expense-table select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c41e3a' stroke-width='2.5'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    background-size: 1.1rem;
+    padding-right: 2rem;
+}
+
+.expense-table textarea {
+    resize: none;
+    min-height: 36px;
+    font-size: 0.92rem;
+}
+
+.expense-table-delete {
+    background-color: #ff7f7f;
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: transform 0.12s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.2);
+}
+
+.expense-table-delete:hover {
+    background-color: #ff6d6d;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(255, 107, 107, 0.2);
+}
+
+.expense-table-delete:active {
+    transform: scale(0.97);
+}
+
+.expense-row input,
+.expense-row select,
+.expense-row textarea {
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.expense-row input:focus,
+.expense-row select:focus,
+.expense-row textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.expense-row select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.5rem;
+    padding-right: 2.5rem;
+}
+
+.expense-row textarea {
+    resize: none;
+    min-height: 60px;
+    font-size: 0.9rem;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+    position: sticky;
+    bottom: 0;
+    background-color: white;
+    padding-bottom: 0.5rem;
+}
+
+.form-actions .btn {
+    padding: 0.8rem 1.5rem;
+}
+
+/* ==============================================
+   BUTTONS - GLOBAL STYLES
+   ============================================== */
+.btn {
+    padding: 0.9rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+    flex: 1;
+    box-shadow: 0 4px 15px rgba(196, 30, 58, 0.3);
+    font-size: 1rem;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(196, 30, 58, 0.4);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(196, 30, 58, 0.3);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-secondary {
+    background-color: #e9ecef;
+    color: #333;
+    flex: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.btn-secondary:hover {
+    background-color: #dee2e6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.btn-secondary:active {
+    transform: translateY(0);
+}
+
+.btn-nav {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+    border: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    font-size: 1.6rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(196, 30, 58, 0.25);
+}
+
+.btn-nav:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(196, 30, 58, 0.35);
+}
+
+.btn-nav:active {
+    transform: scale(0.95);
+}
+
+.btn-add {
+    background-color: #f8f9fa;
+    color: #c41e3a;
+    border: 2px dashed #c41e3a;
+    width: 100%;
+    margin-top: 2rem;
+    margin-bottom: 2.25rem;
+    padding: 1.35rem 2rem;
+    box-shadow: none;
+}
+
+.btn-add:hover {
+    background-color: #ffe5e5;
+    border-color: #8b0000;
+    transform: translateY(-1px);
+}
+
+.btn-add:active {
+    transform: scale(0.98);
+}
+
+.btn-close {
+    background-color: transparent;
+    color: white;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-close:hover {
+    background-color: #f8f9fa;
+}
+
+.btn-close:active {
+    background-color: #e9ecef;
+}
+
+/* Status Messages */
+.status-message {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    display: none;
+}
+
+.status-message.hidden {
+    display: none;
+}
+
+.status-message.show {
+    display: block;
+}
+
+.status-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* ==============================================
+   VIEW EXPENSES SECTION
+   ============================================== */
+.view-expenses {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 1000;
+    animation: slideUp 0.3s ease-out;
+}
+
+.view-expenses.hidden {
+    display: none;
+}
+
+.view-header {
+    background-color: white;
+    padding: 1.25rem;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.view-header h2 {
+    font-size: 1.25rem;
+    flex: 1;
+}
+
+.view-content {
+    background-color: white;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* View Expenses Table Styles */
+.view-expenses-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: white;
+    border: none;
+}
+
+.view-expenses-table thead {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+    position: sticky;
+    top: 0;
+}
+
+.view-expenses-table th {
+    padding: 1.25rem 1rem;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.view-expenses-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.3s ease;
+}
+
+.view-expenses-table tbody tr:hover {
+    background-color: #f8f9ff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.view-expenses-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.view-expenses-table td {
+    padding: 1.25rem 1rem;
+    vertical-align: middle;
+}
+
+.view-expenses-table td:nth-child(1) {
+    font-weight: 600;
+    color: #333;
+}
+
+.view-expenses-table td:nth-child(2) {
+    font-weight: 700;
+    color: #c41e3a;
+}
+
+.view-expenses-table td:nth-child(3) {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.view-expenses-table td:nth-child(4) {
+    color: #999;
+    font-size: 0.9rem;
+}
+
+.view-expenses-table td:last-child {
+    text-align: center;
+    padding: 1.25rem 0.75rem;
+}
+
+.view-delete-btn {
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.2);
+}
+
+.view-delete-btn:hover {
+    background-color: #ff5252;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.22);
+}
+
+.view-delete-btn:active {
+    transform: scale(0.97);
+}
+
+.no-expenses {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #adb5bd;
+    font-size: 1rem;
+}
+
+/* ==============================================
+   FOOTER STYLES
+   ============================================== */
+.app-footer {
+    background-color: #f8f9fa;
+    text-align: center;
+    padding: 1.5rem;
+    font-size: 0.85rem;
+    color: #666;
+    border-top: 1px solid #dee2e6;
+}
+
+/* ==============================================
+   RESPONSIVE DESIGN - TABLET & ABOVE (768px+)
+   ============================================== */
+@media (min-width: 768px) {
+    .app-header {
+        padding: 2.5rem 3rem;
+    }
+
+    .app-title {
+        font-size: 2.25rem;
+    }
+
+    .calendar-section {
+        padding: 2rem;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .form-content {
+        max-height: 60vh;
+    }
+
+    .expense-form {
+        justify-content: center;
+        align-items: center;
+    }
+
+    .expense-form form {
+        width: 90%;
+        max-width: 500px;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .view-expenses {
+        justify-content: center;
+        align-items: center;
+    }
+
+    .view-expenses > * {
+        width: 90%;
+        max-width: 500px;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn {
+        padding: 0.9rem 2rem;
+    }
+}
+
+/* ==============================================
+   RESPONSIVE DESIGN - LARGE DESKTOP (1024px+)
+   ============================================== */
+@media (min-width: 1024px) {
+    .calendar-section {
+        max-width: 700px;
+    }
+
+    .app-title {
+        font-size: 2.5rem;
+    }
+
+    .calendar-date {
+        font-size: 1rem;
+    }
+}
+
+/* ==============================================
+   UTILITY CLASSES
+   ============================================== */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.mt-1 {
+    margin-top: 0.5rem;
+}
+
+.mt-2 {
+    margin-top: 1rem;
+}
+
+.mb-1 {
+    margin-bottom: 0.5rem;
+}
+
+.mb-2 {
+    margin-bottom: 1rem;
+}
