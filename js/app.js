@@ -41,6 +41,10 @@ let appState = {
 // DOM ELEMENT REFERENCES
 // ====================================================
 
+// Header/Menu elements
+const menuBtn = document.getElementById('menuBtn');
+const menuDropdown = document.getElementById('menuDropdown');
+
 // Calendar elements
 const monthYearDisplay = document.getElementById('monthYear');
 const prevMonthBtn = document.getElementById('prevMonth');
@@ -69,6 +73,22 @@ const expensesList = document.getElementById('expensesList');
 // ====================================================
 
 /**
+ * Toggle menu dropdown visibility
+ */
+function toggleMenu() {
+    menuDropdown.classList.toggle('hidden');
+}
+
+/**
+ * Close menu when clicking outside
+ */
+function closeMenuOnClickOutside(event) {
+    if (!menuBtn.contains(event.target) && !menuDropdown.contains(event.target)) {
+        menuDropdown.classList.add('hidden');
+    }
+}
+
+/**
  * Initialize the application
  * Called when DOM is ready
  */
@@ -91,6 +111,10 @@ function initializeApp() {
  * Setup all event listeners for buttons and form
  */
 function setupEventListeners() {
+    // Header menu
+    menuBtn.addEventListener('click', toggleMenu);
+    document.addEventListener('click', closeMenuOnClickOutside);
+    
     // Calendar navigation
     prevMonthBtn.addEventListener('click', goToPreviousMonth);
     nextMonthBtn.addEventListener('click', goToNextMonth);

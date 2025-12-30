@@ -11,8 +11,18 @@
     <div class="container">
         <!-- HEADER SECTION -->
         <header class="app-header">
-            <h1 class="app-title">💰 Expense Manager</h1>
-            <p class="app-subtitle">Track your spending, one day at a time</p>
+            <div class="header-content">
+                <h1 class="app-title">Expense Manager</h1>
+                <nav class="header-menu">
+                    <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+                    <div class="menu-dropdown hidden" id="menuDropdown">
+                        <a href="#" class="menu-item" id="profileMenuItem">👤 Profile</a>
+                        <a href="#" class="menu-item" id="settingsMenuItem">⚙️ Settings</a>
+                        <hr class="menu-divider">
+                        <a href="#" class="menu-item logout" id="logoutMenuItem">🚪 Logout</a>
+                    </div>
+                </nav>
+            </div>
         </header>
 
         <!-- MAIN CONTENT AREA -->
