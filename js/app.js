@@ -12,7 +12,7 @@
  */
 const CONFIG = {
     // Replace with your deployed Apps Script Web App URL
-    BACKEND_URL: 'https://script.google.com/macros/s/AKfycbwMgMozPe55sRL8b0_om3GCwnyERUoxFpEWfF8eMNoo-4z-QAGCAADsn616d-K_vnkQog/exec',
+    BACKEND_URL: 'https://script.google.com/macros/s/AKfycbxAGyg-FWbRqEpGoJozCWWeIqP4xfWGBxuxEykseJkuOkXLu1oZyc3wBBO5yqvOPbMFoQ/exec',
     MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June',
                   'July', 'August', 'September', 'October', 'November', 'December'],
     EXPENSE_ROWS: 5,
@@ -291,6 +291,12 @@ function initializeApp() {
     // Render the calendar for the current month
     renderCalendar();
     
+    // Initialize Home page
+    initializeHomePage();
+    
+    // Initialize Add screen
+    initializeAddScreen();
+    
     // Setup event listeners
     setupEventListeners();
     
@@ -389,8 +395,8 @@ async function fetchExpensesForMonth() {
             });
             console.log(`[MONTH_FETCH] Updated hasExpensesByDate:`, appState.hasExpensesByDate);
             
-            // Re-render to show dots
-            renderCalendar();
+            // Update dots on existing calendar cells without re-rendering entire calendar
+            updateCalendarDots();
         } else if (result.success && result.expenses && Array.isArray(result.expenses)) {
             console.log(`[MONTH_FETCH] Found ${result.expenses.length} total expenses`);
             // Group by date and update hasExpensesByDate
@@ -401,7 +407,7 @@ async function fetchExpensesForMonth() {
                 }
             });
             console.log(`[MONTH_FETCH] Updated hasExpensesByDate:`, appState.hasExpensesByDate);
-            renderCalendar();
+            updateCalendarDots();
         } else {
             console.warn('[MONTH_FETCH] getExpensesByMonth not available. Falling back to individual date fetch...');
             await fallbackFetchAllDates();
@@ -461,6 +467,29 @@ async function fallbackFetchAllDates() {
     // Re-render calendar once after all data is loaded to show all dots
     console.log('[FALLBACK_FETCH] Completed. Rendering calendar with all dots...');
     renderCalendar();
+}
+
+/**
+ * Update expense indicator dots on existing calendar cells
+ * (without re-rendering the entire calendar)
+ */
+function updateCalendarDots() {
+    console.log('[UPDATE_DOTS] Updating calendar dots...');
+    
+    const dateCells = document.querySelectorAll('.calendar-date');
+    
+    dateCells.forEach(cell => {
+        const dateStr = cell.dataset.date;
+        if (dateStr && appState.hasExpensesByDate[dateStr]) {
+            // Add indicator if it doesn't exist
+            if (!cell.querySelector('.expense-indicator')) {
+                const indicator = document.createElement('div');
+                indicator.className = 'expense-indicator';
+                cell.appendChild(indicator);
+                console.log(`[UPDATE_DOTS] Added dot for ${dateStr}`);
+            }
+        }
+    });
 }
 
 /**
@@ -1048,6 +1077,250 @@ function formatDateForDisplay(dateString) {
 // REMOVED - using the new async version without parameters instead
 
 // ====================================================
+// HOME PAGE FUNCTIONS (MONTHLY OVERVIEW)
+// ====================================================
+
+/**
+ * Initialize Home Page state and elements
+ */
+function initializeHomePage() {
+    // Set initial month to current month
+    const now = new Date();
+    appState.homeSelectedMonth = {
+        year: now.getFullYear(),
+        month: now.getMonth() + 1 // 1-12
+    };
+    
+    // Setup event listeners
+    const homePrevBtn = document.getElementById('homePrevMonth');
+    const homeNextBtn = document.getElementById('homeNextMonth');
+    const homeMonthPicker = document.getElementById('homeMonthPicker');
+    const homeAddBtn = document.getElementById('homeAddBtn');
+    
+    if (homePrevBtn) homePrevBtn.addEventListener('click', () => changeHomeMonth(-1));
+    if (homeNextBtn) homeNextBtn.addEventListener('click', () => changeHomeMonth(1));
+    if (homeMonthPicker) homeMonthPicker.addEventListener('change', handleMonthPickerChange);
+    if (homeAddBtn) homeAddBtn.addEventListener('click', navigateToAddExpense);
+    
+    // Set initial picker value
+    updateMonthPicker();
+    
+    // Load Home data
+    loadHomeData();
+}
+
+/**
+ * Change month on Home page
+ */
+function changeHomeMonth(direction) {
+    const { year, month } = appState.homeSelectedMonth;
+    
+    let newMonth = month + direction;
+    let newYear = year;
+    
+    if (newMonth < 1) {
+        newMonth = 12;
+        newYear--;
+    } else if (newMonth > 12) {
+        newMonth = 1;
+        newYear++;
+    }
+    
+    appState.homeSelectedMonth = { year: newYear, month: newMonth };
+    updateMonthPicker();
+    loadHomeData();
+}
+
+/**
+ * Handle month picker change
+ */
+function handleMonthPickerChange(event) {
+    const value = event.target.value; // Format: "2025-12"
+    if (!value) return;
+    
+    const [year, month] = value.split('-').map(Number);
+    appState.homeSelectedMonth = { year, month };
+    loadHomeData();
+}
+
+/**
+ * Update month picker input value
+ */
+function updateMonthPicker() {
+    const monthPicker = document.getElementById('homeMonthPicker');
+    if (monthPicker) {
+        const { year, month } = appState.homeSelectedMonth;
+        monthPicker.value = `${year}-${String(month).padStart(2, '0')}`;
+    }
+}
+
+/**
+ * Navigate to Add screen
+ */
+function navigateToAddExpense() {
+    openAddScreen();
+}
+
+/**
+ * Load all Home page data (summary, transactions)
+ */
+async function loadHomeData() {
+    const { year, month } = appState.homeSelectedMonth;
+    
+    // Update month/year display
+    const monthYearDisplay = document.getElementById('homeMonthYear');
+    if (monthYearDisplay) {
+        monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${year}`;
+    }
+    
+    // Fetch expenses for the month
+    await fetchHomeExpensesForMonth(year, month);
+    
+    // Calculate and display summary
+    calculateAndDisplayMonthlySummary(year, month);
+    
+    // Display transaction list
+    renderMonthlyTransactionList(year, month);
+}
+
+/**
+ * Fetch expenses for a specific month for Home page
+ */
+async function fetchHomeExpensesForMonth(year, month) {
+    try {
+        console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
+        
+        const response = await fetch(CONFIG.BACKEND_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify({
+                action: 'getExpensesByMonth',
+                year: year,
+                month: month
+            })
+        });
+        
+        const result = await response.json();
+        console.log('[HOME] Fetch result:', result);
+        
+        if (result.success && result.expensesByDate) {
+            appState.homeExpensesByDate = result.expensesByDate;
+        } else if (result.success && result.expenses) {
+            // Group by date if backend returns flat array
+            appState.homeExpensesByDate = {};
+            result.expenses.forEach(expense => {
+                const date = expense.date || expense.Date;
+                if (!appState.homeExpensesByDate[date]) {
+                    appState.homeExpensesByDate[date] = [];
+                }
+                appState.homeExpensesByDate[date].push(expense);
+            });
+        } else {
+            appState.homeExpensesByDate = {};
+        }
+        
+    } catch (error) {
+        console.error('[HOME] Error fetching expenses:', error);
+        appState.homeExpensesByDate = {};
+    }
+}
+
+/**
+ * Calculate and display monthly summary totals
+ */
+function calculateAndDisplayMonthlySummary(year, month) {
+    let totalExpense = 0;
+    let totalIncome = 0;
+    let totalSavings = 0;
+    let totalPayoff = 0;
+    
+    // Sum up all expenses for the month
+    if (appState.homeExpensesByDate) {
+        Object.values(appState.homeExpensesByDate).forEach(expenses => {
+            expenses.forEach(expense => {
+                const amount = parseFloat(expense.amount || expense.Amount || 0);
+                const type = (expense.type || expense.Type || '').toLowerCase();
+                
+                if (type === 'expense') {
+                    totalExpense += amount;
+                } else if (type === 'income') {
+                    totalIncome += amount;
+                } else if (type === 'savings') {
+                    totalSavings += amount;
+                } else if (type === 'payoff') {
+                    totalPayoff += amount;
+                }
+            });
+        });
+    }
+    
+    // Update DOM
+    const expenseEl = document.getElementById('homeTotalExpenses');
+    const incomeEl = document.getElementById('homeTotalIncome');
+    const savingsEl = document.getElementById('homeTotalSavings');
+    const payoffEl = document.getElementById('homeTotalPayoffs');
+    
+    if (expenseEl) expenseEl.textContent = `₹${totalExpense.toFixed(2)}`;
+    if (incomeEl) incomeEl.textContent = `₹${totalIncome.toFixed(2)}`;
+    if (savingsEl) savingsEl.textContent = `₹${totalSavings.toFixed(2)}`;
+    if (payoffEl) payoffEl.textContent = `₹${totalPayoff.toFixed(2)}`;
+}
+
+/**
+ * Render monthly transaction list
+ */
+function renderMonthlyTransactionList(year, month) {
+    const listContainer = document.getElementById('homeTransactionList');
+    
+    if (!listContainer) return;
+    
+    // Collect all transactions
+    const allTransactions = [];
+    if (appState.homeExpensesByDate) {
+        Object.entries(appState.homeExpensesByDate).forEach(([date, expenses]) => {
+            expenses.forEach(expense => {
+                allTransactions.push({
+                    date: date,
+                    type: expense.type || expense.Type || 'Expense',
+                    category: expense.category || expense.Category || 'Uncategorized',
+                    amount: parseFloat(expense.amount || expense.Amount || 0),
+                    notes: expense.notes || expense.Notes || ''
+                });
+            });
+        });
+    }
+    
+    // Sort by date (newest first)
+    allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // Render
+    if (allTransactions.length === 0) {
+        listContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <p>No transactions for this month</p>
+            </div>
+        `;
+    } else {
+        listContainer.innerHTML = allTransactions.map(txn => {
+            const displayDate = formatDateForDisplay(txn.date);
+            return `
+                <div class="transaction-card">
+                    <div class="transaction-card-left">
+                        <div class="transaction-date">${displayDate}</div>
+                        <div class="transaction-category">${txn.category}</div>
+                        <span class="transaction-type-badge ${txn.type.toLowerCase()}">${txn.type}</span>
+                    </div>
+                    <div class="transaction-amount">₹${txn.amount.toFixed(2)}</div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+// ====================================================
 // PAGE NAVIGATION HANDLER
 // ====================================================
 
@@ -1088,6 +1361,20 @@ function setupPageNavigation() {
         });
     });
 
+    // Show dashboard by default on initial load
+    const dashboardPage = document.getElementById('dashboard-page');
+    const dashboardBtn = document.querySelector('.page-nav-btn[data-page="dashboard"]');
+    
+    if (dashboardPage) {
+        dashboardPage.style.display = 'block';
+        console.log('[PAGE_NAV] Dashboard set as initial page');
+    }
+    
+    if (dashboardBtn) {
+        dashboardBtn.classList.add('active');
+        console.log('[PAGE_NAV] Dashboard button marked as active');
+    }
+
     console.log('[PAGE_NAV] Page navigation initialized with', pageNavBtns.length, 'buttons and', pages.length, 'pages');
 }
 
@@ -1105,3 +1392,768 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Log app initialization for debugging
 console.log('Expense Manager app script loaded');
+
+// ====================================================
+// ADD SCREEN FUNCTIONS (REFACTORED)
+// ====================================================
+
+let addScreenState = {
+    currentTab: 'expenses',
+    expenseRows: [],
+    monthlyRows: {
+        income: [],
+        savings: [],
+        payoff: []
+    },
+    rowCounter: 0
+};
+
+/**
+ * Initialize Add Screen
+ */
+function initializeAddScreen() {
+    console.log('[ADD_SCREEN] Initializing...');
+    
+    // Tab switching
+    const tabButtons = document.querySelectorAll('.add-tab');
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => switchAddTab(btn.dataset.tab));
+    });
+    
+    // Back button
+    const addBackBtn = document.getElementById('addBackBtn');
+    if (addBackBtn) {
+        addBackBtn.addEventListener('click', closeAddScreen);
+    }
+    
+    // Expenses tab buttons
+    const addExpenseRowBtn = document.getElementById('addExpenseRowBtn');
+    if (addExpenseRowBtn) {
+        addExpenseRowBtn.addEventListener('click', addExpenseRow);
+    }
+    
+    const expensesSaveBtn = document.getElementById('expensesSaveBtn');
+    if (expensesSaveBtn) {
+        expensesSaveBtn.addEventListener('click', saveExpenses);
+    }
+    
+    // Monthly tab buttons
+    const monthlySaveBtn = document.getElementById('monthlySaveBtn');
+    if (monthlySaveBtn) {
+        monthlySaveBtn.addEventListener('click', saveMonthly);
+    }
+    
+    // Collapsible sections
+    const sectionHeaders = document.querySelectorAll('.section-header-collapsible');
+    sectionHeaders.forEach(header => {
+        header.addEventListener('click', () => toggleSection(header.dataset.section));
+    });
+    
+    console.log('[ADD_SCREEN] Initialized successfully');
+}
+
+/**
+ * Open Add Screen
+ */
+function openAddScreen() {
+    console.log('[ADD_SCREEN] Opening...');
+    console.log('[ADD_SCREEN] appState.categories available:', appState.categories ? appState.categories.length : 'undefined');
+    
+    // Ensure categories are loaded
+    if (!appState.categories || appState.categories.length === 0) {
+        console.log('[ADD_SCREEN] Categories not loaded, fetching now...');
+        fetchCategories().then(() => {
+            openAddScreenAfterCategories();
+        });
+    } else {
+        openAddScreenAfterCategories();
+    }
+}
+
+/**
+ * Open Add Screen after categories are loaded
+ */
+function openAddScreenAfterCategories() {
+    // Switch to add page
+    const addPage = document.getElementById('add-page');
+    if (addPage) {
+        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+        addPage.style.display = 'block';
+        
+        // Reset to expenses tab
+        resetAddScreen();
+        switchAddTab('expenses');
+    }
+}
+
+/**
+ * Close Add Screen
+ */
+function closeAddScreen() {
+    console.log('[ADD_SCREEN] Closing...');
+    
+    // Navigate to home
+    const homeNavBtn = document.querySelector('.page-nav-btn[data-page="dashboard"]');
+    if (homeNavBtn) {
+        homeNavBtn.click();
+    }
+}
+
+/**
+ * Reset Add Screen
+ */
+function resetAddScreen() {
+    console.log('[ADD_SCREEN] Resetting...');
+    
+    // Reset state
+    addScreenState.expenseRows = [];
+    addScreenState.monthlyRows = {
+        income: [],
+        savings: [],
+        payoff: []
+    };
+    addScreenState.rowCounter = 0;
+    
+    // Set default dates
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    
+    document.getElementById('expensesDate').value = dateStr;
+    document.getElementById('monthlyMonthPicker').value = monthStr;
+    
+    // Clear and initialize expenses tab (1 row)
+    document.getElementById('expenseRowsContainer').innerHTML = '';
+    addExpenseRow();
+    
+    // Clear and initialize monthly sections (1 row each)
+    document.getElementById('incomeMonthlyRows').innerHTML = '';
+    document.getElementById('savingsMonthlyRows').innerHTML = '';
+    document.getElementById('payoffMonthlyRows').innerHTML = '';
+    
+    addMonthlyRow('income');
+    addMonthlyRow('savings');
+    addMonthlyRow('payoff');
+    
+    // Expand Income section by default
+    expandSection('income');
+    
+    // Update save buttons
+    updateSaveButtonState();
+}
+
+/**
+ * Switch tabs
+ */
+function switchAddTab(tabName) {
+    console.log('[ADD_SCREEN] Switching to tab:', tabName);
+    
+    addScreenState.currentTab = tabName;
+    
+    // Update tab buttons
+    document.querySelectorAll('.add-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    
+    // Update tab content
+    document.querySelectorAll('.add-tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === tabName + 'TabContent');
+    });
+    
+    // Update save button state
+    updateSaveButtonState();
+}
+
+/**
+ * Toggle collapsible section
+ */
+function toggleSection(sectionName) {
+    const content = document.getElementById(sectionName + 'SectionContent');
+    const arrow = document.querySelector(`[data-section="${sectionName}"] .collapse-arrow`);
+    
+    if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        arrow.textContent = '▼';
+    } else {
+        content.classList.add('collapsed');
+        arrow.textContent = '▶';
+    }
+}
+
+/**
+ * Expand section
+ */
+function expandSection(sectionName) {
+    const content = document.getElementById(sectionName + 'SectionContent');
+    const arrow = document.querySelector(`[data-section="${sectionName}"] .collapse-arrow`);
+    
+    if (content) {
+        content.classList.remove('collapsed');
+        if (arrow) arrow.textContent = '▼';
+    }
+}
+
+/**
+ * Add expense row
+ */
+function addExpenseRow() {
+    const container = document.getElementById('expenseRowsContainer');
+    const rowId = addScreenState.rowCounter++;
+    const isFirstRow = addScreenState.expenseRows.length === 0;
+    
+    const row = document.createElement('tr');
+    row.className = 'expense-row';
+    row.dataset.rowId = rowId;
+    row.dataset.type = 'expense';
+    
+    row.innerHTML = `
+        <td data-label="Category">
+            <select class="row-category" data-row-id="${rowId}">
+                <option value="">Select category</option>
+            </select>
+        </td>
+        <td data-label="Amount">
+            <input type="number" class="row-amount" data-row-id="${rowId}" placeholder="0.00" step="0.01" min="0">
+        </td>
+        <td data-label="Notes">
+            <input type="text" class="row-notes" data-row-id="${rowId}" placeholder="Optional">
+        </td>
+        <td data-label="Action">
+            <button type="button" class="remove-btn" ${isFirstRow ? 'disabled' : ''} onclick="removeExpenseRow(${rowId})">✕</button>
+        </td>
+    `;
+    
+    container.appendChild(row);
+    
+    // Populate categories
+    const categorySelect = row.querySelector('.row-category');
+    console.log('[ADD_SCREEN] addExpenseRow: Populating categories for expense row');
+    
+    // Try to find expense categories - database uses 'Expenses' (plural)
+    const typesToTry = ['Expenses', 'Expense', 'expense'];
+    
+    for (let typeVariation of typesToTry) {
+        populateCategoriesByType(categorySelect, typeVariation);
+        if (categorySelect.options.length > 1) { // More than just the "Select category" option
+            console.log(`[ADD_SCREEN] ✓ Found categories with type: "${typeVariation}"`);
+            break;
+        }
+    }
+    
+    // Add to state
+    addScreenState.expenseRows.push(rowId);
+    
+    // Add input listeners for enable logic
+    const inputs = row.querySelectorAll('input, select');
+    console.log(`[ADD_SCREEN] Row ${rowId}: Found ${inputs.length} input/select elements`);
+    
+    inputs.forEach((input, index) => {
+        console.log(`[ADD_SCREEN] Row ${rowId}: Attaching listeners to input ${index}:`, input.className);
+        
+        input.addEventListener('input', () => {
+            console.log(`[ADD_SCREEN] Row ${rowId}: input event triggered`);
+            checkExpenseRowInput();
+            updateSaveButtonState();
+        });
+        
+        input.addEventListener('change', () => {
+            console.log(`[ADD_SCREEN] Row ${rowId}: change event triggered`);
+            checkExpenseRowInput();
+            updateSaveButtonState();
+        });
+    });
+    
+    console.log('[ADD_SCREEN] Added expense row:', rowId);
+}
+
+/**
+ * Remove expense row
+ */
+function removeExpenseRow(rowId) {
+    const row = document.querySelector(`.expense-row[data-row-id="${rowId}"]`);
+    if (row) {
+        row.remove();
+        addScreenState.expenseRows = addScreenState.expenseRows.filter(id => id !== rowId);
+        checkExpenseRowInput();
+        updateSaveButtonState();
+        console.log('[ADD_SCREEN] Removed expense row:', rowId);
+    }
+}
+
+/**
+ * Check if any expense row has input (to enable + button)
+ */
+function checkExpenseRowInput() {
+    const rows = document.querySelectorAll('.expense-row');
+    let hasInput = false;
+    
+    console.log('[ADD_SCREEN] checkExpenseRowInput: Checking', rows.length, 'expense rows');
+    
+    rows.forEach((row, index) => {
+        const categorySelect = row.querySelector('.row-category');
+        const amountInput = row.querySelector('.row-amount');
+        const notesInput = row.querySelector('.row-notes');
+        
+        const category = categorySelect ? categorySelect.value : '';
+        const amount = amountInput ? amountInput.value : '';
+        const notes = notesInput ? notesInput.value : '';
+        
+        console.log(`[ADD_SCREEN] Row ${index}: category="${category}", amount="${amount}", notes="${notes}"`);
+        
+        if (category || amount || notes) {
+            hasInput = true;
+        }
+    });
+    
+    const addBtn = document.getElementById('addExpenseRowBtn');
+    if (addBtn) {
+        addBtn.disabled = !hasInput;
+        console.log(`[ADD_SCREEN] Add button state: disabled=${!hasInput}`);
+    }
+}
+
+
+/**
+ * Add monthly row
+ */
+function addMonthlyRow(sectionType) {
+    const container = document.getElementById(sectionType + 'MonthlyRows');
+    const rowId = addScreenState.rowCounter++;
+    
+    const row = document.createElement('tr');
+    row.className = 'monthly-row';
+    row.dataset.rowId = rowId;
+    row.dataset.type = sectionType;
+    
+    const isFirstRow = addScreenState.monthlyRows[sectionType].length === 0;
+    
+    row.innerHTML = `
+        <td data-label="Category">
+            <select class="row-category" data-row-id="${rowId}">
+                <option value="">Select category</option>
+            </select>
+        </td>
+        <td data-label="Amount">
+            <input type="number" class="row-amount" data-row-id="${rowId}" placeholder="0.00" step="0.01" min="0">
+        </td>
+        <td data-label="Notes">
+            <input type="text" class="row-notes" data-row-id="${rowId}" placeholder="Optional">
+        </td>
+    `;
+    
+    container.appendChild(row);
+    
+    // Populate categories
+    const categorySelect = row.querySelector('.row-category');
+    populateCategoriesByType(categorySelect, sectionType);
+    
+    // Add to state
+    addScreenState.monthlyRows[sectionType].push(rowId);
+    
+    // Add input listeners
+    const inputs = row.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        input.addEventListener('input', updateSaveButtonState);
+        input.addEventListener('change', updateSaveButtonState);
+    });
+    
+    console.log('[ADD_SCREEN] Added monthly row:', sectionType, rowId);
+}
+
+/**
+ * Remove monthly row
+ */
+function removeMonthlyRow(rowId, sectionType) {
+    const row = document.querySelector(`.monthly-row[data-row-id="${rowId}"]`);
+    if (row) {
+        row.remove();
+        addScreenState.monthlyRows[sectionType] = addScreenState.monthlyRows[sectionType].filter(id => id !== rowId);
+        updateSaveButtonState();
+        console.log('[ADD_SCREEN] Removed monthly row:', sectionType, rowId);
+    }
+}
+
+/**
+ * Populate categories by type
+ */
+function populateCategoriesByType(selectElement, type) {
+    if (!selectElement) {
+        console.warn('[ADD_SCREEN] selectElement is null');
+        return;
+    }
+    
+    if (!appState.categories || appState.categories.length === 0) {
+        console.warn('[ADD_SCREEN] appState.categories is empty or undefined', appState.categories);
+        selectElement.innerHTML = '<option value="">Loading categories...</option>';
+        return;
+    }
+    
+    selectElement.innerHTML = '<option value="">Select category</option>';
+    
+    // Log all available types
+    const availableTypes = [...new Set(appState.categories.map(cat => cat.type))];
+    console.log(`[ADD_SCREEN] Available category types in appState:`, availableTypes);
+    console.log(`[ADD_SCREEN] Looking for type: "${type}"`);
+    console.log(`[ADD_SCREEN] All categories:`, appState.categories);
+    
+    const filtered = appState.categories.filter(cat => {
+        const catType = cat.type ? cat.type.toLowerCase() : '';
+        const typeMatch = catType === type.toLowerCase();
+        console.log(`[ADD_SCREEN] Category "${cat.name}" has type "${cat.type}" (lowercase: "${catType}") - Match? ${typeMatch}`);
+        return typeMatch;
+    });
+    
+    console.log(`[ADD_SCREEN] RESULT: Found ${filtered.length} categories for type "${type}"`, filtered);
+    
+    filtered.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        selectElement.appendChild(option);
+    });
+    
+    if (filtered.length === 0) {
+        console.warn(`[ADD_SCREEN] ⚠️  NO categories found for type: ${type}`);
+    }
+}
+
+/**
+ * Update save button state
+ */
+/**
+ * Update save button state
+ */
+function updateSaveButtonState() {
+    console.log('[ADD_SCREEN] updateSaveButtonState called, currentTab:', addScreenState.currentTab);
+    
+    if (addScreenState.currentTab === 'expenses') {
+        const saveBtn = document.getElementById('expensesSaveBtn');
+        const hasValidRow = hasValidExpenseRow();
+        console.log('[ADD_SCREEN] Expenses tab: hasValidRow =', hasValidRow);
+        if (saveBtn) {
+            saveBtn.disabled = !hasValidRow;
+            console.log('[ADD_SCREEN] expensesSaveBtn disabled =', saveBtn.disabled);
+        }
+    } else {
+        const saveBtn = document.getElementById('monthlySaveBtn');
+        const hasValidRow = hasValidMonthlyRow();
+        console.log('[ADD_SCREEN] Monthly tab: hasValidRow =', hasValidRow);
+        if (saveBtn) {
+            saveBtn.disabled = !hasValidRow;
+            console.log('[ADD_SCREEN] monthlySaveBtn disabled =', saveBtn.disabled);
+        }
+    }
+}
+
+/**
+ * Check if there's at least one valid expense row
+ */
+function hasValidExpenseRow() {
+    const rows = document.querySelectorAll('.expense-row');
+    console.log('[ADD_SCREEN] hasValidExpenseRow: Checking', rows.length, 'expense rows');
+    
+    for (let row of rows) {
+        const categorySelect = row.querySelector('.row-category');
+        const amountInput = row.querySelector('.row-amount');
+        
+        if (!categorySelect || !amountInput) {
+            console.log('[ADD_SCREEN] hasValidExpenseRow: Missing elements');
+            continue;
+        }
+        
+        const category = categorySelect.value;
+        const amount = parseFloat(amountInput.value);
+        
+        console.log('[ADD_SCREEN] hasValidExpenseRow: category="' + category + '", amount=' + amount + ', valid=' + (category && !isNaN(amount) && amount >= 0));
+        
+        if (category && !isNaN(amount) && amount >= 0) {
+            console.log('[ADD_SCREEN] hasValidExpenseRow: Found valid row! Returning true');
+            return true;
+        }
+    }
+    
+    console.log('[ADD_SCREEN] hasValidExpenseRow: No valid rows found');
+    return false;
+}
+
+/**
+ * Check if there's at least one valid monthly row
+ */
+function hasValidMonthlyRow() {
+    const rows = document.querySelectorAll('.monthly-row');
+    
+    for (let row of rows) {
+        const categorySelect = row.querySelector('.row-category');
+        const amountInput = row.querySelector('.row-amount');
+        
+        if (!categorySelect || !amountInput) continue;
+        
+        const category = categorySelect.value;
+        const amount = parseFloat(amountInput.value);
+        
+        if (category && !isNaN(amount) && amount >= 0) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Save expenses
+ */
+async function saveExpenses() {
+    console.log('[ADD_SCREEN] saveExpenses called');
+    
+    const dateInput = document.getElementById('expensesDate');
+    const date = dateInput.value;
+    
+    console.log('[ADD_SCREEN] Date:', date);
+    
+    if (!date) {
+        showToast('Please select a date', 'error');
+        return;
+    }
+    
+    // Collect all valid rows
+    const rows = document.querySelectorAll('.expense-row');
+    const expenses = [];
+    
+    console.log('[ADD_SCREEN] Found expense rows:', rows.length);
+    
+    rows.forEach((row, index) => {
+        const categorySelect = row.querySelector('.row-category');
+        const amountInput = row.querySelector('.row-amount');
+        const notesInput = row.querySelector('.row-notes');
+        
+        console.log(`[ADD_SCREEN] Row ${index}:`, {
+            categorySelect: !!categorySelect,
+            amountInput: !!amountInput,
+            notesInput: !!notesInput
+        });
+        
+        if (!categorySelect || !amountInput || !notesInput) {
+            console.warn(`[ADD_SCREEN] Row ${index} missing elements`);
+            return;
+        }
+        
+        const category = categorySelect.value;
+        const amount = parseFloat(amountInput.value);
+        const notes = notesInput.value;
+        
+        console.log(`[ADD_SCREEN] Row ${index} data:`, { category, amount, notes });
+        
+        if (category && !isNaN(amount) && amount >= 0) {
+            expenses.push({
+                type: 'Expense',
+                category: category,
+                amount: amount,
+                notes: notes || ''
+            });
+        }
+    });
+    
+    console.log('[ADD_SCREEN] Collected expenses:', expenses);
+    
+    if (expenses.length === 0) {
+        showToast('Please add at least one valid expense', 'error');
+        return;
+    }
+    
+    console.log('[ADD_SCREEN] Saving expenses:', expenses);
+    
+    // Save using existing API
+    try {
+        const saveBtn = document.getElementById('expensesSaveBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        
+        const payload = {
+            action: 'saveExpenses',
+            date: date,
+            expenses: expenses
+        };
+        
+        console.log('[ADD_SCREEN] Sending payload:', JSON.stringify(payload, null, 2));
+        
+        const response = await fetch(CONFIG.BACKEND_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json();
+        
+        console.log('[ADD_SCREEN] Save response status:', response.status);
+        console.log('[ADD_SCREEN] Save result:', result);
+        console.log('[ADD_SCREEN] Result success?', result.success);
+        console.log('[ADD_SCREEN] Result message:', result.message);
+        console.log('[ADD_SCREEN] Full result object:', JSON.stringify(result, null, 2));
+        
+        if (result.success) {
+            showToast(`${expenses.length} expense(s) saved successfully`, 'success');
+            setTimeout(() => {
+                closeAddScreen();
+                if (appState.homeSelectedMonth) {
+                    loadHomeData();
+                }
+            }, 1500);
+        } else {
+            showToast('Failed to save. Please try again.', 'error');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+        }
+    } catch (error) {
+        console.error('[ADD_SCREEN] Error saving expenses:', error);
+        showToast('Failed to save. Please try again.', 'error');
+        const saveBtn = document.getElementById('expensesSaveBtn');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+    }
+}
+
+/**
+ * Save monthly transactions
+ */
+async function saveMonthly() {
+    console.log('[ADD_SCREEN] saveMonthly called');
+    
+    const monthPicker = document.getElementById('monthlyMonthPicker');
+    const monthValue = monthPicker.value;
+    
+    console.log('[ADD_SCREEN] Month:', monthValue);
+    
+    if (!monthValue) {
+        showToast('Please select a month', 'error');
+        return;
+    }
+    
+    const [year, month] = monthValue.split('-');
+    const date = `${year}-${month}-01`;
+    
+    // Collect all valid rows
+    const rows = document.querySelectorAll('.monthly-row');
+    const transactions = [];
+    
+    console.log('[ADD_SCREEN] Found monthly rows:', rows.length);
+    
+    rows.forEach((row, index) => {
+        const categorySelect = row.querySelector('.row-category');
+        const amountInput = row.querySelector('.row-amount');
+        const notesInput = row.querySelector('.row-notes');
+        const type = row.dataset.type;
+        
+        console.log(`[ADD_SCREEN] Monthly row ${index}:`, {
+            categorySelect: !!categorySelect,
+            amountInput: !!amountInput,
+            notesInput: !!notesInput,
+            type: type
+        });
+        
+        if (!categorySelect || !amountInput || !notesInput) {
+            console.warn(`[ADD_SCREEN] Monthly row ${index} missing elements`);
+            return;
+        }
+        
+        const category = categorySelect.value;
+        const amount = parseFloat(amountInput.value);
+        const notes = notesInput.value;
+        
+        console.log(`[ADD_SCREEN] Monthly row ${index} data:`, { category, amount, notes, type });
+        
+        if (category && !isNaN(amount) && amount >= 0) {
+            // Capitalize first letter of type
+            const typeCapitalized = type.charAt(0).toUpperCase() + type.slice(1);
+            
+            transactions.push({
+                type: typeCapitalized,
+                category: category,
+                amount: amount,
+                notes: notes || ''
+            });
+        }
+    });
+    
+    console.log('[ADD_SCREEN] Collected transactions:', transactions);
+    
+    if (transactions.length === 0) {
+        showToast('Please add at least one valid transaction', 'error');
+        return;
+    }
+    
+    console.log('[ADD_SCREEN] Saving monthly transactions:', transactions);
+    
+    // Save using existing API
+    try {
+        const saveBtn = document.getElementById('monthlySaveBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        
+        const payload = {
+            action: 'saveExpenses',
+            date: date,
+            expenses: transactions
+        };
+        
+        console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
+        
+        const response = await fetch(CONFIG.BACKEND_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json();
+        
+        console.log('[ADD_SCREEN] Monthly save response status:', response.status);
+        console.log('[ADD_SCREEN] Monthly save result:', result);
+        console.log('[ADD_SCREEN] Result success?', result.success);
+        console.log('[ADD_SCREEN] Result message:', result.message);
+        console.log('[ADD_SCREEN] Full result object:', JSON.stringify(result, null, 2));
+        
+        if (result.success) {
+            showToast(`${transactions.length} transaction(s) saved successfully`, 'success');
+            setTimeout(() => {
+                closeAddScreen();
+                if (appState.homeSelectedMonth) {
+                    loadHomeData();
+                }
+            }, 1500);
+        } else {
+            showToast('Failed to save. Please try again.', 'error');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+        }
+    } catch (error) {
+        console.error('[ADD_SCREEN] Error saving transactions:', error);
+        showToast('Failed to save. Please try again.', 'error');
+        const saveBtn = document.getElementById('monthlySaveBtn');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+    }
+}
+
+/**
+ * Show toast notification
+ */
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    
+    toast.textContent = message;
+    toast.className = `toast ${type}`;
+    toast.classList.remove('hidden');
+    toast.classList.add('show');
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 300);
+    }, 3000);
+}
+

@@ -13,23 +13,20 @@
         <header class="app-header">
             <div class="header-content">
                 <h1 class="app-title">Expense Manager</h1>
+                
+                <!-- PAGE NAVIGATION IN HEADER -->
+                <nav class="page-nav">
+                    <button class="page-nav-btn active" data-page="dashboard">📊 Dashboard</button>
+                    <button class="page-nav-btn" data-page="budget">💰 Budget</button>
+                    <button class="page-nav-btn" data-page="settings">⚙️ Settings</button>
+                </nav>
+                
                 <nav class="header-actions">
                     <button class="header-btn" id="notificationBtn" aria-label="Notifications" title="Notifications">🔔</button>
                     <button class="header-btn logout-btn" id="logoutBtn" aria-label="Logout" title="Logout">🚪 Logout</button>
                 </nav>
             </div>
         </header>
-
-        <!-- PAGE NAVIGATION -->
-        <nav class="page-nav">
-            <button class="page-nav-btn active" data-page="dashboard">📊 Dashboard</button>
-            <button class="page-nav-btn" data-page="calendar">📅 Calendar</button>
-            <button class="page-nav-btn" data-page="budget">💰 Budget</button>
-            <button class="page-nav-btn" data-page="settings">⚙️ Settings</button>
-        </nav>
-
-        <!-- MAIN CONTENT AREA -->
-        <main class="main-content">
 
         <!-- MAIN CONTENT AREA -->
         <main class="main-content">
@@ -138,106 +135,61 @@
                 </div>
             </div>
 
-            <!-- ====== PAGE 2: DASHBOARD ====== -->
+            <!-- ====== PAGE 2: HOME (Monthly Overview) ====== -->
             <div class="page" id="dashboard-page" data-page="dashboard">
-                <div class="dashboard-container">
-                    <div class="dashboard-header">
-                        <h2>Dashboard</h2>
-                        <div class="month-selector">
-                            <select id="dashboardMonth">
-                                <option value="current">Current Month</option>
-                                <option value="last">Last Month</option>
-                                <option value="ytd">Year to Date</option>
-                                <option value="custom">Custom Period</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="home-main-container">
+                    
+                    <!-- MONTH SELECTOR -->
+                    <section class="home-month-selector">
+                        <button class="btn btn-nav" id="homePrevMonth" aria-label="Previous month">❮</button>
+                        <input type="month" id="homeMonthPicker" class="home-month-picker">
+                        <button class="btn btn-nav" id="homeNextMonth" aria-label="Next month">❯</button>
+                    </section>
 
-                    <!-- Monthly Summary -->
-                    <section class="dashboard-section">
+                    <!-- MONTHLY SUMMARY SECTION -->
+                    <section class="home-summary-section">
                         <h3>Monthly Summary</h3>
-                        <div class="summary-grid">
-                            <div class="summary-card">
-                                <div class="summary-label">Income</div>
-                                <div class="summary-amount">₹0</div>
-                                <div class="summary-sub">Budget: ₹0</div>
+                        <div class="home-summary-grid">
+                            <div class="home-summary-card expense-card">
+                                <div class="card-icon">💸</div>
+                                <div class="card-label">Expenses</div>
+                                <div class="card-amount" id="homeTotalExpenses">₹0</div>
                             </div>
-                            <div class="summary-card">
-                                <div class="summary-label">Expenses</div>
-                                <div class="summary-amount">₹0</div>
-                                <div class="summary-sub">Budget: ₹0</div>
+                            <div class="home-summary-card income-card">
+                                <div class="card-icon">💵</div>
+                                <div class="card-label">Income</div>
+                                <div class="card-amount" id="homeTotalIncome">₹0</div>
                             </div>
-                            <div class="summary-card">
-                                <div class="summary-label">Payoffs</div>
-                                <div class="summary-amount">₹0</div>
-                                <div class="summary-sub">Budget: ₹0</div>
+                            <div class="home-summary-card savings-card">
+                                <div class="card-icon">💰</div>
+                                <div class="card-label">Savings</div>
+                                <div class="card-amount" id="homeTotalSavings">₹0</div>
                             </div>
-                            <div class="summary-card highlight">
-                                <div class="summary-label">Savings</div>
-                                <div class="summary-amount">₹0</div>
-                                <div class="summary-sub">Target: ₹0</div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- Budget vs Actual -->
-                    <section class="dashboard-section">
-                        <h3>Budget vs Actual</h3>
-                        <div class="budget-comparison">
-                            <div class="comparison-item">
-                                <div class="comparison-label">Income</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <div class="comparison-values">₹0 / ₹0</div>
-                            </div>
-                            <div class="comparison-item">
-                                <div class="comparison-label">Expenses</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <div class="comparison-values">₹0 / ₹0</div>
-                            </div>
-                            <div class="comparison-item">
-                                <div class="comparison-label">Payoffs</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <div class="comparison-values">₹0 / ₹0</div>
+                            <div class="home-summary-card payoff-card">
+                                <div class="card-icon">🏦</div>
+                                <div class="card-label">Payoffs</div>
+                                <div class="card-amount" id="homeTotalPayoffs">₹0</div>
                             </div>
                         </div>
                     </section>
 
-                    <!-- Category Breakdown -->
-                    <section class="dashboard-section">
-                        <h3>Category Breakdown</h3>
-                        <div class="category-chart">
+                    <!-- TRANSACTION LIST SECTION -->
+                    <section class="home-transactions-section">
+                        <h3>Transactions</h3>
+                        <div id="homeTransactionList" class="home-transaction-list">
                             <!-- Will be populated by JS -->
+                            <div class="empty-state">
+                                <div class="empty-icon">📭</div>
+                                <p>No transactions for this month</p>
+                            </div>
                         </div>
                     </section>
 
-                    <!-- Annual Summary -->
-                    <section class="dashboard-section">
-                        <h3>Annual Summary</h3>
-                        <div class="annual-summary">
-                            <div class="summary-card">
-                                <div class="summary-label">YTD Income</div>
-                                <div class="summary-amount">₹0</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="summary-label">YTD Expenses</div>
-                                <div class="summary-amount">₹0</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="summary-label">YTD Payoffs</div>
-                                <div class="summary-amount">₹0</div>
-                            </div>
-                            <div class="summary-card highlight">
-                                <div class="summary-label">YTD Savings</div>
-                                <div class="summary-amount">₹0</div>
-                            </div>
-                        </div>
-                    </section>
+                    <!-- FLOATING ADD BUTTON -->
+                    <button class="btn-floating-add" id="homeAddBtn" aria-label="Add transaction">
+                        <span class="add-icon">+</span>
+                    </button>
+                    
                 </div>
             </div>
 
@@ -368,6 +320,143 @@
                     </section>
                 </div>
             </div>
+
+            <!-- ====== PAGE 5: ADD (NEW) ====== -->
+            <div class="page" id="add-page" data-page="add" style="display: none;">
+                <div class="add-page-container">
+                    
+                    <!-- HEADER -->
+                    <div class="add-header">
+                        <button class="btn-back" id="addBackBtn" aria-label="Back">←</button>
+                        <h2>Add</h2>
+                        <div class="header-spacer"></div>
+                    </div>
+
+                    <!-- TABS -->
+                    <div class="add-tabs">
+                        <button class="add-tab active" data-tab="expenses" id="tabExpenses">Expenses</button>
+                        <button class="add-tab" data-tab="monthly" id="tabMonthly">Monthly</button>
+                    </div>
+
+                    <!-- EXPENSES TAB CONTENT -->
+                    <div class="add-tab-content active" id="expensesTabContent">
+                        <div class="add-content-scroll">
+                            <div class="form-section">
+                                <label for="expensesDate">Date</label>
+                                <input type="date" id="expensesDate" class="form-input" required>
+                            </div>
+
+                            <div class="form-section">
+                                <table class="expense-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Amount</th>
+                                            <th>Notes</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expenseRowsContainer">
+                                        <!-- Rows will be added by JS -->
+                                    </tbody>
+                                </table>
+                                <button type="button" class="btn-add-row" id="addExpenseRowBtn" disabled>+ Add another expense</button>
+                            </div>
+                        </div>
+
+                        <div class="form-actions-fixed">
+                            <button type="button" class="btn btn-primary btn-save" id="expensesSaveBtn" disabled>Save</button>
+                        </div>
+                    </div>
+
+                    <!-- MONTHLY TAB CONTENT -->
+                    <div class="add-tab-content" id="monthlyTabContent">
+                        <div class="add-content-scroll">
+                            <div class="form-section">
+                                <label for="monthlyMonthPicker">Month</label>
+                                <input type="month" id="monthlyMonthPicker" class="form-input" required>
+                            </div>
+
+                            <!-- INCOME SECTION -->
+                            <div class="collapsible-section" data-section="income">
+                                <div class="section-header-collapsible" data-section="income">
+                                    <span class="section-icon">💵</span>
+                                    <span class="section-title">Income</span>
+                                    <span class="collapse-arrow">▼</span>
+                                </div>
+                                <div class="section-content" id="incomeSectionContent">
+                                    <table class="monthly-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Amount</th>
+                                                <th>Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="incomeMonthlyRows">
+                                            <!-- Rows added by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- SAVINGS SECTION -->
+                            <div class="collapsible-section" data-section="savings">
+                                <div class="section-header-collapsible" data-section="savings">
+                                    <span class="section-icon">💰</span>
+                                    <span class="section-title">Savings</span>
+                                    <span class="collapse-arrow">▼</span>
+                                </div>
+                                <div class="section-content collapsed" id="savingsSectionContent">
+                                    <table class="monthly-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Amount</th>
+                                                <th>Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="savingsMonthlyRows">
+                                            <!-- Rows added by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- PAYOFF SECTION -->
+                            <div class="collapsible-section" data-section="payoff">
+                                <div class="section-header-collapsible" data-section="payoff">
+                                    <span class="section-icon">🏦</span>
+                                    <span class="section-title">Payoffs</span>
+                                    <span class="collapse-arrow">▼</span>
+                                </div>
+                                <div class="section-content collapsed" id="payoffSectionContent">
+                                    <table class="monthly-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Amount</th>
+                                                <th>Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="payoffMonthlyRows">
+                                            <!-- Rows added by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions-fixed">
+                            <button type="button" class="btn btn-primary btn-save" id="monthlySaveBtn" disabled>Save</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- TOAST NOTIFICATION -->
+            <div id="toast" class="toast hidden"></div>
 
         </main>
 
