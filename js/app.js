@@ -34,7 +34,8 @@ let appState = {
     expensesByDate: {}, // Store fetched expenses in cache
     hasExpensesByDate: {}, // Quick lookup for which dates have expenses
     expenseRowCount: 2, // Track number of expense rows
-    activeEntryType: 'Expense'
+    activeEntryType: 'Expense',
+    isFetchingMonth: false // Flag to prevent duplicate month fetches
 };
 
 // ====================================================
@@ -42,8 +43,14 @@ let appState = {
 // ====================================================
 
 // Header/Menu elements
-const menuBtn = document.getElementById('menuBtn');
-const menuDropdown = document.getElementById('menuDropdown');
+const notificationBtn = document.getElementById('notificationBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+
+// Expense Management (Split View)
+const expenseDetailsSection = document.getElementById('expenseDetailsSection');
+const detailsTitle = document.getElementById('detailsTitle');
+const existingExpensesList = document.getElementById('existingExpensesList');
+const noExpensesMsg = document.getElementById('noExpensesMsg');
 
 // Calendar elements
 const monthYearDisplay = document.getElementById('monthYear');
@@ -52,21 +59,15 @@ const nextMonthBtn = document.getElementById('nextMonth');
 const calendarDatesContainer = document.getElementById('calendarDates');
 
 // Expense form elements
-const expenseFormSection = document.getElementById('expenseForm');
-const selectedDateDisplay = document.getElementById('selectedDateDisplay');
 const expenseEntryForm = document.getElementById('expenseEntryForm');
 const expenseRowsContainer = document.getElementById('expenseRows');
-const closeFormBtn = document.getElementById('closeForm');
 const cancelBtn = document.getElementById('cancelBtn');
 const saveBtnForm = document.getElementById('saveBtn');
 const addExpenseBtn = document.getElementById('addExpenseBtn');
 const statusMessage = document.getElementById('statusMessage');
+const detailsTabs = document.querySelectorAll('.details-tab');
+const detailsPanels = document.querySelectorAll('.details-panel');
 
-// View expenses elements
-const viewExpensesSection = document.getElementById('viewExpenses');
-const closeViewBtn = document.getElementById('closeViewBtn');
-const viewDateDisplay = document.getElementById('viewDateDisplay');
-const expensesList = document.getElementById('expensesList');
 
 // ====================================================
 // INITIALIZATION
@@ -77,6 +78,195 @@ const expensesList = document.getElementById('expensesList');
  */
 function toggleMenu() {
     menuDropdown.classList.toggle('hidden');
+}
+
+/**
+ * Close menu when clicking outside
+ */
+function closeMenuOnClickOutside(event) {
+    if (!menuBtn.contains(event.target) && !menuDropdown.contains(event.target)) {
+        menuDropdown.classList.add('hidden');
+    }
+}
+
+/**
+ * Toggle panel collapse/expand
+ */
+function togglePanelCollapse(event) {
+    const header = event.currentTarget;
+    const panelType = header.dataset.panel;
+    const panel = header.closest('.details-panel');
+    const content = panel.querySelector('.panel-content');
+    const icon = header.querySelector('.collapse-icon');
+    
+    // Toggle hidden class
+    content.classList.toggle('hidden');
+    
+    // Update icon and collapsed state
+    if (content.classList.contains('hidden')) {
+        icon.textContent = '▶';
+        panel.classList.remove('expanded');
+        panel.classList.add('collapsed');
+    } else {
+        icon.textContent = '▼';
+        panel.classList.add('expanded');
+        panel.classList.remove('collapsed');
+    }
+}
+
+// Switch between Add and Existing tabs
+function setDetailsTab(panel) {
+    detailsTabs.forEach(tab => {
+        const isActive = tab.dataset.panel === panel;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', isActive);
+    });
+
+    detailsPanels.forEach(p => {
+        const isActive = p.dataset.panel === panel;
+        p.classList.toggle('hidden-panel', !isActive);
+    });
+
+    // When switching to existing, load expenses for selected date
+    if (panel === 'view' && appState.selectedDate) {
+        loadExistingExpenses(appState.selectedDate);
+    }
+}
+
+/**
+ * Open Expense Details (No Modal - Permanent Split View)
+ * Updates the right side panel with selected date's details
+ */
+function openExpenseManagement(dateString) {
+    appState.selectedDate = dateString;
+    const dateDisplay = formatDateForDisplay(dateString);
+    detailsTitle.textContent = `Manage Expenses - ${dateDisplay}`;
+    
+    // Clear previous expenses display
+    existingExpensesList.innerHTML = '';
+    noExpensesMsg.style.display = 'none';
+    
+    // Load and display existing expenses for THIS specific date only
+    loadExistingExpenses(dateString);
+    
+    // Reset form for new entries
+    resetExpenseForm();
+
+    // Default to Add tab when a date is selected
+    setDetailsTab('entry');
+    
+    console.log(`Displaying expense details for ${dateString}`);
+}
+
+/**
+ * Close Expense Details (No-op for permanent split view)
+ */
+function closeExpenseManagement() {
+    // No-op: Details section is always visible
+}
+
+/**
+ * Load existing expenses for a specific date
+ */
+function loadExistingExpenses(dateString) {
+    // Check cache first
+    if (appState.expensesByDate[dateString]) {
+        displayExistingExpenses(appState.expensesByDate[dateString]);
+    } else {
+        // Fetch from backend
+        fetchExpensesForDate(dateString);
+    }
+}
+
+/**
+ * Fetch expenses for a specific date from backend
+ */
+async function fetchExpensesForDate(dateString) {
+    try {
+        // Show loading state
+        const expenseCountBadge = document.getElementById('expenseCountBadge');
+        const existingExpensesList = document.getElementById('existingExpensesList');
+        const noExpensesMsg = document.getElementById('noExpensesMsg');
+        
+        existingExpensesList.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #999;">Loading...</td></tr>';
+        
+        console.log(`Fetching expenses for ${dateString}...`);
+        const response = await fetch(CONFIG.BACKEND_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify({
+                action: 'getExpenses',
+                date: dateString
+            })
+        });
+        
+        const result = await response.json();
+        console.log('Fetch result:', result);
+        
+        if (result.success && result.expenses) {
+            appState.expensesByDate[dateString] = result.expenses;
+            appState.hasExpensesByDate[dateString] = result.expenses.length > 0;
+            displayExistingExpenses(result.expenses);
+            
+            // Update calendar to show indicator
+            renderCalendar();
+            console.log(`Successfully loaded ${result.expenses.length} expenses for ${dateString}`);
+        } else {
+            console.warn('Fetch failed or no expenses:', result.message);
+            displayExistingExpenses([]);
+        }
+    } catch (error) {
+        console.error('Error fetching expenses:', error);
+        noExpensesMsg.style.display = 'block';
+        noExpensesMsg.textContent = 'Error loading expenses';
+    }
+}
+
+/**
+ * Display existing expenses for the selected date
+ * Only shows expenses from appState.selectedDate
+ */
+function displayExistingExpenses(expenses) {
+    // Verify we're showing expenses for the correct date
+    const displayDate = appState.selectedDate;
+    const expenseCountBadge = document.getElementById('expenseCountBadge');
+    
+    if (!expenses || expenses.length === 0) {
+        noExpensesMsg.style.display = 'block';
+        existingExpensesList.innerHTML = '';
+        expenseCountBadge.style.display = 'none';
+        console.log(`No expenses found for ${displayDate}`);
+        return;
+    }
+    
+    // Mark this date as having expenses (for yellow dot indicator)
+    // selectedDate is already a string like "2025-12-31"
+    const selectedDateStr = typeof appState.selectedDate === 'string' 
+        ? appState.selectedDate 
+        : appState.selectedDate.toISOString().split('T')[0];
+    appState.hasExpensesByDate[selectedDateStr] = true;
+    console.log(`[DISPLAY_EXPENSES] Marked ${selectedDateStr} as having expenses`);
+    
+    noExpensesMsg.style.display = 'none';
+    
+    // Show badge with count
+    expenseCountBadge.textContent = expenses.length;
+    expenseCountBadge.style.display = 'inline-flex';
+    
+    // Build table rows with only this date's expenses
+    const rows = expenses.map((expense, index) => `
+        <tr>
+            <td>${expense.type || 'Expense'}</td>
+            <td>${expense.category || '-'}</td>
+            <td>₹${parseFloat(expense.amount).toFixed(2)}</td>
+            <td>${expense.notes || '-'}</td>
+        </tr>
+    `).join('');
+    
+    existingExpensesList.innerHTML = rows;
+    console.log(`Displaying ${expenses.length} expenses for ${displayDate}`);
 }
 
 /**
@@ -108,20 +298,38 @@ function initializeApp() {
 }
 
 /**
+ * Handle notification button click
+ */
+function handleNotificationClick() {
+    console.log('[HEADER] Notifications clicked');
+    alert('🔔 No new notifications');
+}
+
+/**
+ * Handle logout button click
+ */
+function handleLogout() {
+    console.log('[HEADER] Logout clicked');
+    if (confirm('Are you sure you want to logout?')) {
+        // TODO: Clear user session and redirect to login
+        alert('Logout functionality coming soon with Google Authentication');
+    }
+}
+
+/**
  * Setup all event listeners for buttons and form
  */
 function setupEventListeners() {
-    // Header menu
-    menuBtn.addEventListener('click', toggleMenu);
-    document.addEventListener('click', closeMenuOnClickOutside);
-    
     // Calendar navigation
     prevMonthBtn.addEventListener('click', goToPreviousMonth);
     nextMonthBtn.addEventListener('click', goToNextMonth);
     
+    // Header actions
+    notificationBtn.addEventListener('click', handleNotificationClick);
+    logoutBtn.addEventListener('click', handleLogout);
+    
     // Expense form
-    closeFormBtn.addEventListener('click', closeExpenseForm);
-    cancelBtn.addEventListener('click', closeExpenseForm);
+    cancelBtn.addEventListener('click', resetExpenseForm);
     expenseEntryForm.addEventListener('submit', saveExpenses);
     addExpenseBtn.addEventListener('click', addExpenseRow);
 
@@ -129,9 +337,14 @@ function setupEventListeners() {
     document.querySelectorAll('.entry-tab').forEach(btn => {
         btn.addEventListener('click', () => setEntryType(btn.dataset.type));
     });
-    
-    // View expenses
-    closeViewBtn.addEventListener('click', closeViewExpenses);
+
+    // Details tabs (Add vs Existing)
+    detailsTabs.forEach(tab => {
+        tab.addEventListener('click', () => setDetailsTab(tab.dataset.panel));
+    });
+
+    // Default tab
+    setDetailsTab('entry');
 }
 
 // ====================================================
@@ -139,12 +352,126 @@ function setupEventListeners() {
 // ====================================================
 
 /**
+ * Fetch all expenses for the current month to show indicators
+ * Falls back to fetching expenses for each date individually
+ */
+async function fetchExpensesForMonth() {
+    console.log('[MONTH_FETCH] Function called - starting execution');
+    try {
+        const year = appState.currentDate.getFullYear();
+        const month = appState.currentDate.getMonth() + 1; // 1-12
+        
+        console.log(`[MONTH_FETCH] Starting fetch for month: ${year}-${String(month).padStart(2, '0')}`);
+        const response = await fetch(CONFIG.BACKEND_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify({
+                action: 'getExpensesByMonth',
+                year: year,
+                month: month
+            })
+        });
+        
+        const result = await response.json();
+        console.log('[MONTH_FETCH] Response:', result);
+        
+        if (result.success && result.expensesByDate && typeof result.expensesByDate === 'object') {
+            console.log(`[MONTH_FETCH] Got expensesByDate from backend`);
+            // Backend returns object with dates as keys: {"2025-12-30": [...], "2025-12-31": [...]}
+            Object.keys(result.expensesByDate).forEach(dateKey => {
+                const expenses = result.expensesByDate[dateKey];
+                if (Array.isArray(expenses) && expenses.length > 0) {
+                    appState.hasExpensesByDate[dateKey] = true;
+                    console.log(`[MONTH_FETCH] Marked ${dateKey} as having ${expenses.length} expenses`);
+                }
+            });
+            console.log(`[MONTH_FETCH] Updated hasExpensesByDate:`, appState.hasExpensesByDate);
+            
+            // Re-render to show dots
+            renderCalendar();
+        } else if (result.success && result.expenses && Array.isArray(result.expenses)) {
+            console.log(`[MONTH_FETCH] Found ${result.expenses.length} total expenses`);
+            // Group by date and update hasExpensesByDate
+            result.expenses.forEach(expense => {
+                const dateKey = expense.date || expense.Date;
+                if (dateKey) {
+                    appState.hasExpensesByDate[dateKey] = true;
+                }
+            });
+            console.log(`[MONTH_FETCH] Updated hasExpensesByDate:`, appState.hasExpensesByDate);
+            renderCalendar();
+        } else {
+            console.warn('[MONTH_FETCH] getExpensesByMonth not available. Falling back to individual date fetch...');
+            await fallbackFetchAllDates();
+        }
+    } catch (error) {
+        console.error('[MONTH_FETCH] Error fetching month expenses:', error);
+        console.log('[MONTH_FETCH] Falling back to individual date fetch...');
+        await fallbackFetchAllDates();
+    }
+}
+
+/**
+ * Fallback: Fetch expenses for each date in the current month (parallel)
+ */
+async function fallbackFetchAllDates() {
+    const year = appState.currentDate.getFullYear();
+    const month = appState.currentDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    console.log(`[FALLBACK_FETCH] Fetching all dates in ${year}-${String(month + 1).padStart(2, '0')} (${daysInMonth} days)`);
+    
+    // Create array of all dates to fetch
+    const datesToFetch = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        datesToFetch.push(dateStr);
+    }
+    
+    // Fetch all dates in parallel (max 5 at a time to avoid overwhelming backend)
+    const batchSize = 5;
+    for (let i = 0; i < datesToFetch.length; i += batchSize) {
+        const batch = datesToFetch.slice(i, i + batchSize);
+        const promises = batch.map(dateStr => 
+            fetch(CONFIG.BACKEND_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8'
+                },
+                body: JSON.stringify({
+                    action: 'getExpenses',
+                    date: dateStr
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success && result.expenses && result.expenses.length > 0) {
+                    appState.hasExpensesByDate[dateStr] = true;
+                    console.log(`[FALLBACK_FETCH] Date ${dateStr} has ${result.expenses.length} expenses`);
+                }
+            })
+            .catch(error => console.error(`[FALLBACK_FETCH] Error fetching ${dateStr}:`, error))
+        );
+        
+        await Promise.all(promises);
+    }
+    
+    // Re-render calendar once after all data is loaded to show all dots
+    console.log('[FALLBACK_FETCH] Completed. Rendering calendar with all dots...');
+    renderCalendar();
+}
+
+/**
  * Render the calendar for the current month
  * Creates calendar grid with dates, navigation, and indicators
  */
-function renderCalendar() {
+async function renderCalendar() {
     const year = appState.currentDate.getFullYear();
     const month = appState.currentDate.getMonth();
+    
+    console.log(`[RENDER_CALENDAR] Starting render for ${CONFIG.MONTH_NAMES[month]} ${year}`);
     
     // Update month/year display
     monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month]} ${year}`;
@@ -177,8 +504,9 @@ function renderCalendar() {
         const dateString = formatDateToString(dateObj);
         const isToday = dateObj.toDateString() === today.toDateString();
         const hasExpense = appState.hasExpensesByDate[dateString] || false;
+        const isSelected = appState.selectedDate === dateString;
         
-        const dateDiv = createDateCell(day, false, dateString, isToday, hasExpense);
+        const dateDiv = createDateCell(day, false, dateString, isToday, hasExpense, isSelected);
         dateElements.push(dateDiv);
     }
     
@@ -195,6 +523,14 @@ function renderCalendar() {
     });
     
     console.log(`Calendar rendered for ${CONFIG.MONTH_NAMES[month]} ${year}`);
+    
+    // Fetch all month's expenses in the background
+    setTimeout(() => {
+        console.log('[RENDER_CALENDAR] Starting deferred background fetch for expenses...');
+        console.log('[RENDER_CALENDAR] fetchExpensesForMonth function exists?', typeof fetchExpensesForMonth);
+        const result = fetchExpensesForMonth();
+        console.log('[RENDER_CALENDAR] Function returned:', result);
+    }, 100);
 }
 
 /**
@@ -204,9 +540,10 @@ function renderCalendar() {
  * @param {string} dateString - Full date string (YYYY-MM-DD)
  * @param {boolean} isToday - Whether this is today's date
  * @param {boolean} hasExpense - Whether this date has expenses
+ * @param {boolean} isSelected - Whether this date is selected by user
  * @returns {HTMLElement} - The date cell element
  */
-function createDateCell(day, isOtherMonth = false, dateString = null, isToday = false, hasExpense = false) {
+function createDateCell(day, isOtherMonth = false, dateString = null, isToday = false, hasExpense = false, isSelected = false) {
     const dateDiv = document.createElement('div');
     dateDiv.className = 'calendar-date';
     dateDiv.textContent = day;
@@ -221,6 +558,9 @@ function createDateCell(day, isOtherMonth = false, dateString = null, isToday = 
     if (hasExpense && !isOtherMonth) {
         dateDiv.classList.add('has-expense');
     }
+    if (isSelected) {
+        dateDiv.classList.add('selected');
+    }
     
     // Add click handler for selecting dates (only for current month)
     if (!isOtherMonth) {
@@ -234,12 +574,15 @@ function createDateCell(day, isOtherMonth = false, dateString = null, isToday = 
 
 /**
  * Select a date from the calendar
- * Opens the expense entry form
+ * Opens the expense management (split/tabbed view)
  * @param {string} dateString - Date in YYYY-MM-DD format
  * @param {HTMLElement} dateCell - The clicked date cell
  */
 function selectDate(dateString, dateCell) {
-    // Remove previous selection highlight
+    // Update app state with selected date
+    appState.selectedDate = dateString;
+    
+    // Remove previous selection highlight (except today which keeps its style)
     document.querySelectorAll('.calendar-date.selected').forEach(cell => {
         cell.classList.remove('selected');
     });
@@ -247,17 +590,8 @@ function selectDate(dateString, dateCell) {
     // Add selection to clicked cell
     dateCell.classList.add('selected');
     
-    // Update app state
-    appState.selectedDate = dateString;
-    
-    // Update form display
-    selectedDateDisplay.textContent = `Date: ${formatDateForDisplay(dateString)}`;
-    
-    // Fetch existing expenses for this date
-    fetchExpensesForDate(dateString);
-    
-    // Show expense form
-    openExpenseForm();
+    // Open expense management view (split/tabbed)
+    openExpenseManagement(dateString);
     
     console.log(`Date selected: ${dateString}`);
 }
@@ -316,6 +650,7 @@ function createAndAppendExpenseRow(rowNumber) {
     const categoryTd = document.createElement('td');
     const categorySelect = document.createElement('select');
     categorySelect.name = `category-${rowNumber}`;
+    categorySelect.className = 'expense-row';
     populateCategoryOptions(categorySelect);
     categoryTd.appendChild(categorySelect);
     
@@ -327,6 +662,7 @@ function createAndAppendExpenseRow(rowNumber) {
     amountInput.placeholder = 'Amount';
     amountInput.step = '0.01';
     amountInput.min = '0';
+    amountInput.className = 'expense-row';
     amountTd.appendChild(amountInput);
     
     // Notes Cell
@@ -334,6 +670,7 @@ function createAndAppendExpenseRow(rowNumber) {
     const notesInput = document.createElement('textarea');
     notesInput.name = `notes-${rowNumber}`;
     notesInput.placeholder = 'Notes';
+    notesInput.className = 'expense-row';
     notesTd.appendChild(notesInput);
     
     // Delete Cell
@@ -376,29 +713,29 @@ function deleteExpenseRow(rowElement) {
 }
 
 /**
- * Open the expense entry form
+ * Reset expense form for new entries
  */
-function openExpenseForm() {
-    expenseFormSection.classList.remove('hidden');
-    // Scroll to form (for mobile UX)
-    expenseFormSection.scrollIntoView({ behavior: 'smooth', block: 'end' });
+function resetExpenseForm() {
+    expenseEntryForm.reset();
+    document.querySelectorAll('select').forEach(select => select.value = '');
+    setEntryType('Expense');
+    createExpenseRows();
 }
 
 /**
- * Close the expense entry form
+ * Clear only the calendar visual selection (not the app state)
  */
-function closeExpenseForm() {
-    expenseFormSection.classList.add('hidden');
-    clearFormSelection();
-}
-
-/**
- * Clear form selection and reset UI
- */
-function clearFormSelection() {
+function clearCalendarSelection() {
     document.querySelectorAll('.calendar-date.selected').forEach(cell => {
         cell.classList.remove('selected');
     });
+}
+
+/**
+ * Clear form selection and reset app state (used on cancel)
+ */
+function clearFormSelection() {
+    clearCalendarSelection();
     appState.selectedDate = null;
 }
 
@@ -417,7 +754,7 @@ async function saveExpenses(event) {
     
     // Collect form data from all table rows
     const expenses = [];
-    const expenseRows = document.querySelectorAll('.expense-table tbody tr');
+    const expenseRows = document.querySelectorAll('.expense-entry-table tbody tr');
     
     expenseRows.forEach((row, index) => {
         const rowNum = index + 1;
@@ -480,10 +817,10 @@ async function saveExpenses(event) {
             // Reset to 2 rows
             createExpenseRows();
             
-            // Close form after 2 seconds
-            setTimeout(() => {
-                closeExpenseForm();
-            }, 2000);
+            // Reload expenses for current date
+            if (appState.selectedDate) {
+                loadExistingExpenses(appState.selectedDate);
+            }
         } else {
             showStatus(`Error: ${result.message}`, 'error');
         }
@@ -570,34 +907,6 @@ async function fetchCategories() {
     }
 }
 
-/**
- * Fetch expenses for a specific date
- * @param {string} dateString - Date in YYYY-MM-DD format
- */
-async function fetchExpensesForDate(dateString) {
-    try {
-        const response = await fetch(CONFIG.BACKEND_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: JSON.stringify({
-                action: 'getExpenses',
-                date: dateString
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success && result.expenses) {
-            appState.expensesByDate[dateString] = result.expenses;
-            appState.hasExpensesByDate[dateString] = result.expenses.length > 0;
-            console.log(`Expenses loaded for ${dateString}:`, result.expenses);
-        }
-    } catch (error) {
-        console.error('Error fetching expenses:', error);
-    }
-}
 
 /**
  * Display existing expenses for the selected date
@@ -736,38 +1045,50 @@ function formatDateForDisplay(dateString) {
  * @param {number} year - Year
  * @param {number} month - Month (1-12)
  */
-async function fetchExpensesForMonth(year, month) {
-    try {
-        const response = await fetch(CONFIG.BACKEND_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: JSON.stringify({
-                action: 'getExpensesByMonth',
-                year: year,
-                month: month
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success && result.expensesByDate) {
-            // Update cache with month data
-            Object.assign(appState.expensesByDate, result.expensesByDate);
-            
-            // Mark dates with expenses
-            Object.keys(result.expensesByDate).forEach(dateString => {
-                if (result.expensesByDate[dateString].length > 0) {
-                    appState.hasExpensesByDate[dateString] = true;
-                }
+// REMOVED - using the new async version without parameters instead
+
+// ====================================================
+// PAGE NAVIGATION HANDLER
+// ====================================================
+
+function setupPageNavigation() {
+    const pageNavBtns = document.querySelectorAll('.page-nav-btn');
+    const pages = document.querySelectorAll('.page');
+    
+    console.log('[PAGE_NAV] Found buttons:', pageNavBtns.length);
+    console.log('[PAGE_NAV] Found pages:', pages.length);
+
+    pageNavBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetPage = btn.getAttribute('data-page');
+            console.log('[PAGE_NAV] Button clicked, target page:', targetPage);
+
+            // Hide all pages
+            pages.forEach(page => {
+                page.style.display = 'none';
             });
+
+            // Show target page
+            const targetPageEl = document.getElementById(`${targetPage}-page`);
+            console.log('[PAGE_NAV] Looking for element:', `${targetPage}-page`, 'Found:', !!targetPageEl);
             
-            console.log(`Expenses loaded for ${month}/${year}`);
-        }
-    } catch (error) {
-        console.error('Error fetching month expenses:', error);
-    }
+            if (targetPageEl) {
+                targetPageEl.style.display = 'block';
+                console.log('[PAGE_NAV] Showed page:', targetPage);
+            } else {
+                console.error('[PAGE_NAV] Page not found:', `${targetPage}-page`);
+            }
+
+            // Update active button
+            pageNavBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            console.log(`[PAGE_NAV] Switched to page: ${targetPage}`);
+        });
+    });
+
+    console.log('[PAGE_NAV] Page navigation initialized with', pageNavBtns.length, 'buttons and', pages.length, 'pages');
 }
 
 // ====================================================
@@ -777,7 +1098,10 @@ async function fetchExpensesForMonth(year, month) {
 /**
  * Start the application when DOM is fully loaded
  */
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+    setupPageNavigation();
+});
 
 // Log app initialization for debugging
 console.log('Expense Manager app script loaded');

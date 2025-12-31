@@ -13,124 +13,363 @@
         <header class="app-header">
             <div class="header-content">
                 <h1 class="app-title">Expense Manager</h1>
-                <nav class="header-menu">
-                    <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
-                    <div class="menu-dropdown hidden" id="menuDropdown">
-                        <a href="#" class="menu-item" id="profileMenuItem">👤 Profile</a>
-                        <a href="#" class="menu-item" id="settingsMenuItem">⚙️ Settings</a>
-                        <hr class="menu-divider">
-                        <a href="#" class="menu-item logout" id="logoutMenuItem">🚪 Logout</a>
-                    </div>
+                <nav class="header-actions">
+                    <button class="header-btn" id="notificationBtn" aria-label="Notifications" title="Notifications">🔔</button>
+                    <button class="header-btn logout-btn" id="logoutBtn" aria-label="Logout" title="Logout">🚪 Logout</button>
                 </nav>
             </div>
         </header>
 
+        <!-- PAGE NAVIGATION -->
+        <nav class="page-nav">
+            <button class="page-nav-btn active" data-page="dashboard">📊 Dashboard</button>
+            <button class="page-nav-btn" data-page="calendar">📅 Calendar</button>
+            <button class="page-nav-btn" data-page="budget">💰 Budget</button>
+            <button class="page-nav-btn" data-page="settings">⚙️ Settings</button>
+        </nav>
+
         <!-- MAIN CONTENT AREA -->
         <main class="main-content">
 
-            <!-- CALENDAR SECTION -->
-            <section class="calendar-section">
-                <div class="calendar-header">
-                    <button class="btn btn-nav" id="prevMonth" aria-label="Previous month">❮</button>
-                    <h2 id="monthYear" class="month-year">December 2025</h2>
-                    <button class="btn btn-nav" id="nextMonth" aria-label="Next month">❯</button>
+        <!-- MAIN CONTENT AREA -->
+        <main class="main-content">
+
+            <!-- ====== PAGE 1: CALENDAR (Expense Entry) ====== -->
+            <div class="page" id="calendar-page" data-page="calendar" style="display: none;">
+                <div class="split-layout">
+                    <!-- LEFT SIDE: CALENDAR SECTION -->
+                    <section class="calendar-section">
+                        <div class="calendar-header">
+                            <button class="btn btn-nav" id="prevMonth" aria-label="Previous month">❮</button>
+                            <h2 id="monthYear" class="month-year">December 2025</h2>
+                            <button class="btn btn-nav" id="nextMonth" aria-label="Next month">❯</button>
+                        </div>
+
+                        <!-- Calendar Grid -->
+                        <div class="calendar-container">
+                            <!-- Day headers (Sun-Sat) -->
+                            <div class="calendar-grid">
+                                <div class="day-header">Sun</div>
+                                <div class="day-header">Mon</div>
+                                <div class="day-header">Tue</div>
+                                <div class="day-header">Wed</div>
+                                <div class="day-header">Thu</div>
+                                <div class="day-header">Fri</div>
+                                <div class="day-header">Sat</div>
+                                <!-- Calendar dates will be inserted here by JavaScript -->
+                                <div id="calendarDates" class="calendar-dates"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- RIGHT SIDE: DETAILS SECTION -->
+                    <section class="expense-details-section" id="expenseDetailsSection">
+                        <div class="details-header">
+                            <h2 id="detailsTitle">Select a date to view & manage expenses</h2>
+                        </div>
+
+                        <div class="details-tabs" role="tablist">
+                            <button type="button" class="details-tab active" data-panel="entry" role="tab" aria-selected="true">Add Expenses</button>
+                            <button type="button" class="details-tab" data-panel="view" role="tab" aria-selected="false">Existing Expenses<span class="details-tab-badge" id="expenseCountBadge" style="display: none;">0</span></button>
+                        </div>
+
+                        <!-- ENTRY PANEL -->
+                        <div class="details-panel entry-panel expanded" data-panel="entry">
+                            <div class="panel-content entry-content">
+                                <!-- Entry Type Tabs -->
+                                <div class="entry-tabs" role="tablist">
+                                    <button type="button" class="entry-tab active" data-type="Expense" role="tab" aria-selected="true">Expenses</button>
+                                    <button type="button" class="entry-tab" data-type="Income" role="tab" aria-selected="false">Income</button>
+                                    <button type="button" class="entry-tab" data-type="Payoff" role="tab" aria-selected="false">Payoffs</button>
+                                </div>
+
+                                <!-- Expense Entry Form -->
+                                <form id="expenseEntryForm" class="form-content">
+                                    <!-- Expense Table -->
+                                    <table class="expense-entry-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Amount</th>
+                                                <th>Notes</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="expenseRows">
+                                            <!-- Dynamically populated rows -->
+                                        </tbody>
+                                    </table>
+
+                                    <!-- Add More Button -->
+                                    <button type="button" class="btn btn-add" id="addExpenseBtn">+ Add Row</button>
+
+                                    <!-- Action Buttons -->
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-primary" id="saveBtn">Submit</button>
+                                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                                    </div>
+                                </form>
+
+                                <!-- Status Messages -->
+                                <div id="statusMessage" class="status-message hidden"></div>
+                            </div>
+                        </div>
+
+                        <!-- EXISTING EXPENSES PANEL -->
+                        <div class="details-panel view-panel hidden-panel" data-panel="view">
+                            <div class="panel-content view-content">
+                                <table class="expenses-list-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Category</th>
+                                            <th>Amount</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="existingExpensesList">
+                                        <!-- Existing expenses will be displayed here -->
+                                    </tbody>
+                                </table>
+                                <div id="noExpensesMsg" class="no-data">Select a date to view expenses</div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
+            </div>
 
-                <!-- Calendar Grid -->
-                <div class="calendar-container">
-                    <!-- Day headers (Mon-Sun) -->
-                    <div class="calendar-grid">
-                        <div class="day-header">Sun</div>
-                        <div class="day-header">Mon</div>
-                        <div class="day-header">Tue</div>
-                        <div class="day-header">Wed</div>
-                        <div class="day-header">Thu</div>
-                        <div class="day-header">Fri</div>
-                        <div class="day-header">Sat</div>
-
-                        <!-- Calendar dates will be inserted here by JavaScript -->
-                        <div id="calendarDates" class="calendar-dates"></div>
+            <!-- ====== PAGE 2: DASHBOARD ====== -->
+            <div class="page" id="dashboard-page" data-page="dashboard">
+                <div class="dashboard-container">
+                    <div class="dashboard-header">
+                        <h2>Dashboard</h2>
+                        <div class="month-selector">
+                            <select id="dashboardMonth">
+                                <option value="current">Current Month</option>
+                                <option value="last">Last Month</option>
+                                <option value="ytd">Year to Date</option>
+                                <option value="custom">Custom Period</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
-            </section>
 
-            <!-- EXPENSE ENTRY SECTION (Initially hidden) -->
-            <section id="expenseForm" class="expense-form hidden">
-                <div class="form-header">
-                    <button class="btn btn-close" id="closeForm" aria-label="Close form">✕</button>
-                    <h2>Enter Expenses</h2>
-                    <p id="selectedDateDisplay" class="selected-date">Date: -</p>
-                </div>
+                    <!-- Monthly Summary -->
+                    <section class="dashboard-section">
+                        <h3>Monthly Summary</h3>
+                        <div class="summary-grid">
+                            <div class="summary-card">
+                                <div class="summary-label">Income</div>
+                                <div class="summary-amount">₹0</div>
+                                <div class="summary-sub">Budget: ₹0</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Expenses</div>
+                                <div class="summary-amount">₹0</div>
+                                <div class="summary-sub">Budget: ₹0</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Payoffs</div>
+                                <div class="summary-amount">₹0</div>
+                                <div class="summary-sub">Budget: ₹0</div>
+                            </div>
+                            <div class="summary-card highlight">
+                                <div class="summary-label">Savings</div>
+                                <div class="summary-amount">₹0</div>
+                                <div class="summary-sub">Target: ₹0</div>
+                            </div>
+                        </div>
+                    </section>
 
-                <!-- Expense Entry Form -->
-                <form id="expenseEntryForm" class="form-content">
-                    <!-- Entry Type Tabs -->
-                    <div class="entry-tabs" role="tablist">
-                        <button type="button" class="entry-tab active" data-type="Expense" role="tab" aria-selected="true">Expenses</button>
-                        <button type="button" class="entry-tab" data-type="Income" role="tab" aria-selected="false">Income</button>
-                        <button type="button" class="entry-tab" data-type="Payoff" role="tab" aria-selected="false">Payoffs</button>
+                    <!-- Budget vs Actual -->
+                    <section class="dashboard-section">
+                        <h3>Budget vs Actual</h3>
+                        <div class="budget-comparison">
+                            <div class="comparison-item">
+                                <div class="comparison-label">Income</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="comparison-values">₹0 / ₹0</div>
+                            </div>
+                            <div class="comparison-item">
+                                <div class="comparison-label">Expenses</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="comparison-values">₹0 / ₹0</div>
+                            </div>
+                            <div class="comparison-item">
+                                <div class="comparison-label">Payoffs</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="comparison-values">₹0 / ₹0</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Category Breakdown -->
+                    <section class="dashboard-section">
+                        <h3>Category Breakdown</h3>
+                        <div class="category-chart">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </section>
+
+                    <!-- Annual Summary -->
+                    <section class="dashboard-section">
+                        <h3>Annual Summary</h3>
+                        <div class="annual-summary">
+                            <div class="summary-card">
+                                <div class="summary-label">YTD Income</div>
+                                <div class="summary-amount">₹0</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">YTD Expenses</div>
+                                <div class="summary-amount">₹0</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">YTD Payoffs</div>
+                                <div class="summary-amount">₹0</div>
+                            </div>
+                            <div class="summary-card highlight">
+                                <div class="summary-label">YTD Savings</div>
+                                <div class="summary-amount">₹0</div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- ====== PAGE 3: BUDGET SETUP ====== -->
+            <div class="page" id="budget-page" data-page="budget" style="display: none;">
+                <div class="budget-container">
+                    <div class="budget-header">
+                        <h2>Budget Configuration</h2>
+                        <p class="budget-subtitle">Set monthly budgets for all categories</p>
                     </div>
 
-                    <!-- Expense Table -->
-                    <table class="expense-table">
-                        <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th>Amount</th>
-                                <th>Notes</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="expenseRows">
-                            <!-- Dynamically populated rows -->
-                        </tbody>
-                    </table>
+                    <form id="budgetForm" class="budget-form">
+                        <!-- INCOME SECTION -->
+                        <fieldset class="budget-section">
+                            <legend>💵 Income Budget</legend>
+                            <div class="budget-category-group" id="incomeBudgets">
+                                <!-- Income categories will be populated by JS -->
+                            </div>
+                        </fieldset>
 
-                    <!-- Add More Button -->
-                    <button type="button" class="btn btn-add" id="addExpenseBtn">+ Add Row</button>
+                        <!-- EXPENSE SECTION -->
+                        <fieldset class="budget-section">
+                            <legend>💸 Expense Budget</legend>
+                            <div class="budget-category-group" id="expenseBudgets">
+                                <!-- Expense categories will be populated by JS -->
+                            </div>
+                        </fieldset>
 
-                    <!-- Action Buttons -->
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" id="saveBtn">Submit</button>
-                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                        <!-- PAYOFF SECTION -->
+                        <fieldset class="budget-section">
+                            <legend>🏦 Payoff Budget</legend>
+                            <div class="budget-category-group" id="payoffBudgets">
+                                <!-- Payoff categories will be populated by JS -->
+                            </div>
+                        </fieldset>
+
+                        <!-- SAVINGS SECTION -->
+                        <fieldset class="budget-section">
+                            <legend>🎯 Savings Target</legend>
+                            <div class="form-row">
+                                <label>Monthly Savings Target (₹)</label>
+                                <input type="number" id="savingsTarget" step="0.01" placeholder="0.00" required>
+                            </div>
+                        </fieldset>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">💾 Save Budget</button>
+                            <button type="reset" class="btn btn-secondary">Reset</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ====== PAGE 4: SETTINGS ====== -->
+            <div class="page" id="settings-page" data-page="settings" style="display: none;">
+                <div class="settings-container">
+                    <div class="settings-header">
+                        <h2>Settings</h2>
                     </div>
-                </form>
 
-                <!-- Status Messages -->
-                <div id="statusMessage" class="status-message hidden"></div>
-            </section>
+                    <!-- PROFILE SECTION -->
+                    <section class="settings-section">
+                        <h3>👤 Profile</h3>
+                        <form id="profileForm" class="settings-form">
+                            <div class="form-row">
+                                <label>Full Name</label>
+                                <input type="text" id="fullName" placeholder="Your name" required>
+                            </div>
+                            <div class="form-row">
+                                <label>Email</label>
+                                <input type="email" id="email" placeholder="your.email@gmail.com" disabled>
+                            </div>
+                            <div class="form-row">
+                                <label>Phone (optional)</label>
+                                <input type="tel" id="phone" placeholder="+91 98765 43210">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Profile</button>
+                        </form>
+                    </section>
 
-            <!-- VIEW EXPENSES SECTION (Initially hidden) -->
-            <section id="viewExpenses" class="view-expenses hidden">
-                <div class="view-header">
-                    <button class="btn btn-close" id="closeViewBtn" aria-label="Close view">✕</button>
-                    <h2>Expenses for <span id="viewDateDisplay">-</span></h2>
+                    <!-- PREFERENCES SECTION -->
+                    <section class="settings-section">
+                        <h3>⚙️ Preferences</h3>
+                        <form id="preferencesForm" class="settings-form">
+                            <div class="form-row">
+                                <label>Currency</label>
+                                <select id="currency">
+                                    <option value="INR">₹ Indian Rupee (INR)</option>
+                                    <option value="USD">$ US Dollar (USD)</option>
+                                    <option value="EUR">€ Euro (EUR)</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label>Theme</label>
+                                <select id="theme">
+                                    <option value="light">Light</option>
+                                    <option value="dark">Dark</option>
+                                    <option value="auto">Auto</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label>
+                                    <input type="checkbox" id="emailNotifications">
+                                    Enable email notifications
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Preferences</button>
+                        </form>
+                    </section>
+
+                    <!-- DATA SECTION -->
+                    <section class="settings-section danger">
+                        <h3>⚠️ Data Management</h3>
+                        <div class="settings-actions">
+                            <button id="exportDataBtn" class="btn btn-secondary">📥 Export Data</button>
+                            <button id="clearDataBtn" class="btn btn-danger">🗑️ Clear All Data</button>
+                        </div>
+                    </section>
+
+                    <!-- ABOUT SECTION -->
+                    <section class="settings-section">
+                        <h3>ℹ️ About</h3>
+                        <div class="about-info">
+                            <p><strong>App Version:</strong> 1.0.0</p>
+                            <p><strong>Last Updated:</strong> December 2025</p>
+                            <p><a href="#" id="privacyLink">Privacy Policy</a> | <a href="#" id="termsLink">Terms of Service</a></p>
+                        </div>
+                    </section>
                 </div>
-                <div class="view-content">
-                    <table class="view-expenses-table">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th>Category</th>
-                                <th>Amount</th>
-                                <th>Notes</th>
-                                <th>Date</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="expensesList">
-                            <!-- Expenses will be displayed here -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+            </div>
 
         </main>
-
-        <!-- FOOTER SECTION -->
-        <footer class="app-footer">
-            <p>Powered by Expense Manager • Version 1.0</p>
-        </footer>
 
     </div>
 
