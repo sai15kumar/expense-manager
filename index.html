@@ -65,119 +65,6 @@
 
         <!-- MAIN CONTENT AREA -->
         <main class="main-content">
-
-            <!-- ====== PAGE 1: CALENDAR (Expense Entry) ====== -->
-            <div class="page" id="calendar-page" data-page="calendar" style="display: none;">
-                <div class="split-layout">
-                    <!-- LEFT SIDE: CALENDAR SECTION -->
-                    <section class="calendar-section">
-                        <div class="calendar-header">
-                            <button class="btn btn-nav" id="prevMonth" aria-label="Previous month">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="15 18 9 12 15 6"></polyline>
-                                </svg>
-                            </button>
-                            <h2 id="monthYear" class="month-year">December 2025</h2>
-                            <button class="btn btn-nav" id="nextMonth" aria-label="Next month">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="9 6 15 12 9 18"></polyline>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <!-- Calendar Grid -->
-                        <div class="calendar-container">
-                            <!-- Day headers (Sun-Sat) -->
-                            <div class="calendar-grid">
-                                <div class="day-header">Sun</div>
-                                <div class="day-header">Mon</div>
-                                <div class="day-header">Tue</div>
-                                <div class="day-header">Wed</div>
-                                <div class="day-header">Thu</div>
-                                <div class="day-header">Fri</div>
-                                <div class="day-header">Sat</div>
-                                <!-- Calendar dates will be inserted here by JavaScript -->
-                                <div id="calendarDates" class="calendar-dates"></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- RIGHT SIDE: DETAILS SECTION -->
-                    <section class="expense-details-section" id="expenseDetailsSection">
-                        <div class="details-header">
-                            <h2 id="detailsTitle">Select a date to view & manage expenses</h2>
-                        </div>
-
-                        <div class="details-tabs" role="tablist">
-                            <button type="button" class="details-tab active" data-panel="entry" role="tab" aria-selected="true">Add Expenses</button>
-                            <button type="button" class="details-tab" data-panel="view" role="tab" aria-selected="false">Existing Expenses<span class="details-tab-badge" id="expenseCountBadge" style="display: none;">0</span></button>
-                        </div>
-
-                        <!-- ENTRY PANEL -->
-                        <div class="details-panel entry-panel expanded" data-panel="entry">
-                            <div class="panel-content entry-content">
-                                <!-- Entry Type Tabs -->
-                                <div class="entry-tabs" role="tablist">
-                                    <button type="button" class="entry-tab active" data-type="Expense" role="tab" aria-selected="true">Expenses</button>
-                                    <button type="button" class="entry-tab" data-type="Income" role="tab" aria-selected="false">Income</button>
-                                    <button type="button" class="entry-tab" data-type="Payoff" role="tab" aria-selected="false">Payoffs</button>
-                                </div>
-
-                                <!-- Expense Entry Form -->
-                                <form id="expenseEntryForm" class="form-content">
-                                    <!-- Expense Table -->
-                                    <table class="expense-entry-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Category</th>
-                                                <th>Amount</th>
-                                                <th>Notes</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="expenseRows">
-                                            <!-- Dynamically populated rows -->
-                                        </tbody>
-                                    </table>
-
-                                    <!-- Add More Button -->
-                                    <button type="button" class="btn btn-add" id="addExpenseBtn">+ Add Row</button>
-
-                                    <!-- Action Buttons -->
-                                    <div class="form-actions">
-                                        <button type="submit" class="btn btn-primary" id="saveBtn">Submit</button>
-                                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
-                                    </div>
-                                </form>
-
-                                <!-- Status Messages -->
-                                <div id="statusMessage" class="status-message hidden"></div>
-                            </div>
-                        </div>
-
-                        <!-- EXISTING EXPENSES PANEL -->
-                        <div class="details-panel view-panel hidden-panel" data-panel="view">
-                            <div class="panel-content view-content">
-                                <table class="expenses-list-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Type</th>
-                                            <th>Category</th>
-                                            <th>Amount</th>
-                                            <th>Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="existingExpensesList">
-                                        <!-- Existing expenses will be displayed here -->
-                                    </tbody>
-                                </table>
-                                <div id="noExpensesMsg" class="no-data">Select a date to view expenses</div>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-            </div>
-
             <!-- ====== PAGE 2: HOME (Monthly Overview) ====== -->
             <div class="page" id="dashboard-page" data-page="dashboard">
                 <div class="home-main-container">
@@ -556,6 +443,7 @@
                                             <!-- Rows added by JS -->
                                         </tbody>
                                     </table>
+                                    <button type="button" class="btn-add-row" id="addIncomeMonthlyRowBtn">+ Add income row</button>
                                 </div>
                             </div>
 
@@ -583,6 +471,7 @@
                                             <!-- Rows added by JS -->
                                         </tbody>
                                     </table>
+                                    <button type="button" class="btn-add-row" id="addSavingsMonthlyRowBtn">+ Add savings row</button>
                                 </div>
                             </div>
 
@@ -610,6 +499,7 @@
                                             <!-- Rows added by JS -->
                                         </tbody>
                                     </table>
+                                    <button type="button" class="btn-add-row" id="addPayoffMonthlyRowBtn">+ Add payoff row</button>
                                 </div>
                             </div>
                             <div class="form-actions-block">

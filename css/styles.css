@@ -390,179 +390,6 @@ body {
     border-top: 1px solid #eee;
 }
 
-/* ==============================================
-   CALENDAR SECTION - MOBILE FIRST
-   ============================================== */
-.calendar-section {
-    padding: 2rem 1.5rem;
-    background-color: white;
-}
-
-.calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    gap: 1rem;
-}
-
-.month-year {
-    font-size: 1.5rem;
-    font-weight: 700;
-    flex: 1;
-    text-align: center;
-    color: #333;
-    letter-spacing: -0.5px;
-}
-
-/* Navigation Buttons */
-.btn-nav {
-    background-color: #667eea;
-    color: white;
-    border: none;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-}
-
-.btn-nav:active {
-    transform: scale(0.95);
-    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
-}
-
-.btn-nav:hover {
-    background-color: #764ba2;
-}
-
-/* Calendar Grid */
-.calendar-container {
-    width: 100%;
-}
-
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0.5rem;
-    background-color: transparent;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.day-header {
-    background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
-    padding: 1rem 0.5rem;
-    text-align: center;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.calendar-dates {
-    display: contents;
-}
-
-/* Calendar Date Cells */
-.calendar-date {
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: white;
-    border: 2px solid #e9ecef;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: #333;
-    position: relative;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.calendar-date:hover {
-    border-color: var(--color-accent);
-    box-shadow: 0 4px 12px rgba(59, 126, 161, 0.15);
-}
-
-.calendar-date:active {
-    transform: scale(0.95);
-}
-
-.calendar-date.other-month {
-    color: #adb5bd;
-    background-color: #f8f9fa;
-    border-color: #e9ecef;
-}
-
-.calendar-date.today {
-    background: white;
-    color: #333;
-    font-weight: 700;
-    border-color: #e9ecef;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    position: relative;
-}
-
-.calendar-date.today::before {
-    content: 'Today';
-    position: absolute;
-    top: 4px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--color-accent);
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 8px;
-    font-size: 0.6rem;
-    font-weight: 700;
-    white-space: nowrap;
-    letter-spacing: 0.4px;
-}
-
-.calendar-date.has-expense {
-    /* Add indicator dot for dates with expenses */
-}
-
-.calendar-date.has-expense::after {
-    content: '';
-    position: absolute;
-    bottom: 6px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background-color: #ffd43b;
-    box-shadow: 0 2px 4px rgba(255, 212, 59, 0.5);
-}
-
-.calendar-date.today.has-expense::after {
-    background-color: #ffd43b;
-    box-shadow: 0 2px 4px rgba(255, 212, 59, 0.5);
-}
-
-/* Selected date (user clicked) */
-.calendar-date.selected {
-    background: rgba(59, 126, 161, 0.12);
-    color: var(--color-accent-hover);
-    border-color: var(--color-accent);
-    border-radius: 8px;
-    font-weight: 700;
-    box-shadow: 0 4px 12px rgba(59, 126, 161, 0.2);
-}
-
-/* Today is also selected */
-.calendar-date.today.selected {
-    border-color: var(--color-accent);
-    box-shadow: 0 4px 12px rgba(59, 126, 161, 0.2);
-    background: rgba(59, 126, 161, 0.1);
-}
 
 /* ==============================================
    EXPENSE FORM - MODAL STYLE
@@ -620,51 +447,7 @@ body {
     font-weight: 700;
 }
 
-.selected-date {
-    font-size: 0.9rem;
-    opacity: 0.95;
-    width: 100%;
-    margin-top: 0.5rem;
-}
-
-.form-content {
-    background-color: white;
-    max-height: 70vh;
-    overflow-y: auto;
-    padding: 1.25rem 1rem 1.5rem;
-}
-
-.entry-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-
-.entry-tab {
-    flex: 1;
-    border: 1px solid #e4e7ed;
-    background: #f6f7fb;
-    color: #2e3038;
-    padding: 0.65rem 0.5rem;
-    border-radius: 8px;
-    font-weight: 700;
-    letter-spacing: 0.2px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.entry-tab.active {
-    background: var(--color-accent);
-    color: white;
-    border-color: var(--color-accent-hover);
-    box-shadow: 0 4px 12px rgba(59, 126, 161, 0.25);
-}
-
-.entry-tab:active {
-    transform: scale(0.98);
-}
+/* legacy calendar form UI removed */
 
 /* Expense Table */
 /* Flatter, desktop-like tabular look */
@@ -692,14 +475,14 @@ body {
     font-weight: 700;
     font-size: 0.88rem;
     border: none;
-    text-transform: uppercase;
-    letter-spacing: 0.35px;
+    text-transform: none;
+    letter-spacing: 0.15px;
 }
 
 .expense-table th:first-child { width: 30%; }
 .expense-table th:nth-child(2) { width: 20%; }
-.expense-table th:nth-child(3) { width: 38%; }
-.expense-table th:last-child { width: 12%; text-align: center; }
+.expense-table th:nth-child(3) { width: 20%; }
+.expense-table th:last-child { width: 20%; text-align: center; }
 
 .expense-table tbody tr {
     border-bottom: 1px solid #eceff4;
@@ -802,43 +585,7 @@ body {
     transform: scale(0.97);
 }
 
-.expense-entry-table td input,
-.expense-entry-table td select,
-.expense-entry-table td textarea {
-    padding: 0.75rem;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    font-size: 0.95rem;
-    font-family: inherit;
-    width: 100%;
-    height: 44px;
-    box-sizing: border-box;
-    line-height: 1.4;
-}
-
-.expense-row input:focus,
-.expense-row select:focus,
-.expense-row textarea:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.expense-entry-table td select {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 1.5rem;
-    padding-right: 2.5rem;
-}
-
-.expense-entry-table td textarea {
-    resize: none;
-    min-height: 44px;
-    overflow: hidden;
-    vertical-align: top;
-}
+/* legacy expense-entry table removed */
 
 /* Form Actions */
 .form-actions {
@@ -1032,33 +779,7 @@ body {
     background-color: #e9ecef;
 }
 
-/* Status Messages */
-.status-message {
-    margin-top: 1rem;
-    padding: 1rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    display: none;
-}
-
-.status-message.hidden {
-    display: none;
-}
-
-.status-message.show {
-    display: block;
-}
-
-.status-message.success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-.status-message.error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+/* legacy status message styles removed with calendar flow */
 }
 
 /* ==============================================
@@ -1571,149 +1292,6 @@ body {
     .app-title {
         font-size: 2.25rem;
     }
-
-/* Split Layout - 50-50 Side by Side */
-    .split-layout {
-        flex-direction: row;
-        height: 100%;
-        width: 100%;
-    }
-
-    .calendar-section {
-        width: 50%;
-        padding: 2rem;
-        flex: 0 0 50%;
-        min-height: calc(100vh - 80px);
-        overflow-y: auto;
-        border-right: 1px solid #dee2e6;
-        background-color: white;
-    }
-
-    /* Expense Details - Right Side (50%) - Stacked Vertically */
-    .expense-details-section {
-        width: 50%;
-        flex: 0 0 50%;
-        display: flex;
-        flex-direction: column;
-        background-color: white;
-        min-height: calc(100vh - 80px);
-        overflow: hidden;
-    }
-
-    .details-header {
-        padding: 1.5rem;
-        background-color: #f8f9fa;
-        border-bottom: 2px solid var(--color-border);
-        flex-shrink: 0;
-        display: block;
-    }
-
-    /* Stack panels vertically on right side */
-    .view-panel {
-        flex: 0 0 35%;
-        margin: 0;
-        border-radius: 0;
-        border-right: none;
-        border-bottom: 1px solid #dee2e6;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-    
-    .view-panel .panel-content {
-        overflow-y: auto;
-        max-height: calc(100% - 60px);
-    }
-    
-    .view-panel.collapsed {
-        flex: 0 0 auto;
-    }
-    
-    .view-panel.collapsed .panel-content {
-        display: none;
-    }
-
-    .entry-panel {
-        flex: 0 0 65%;
-        margin: 0;
-        border-radius: 0;
-        border-right: none;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-    
-    .entry-panel .panel-content {
-        overflow-y: auto;
-        max-height: 70vh;
-    }
-    
-    .entry-panel.collapsed {
-        flex: 0 0 auto;
-    }
-    
-    .entry-panel.collapsed .panel-content {
-        display: none;
-    }
-
-    .details-panel {
-        flex: 1;
-        margin: 0;
-        border-radius: 0;
-        border-right: none;
-    }
-        margin: 0;
-        border-radius: 0;
-    }
-
-    .panel-header {
-        cursor: default;
-    }
-
-    /* Expense Management Modal Styling for Desktop */
-    .expense-management {
-        align-items: center;
-        justify-content: center;
-    }
-
-    .expense-split-container {
-        margin-top: 0;
-        border-radius: 12px;
-        max-height: 80vh;
-        max-width: 1000px;
-        width: 90%;
-    }
-
-    .form-content {
-        max-height: 60vh;
-    }
-
-    .expense-form {
-        justify-content: center;
-        align-items: center;
-    }
-
-    .expense-form form {
-        width: 90%;
-        max-width: 500px;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    }
-
-    .view-expenses {
-        justify-content: center;
-        align-items: center;
-    }
-
-    .view-expenses > * {
-        width: 90%;
-        max-width: 500px;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    }
-
     .btn {
         padding: 0.9rem 2rem;
     }
@@ -1723,16 +1301,8 @@ body {
    RESPONSIVE DESIGN - LARGE DESKTOP (1024px+)
    ============================================== */
 @media (min-width: 1024px) {
-    .calendar-section {
-        max-width: 700px;
-    }
-
     .app-title {
         font-size: 2.5rem;
-    }
-
-    .calendar-date {
-        font-size: 1rem;
     }
 }
 
