@@ -1325,7 +1325,7 @@ function renderMonthlyTransactionList(year, month) {
 // ====================================================
 
 function setupPageNavigation() {
-    const pageNavBtns = document.querySelectorAll('.page-nav-btn');
+    const pageNavBtns = document.querySelectorAll('.nav-rail-item');
     const pages = document.querySelectorAll('.page');
     
     console.log('[PAGE_NAV] Found buttons:', pageNavBtns.length);
@@ -1336,6 +1336,14 @@ function setupPageNavigation() {
             e.preventDefault();
             const targetPage = btn.getAttribute('data-page');
             console.log('[PAGE_NAV] Button clicked, target page:', targetPage);
+
+            // Use Add flow helper so rows and defaults are initialized every time
+            if (targetPage === 'add') {
+                openAddScreen();
+                pageNavBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                return;
+            }
 
             // Hide all pages
             pages.forEach(page => {
@@ -1369,7 +1377,7 @@ function setupPageNavigation() {
 
     // Show dashboard by default on initial load
     const dashboardPage = document.getElementById('dashboard-page');
-    const dashboardBtn = document.querySelector('.page-nav-btn[data-page="dashboard"]');
+    const dashboardBtn = document.querySelector('.nav-rail-item[data-page="dashboard"]');
     
     if (dashboardPage) {
         dashboardPage.style.display = 'block';
@@ -1394,10 +1402,35 @@ function setupPageNavigation() {
 document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
     setupPageNavigation();
+    setupFAB();
 });
 
 // Log app initialization for debugging
 console.log('Expense Manager app script loaded');
+
+// ====================================================
+// FLOATING ACTION BUTTON (FAB) HANDLER
+// ====================================================
+
+/**
+ * Setup FAB to open Add page
+ */
+function setupFAB() {
+    const fabBtn = document.getElementById('fabAddExpense');
+    if (fabBtn) {
+        fabBtn.addEventListener('click', () => {
+            console.log('[FAB] Opening add page...');
+            // Use same flow as nav to reset rows/defaults
+            openAddScreen();
+            // Remove active class from all nav items to reflect floating entry
+            const navItems = document.querySelectorAll('.nav-rail-item');
+            navItems.forEach(item => item.classList.remove('active'));
+        });
+        console.log('[FAB] FAB button initialized');
+    } else {
+        console.warn('[FAB] FAB button not found in DOM');
+    }
+}
 
 // ====================================================
 // ADD SCREEN FUNCTIONS (REFACTORED)
@@ -1499,7 +1532,7 @@ function closeAddScreen() {
     console.log('[ADD_SCREEN] Closing...');
     
     // Navigate to home
-    const homeNavBtn = document.querySelector('.page-nav-btn[data-page="dashboard"]');
+    const homeNavBtn = document.querySelector('.nav-rail-item[data-page="dashboard"]');
     if (homeNavBtn) {
         homeNavBtn.click();
     }
