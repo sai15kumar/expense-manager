@@ -1,23 +1,27 @@
 /* ====================================================
-   EXPENSE MANAGER - VANILLA JAVASCRIPT APP
-   ==================================================== */
+    EXPENSE MANAGER - VANILLA JAVASCRIPT APP
+    ==================================================== */
 
 // ====================================================
 // CONFIGURATION & CONSTANTS
 // ====================================================
 
-/**
- * Configuration object for the application
- * Update BACKEND_URL with your deployed Google Apps Script URL
- */
 const CONFIG = {
-    // Replace with your deployed Apps Script Web App URL
-    BACKEND_URL: 'https://script.google.com/macros/s/AKfycbws-83nO_YVDBgOgDe_fLAmO8V8MJOC0-YpgK-Cxfjomy8zpnXGL2yDWFTFVTCTyS64Qg/exec',
-    MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June',
-                  'July', 'August', 'September', 'October', 'November', 'December'],
-    EXPENSE_ROWS: 5,
-    DATE_FORMAT: 'YYYY-MM-DD' // Format: 2025-12-30
+     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbxLU7wDppO5ngh0ltNZt3ifD7VAgtauRPY_UVhyDXE_2kTx0Ij1Bij-sO2MWmnb4wGx7A/exec',
+     MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'],
+     EXPENSE_ROWS: 5,
+     DATE_FORMAT: 'YYYY-MM-DD'
 };
+window.CONFIG = CONFIG;
+
+// Shared auth storage configuration
+const STORAGE_KEYS = window.AUTH_STORAGE_KEYS || {
+    idToken: 'expenseManager_idToken',
+    userEmail: 'expenseManager_userEmail',
+    userName: 'expenseManager_userName'
+};
+const storage = window.AUTH_STORAGE || sessionStorage;
 
 // ====================================================
 // STATE MANAGEMENT
@@ -44,13 +48,11 @@ let appState = {
 // ====================================================
 
 /**
- * Get authenticated user email for API authorization
- * @returns {string|null} - User email or null if not signed in
+ * Get the current Google ID token for authenticated API calls.
+ * @returns {string|null} - ID token or null if not signed in
  */
-function getAuthUserEmail() {
-    return (window.appAuth && typeof window.appAuth.getUserEmail === 'function') 
-        ? window.appAuth.getUserEmail() 
-        : null;
+function getAuthToken() {
+    return storage.getItem(STORAGE_KEYS.idToken);
 }
 
 /**
@@ -76,20 +78,21 @@ function checkApiAuthorization(result) {
  */
 async function fetchCategories() {
     try {
-        const userEmail = getAuthUserEmail();
-        if (!userEmail) {
+        const idToken = getAuthToken();
+        if (!idToken) {
             console.warn('[API] User not signed in, skipping fetchCategories');
+            showToast('Please sign in to continue', 'error');
             return;
         }
 
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
                 action: 'getCategories',
-                userEmail: userEmail  // Required for backend authorization
+                idToken: idToken
             })
         });
 
@@ -258,8 +261,8 @@ async function fetchHomeExpensesForMonth(year, month) {
     try {
         console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
         
-        const userEmail = getAuthUserEmail();
-        if (!userEmail) {
+        const idToken = getAuthToken();
+        if (!idToken) {
             console.warn('[HOME] User not signed in');
             showToast('Please sign in to continue', 'error');
             return;
@@ -268,13 +271,13 @@ async function fetchHomeExpensesForMonth(year, month) {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 action: 'getExpensesByMonth',
                 year: year,
                 month: month,
-                userEmail: userEmail  // Required for backend authorization
+                idToken: idToken
             })
         });
         
@@ -478,22 +481,43 @@ function setupPageNavigation() {
 // APP START
 // ====================================================
 
-function initializeApp() {
-    console.log('[APP] Initializing app...');
-    initializeHomePage();
-    initializeAddScreen();
-    fetchCategories().catch(err => console.error('[APP] Failed to load categories:', err));
-    setupLogout();
+let authedAppInitialized = false;
+
+function resetAppInitialization() {
+    authedAppInitialized = false;
 }
 
-/**
- * Start the application when DOM is fully loaded
- */
-document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
+function initializeAppAfterAuth() {
+    if (authedAppInitialized) return true;
+
+    const token = getAuthToken();
+    if (!token) {
+        console.log('[APP] No idToken in session; skipping app initialization');
+        return false;
+    }
+
+    console.log('[APP] Initializing app after auth');
+    initializeHomePage();
+    initializeAddScreen();
     setupPageNavigation();
     setupFAB();
+    setupLogout();
+    fetchCategories().catch(err => console.error('[APP] Failed to load categories:', err));
+
+    authedAppInitialized = true;
+    return true;
+}
+
+// Start-up: only attempt auth-gated init if a token already exists
+document.addEventListener('DOMContentLoaded', () => {
+    if (!initializeAppAfterAuth()) {
+        console.log('[APP] Awaiting authentication before initializing app');
+    }
 });
+
+// Expose hooks for auth module
+window.initializeAppAfterAuth = initializeAppAfterAuth;
+window.resetAppInitialization = resetAppInitialization;
 
 // Log app initialization for debugging
 console.log('Expense Manager app script loaded');
@@ -538,9 +562,9 @@ function setupLogout() {
             window.appAuth.logout();
         } else {
             // Fallback: clear storage and reload
-            localStorage.removeItem('expenseManager_idToken');
-            localStorage.removeItem('expenseManager_userEmail');
-            localStorage.removeItem('expenseManager_userName');
+            storage.removeItem(STORAGE_KEYS.idToken);
+            storage.removeItem(STORAGE_KEYS.userEmail);
+            storage.removeItem(STORAGE_KEYS.userName);
             window.location.reload();
         }
     });
@@ -1130,8 +1154,8 @@ async function saveExpenses() {
     
     // Save using existing API
     try {
-        const userEmail = getAuthUserEmail();
-        if (!userEmail) {
+        const idToken = getAuthToken();
+        if (!idToken) {
             showToast('Please sign in to continue', 'error');
             return;
         }
@@ -1144,7 +1168,7 @@ async function saveExpenses() {
             action: 'saveExpenses',
             date: date,
             expenses: expenses,
-            userEmail: userEmail  // Required for backend authorization
+            idToken: idToken
         };
         
         console.log('[ADD_SCREEN] Sending payload:', JSON.stringify(payload, null, 2));
@@ -1152,7 +1176,7 @@ async function saveExpenses() {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
         });
@@ -1268,8 +1292,8 @@ async function saveMonthly() {
     
     // Save using existing API
     try {
-        const userEmail = getAuthUserEmail();
-        if (!userEmail) {
+        const idToken = getAuthToken();
+        if (!idToken) {
             showToast('Please sign in to continue', 'error');
             return;
         }
@@ -1282,7 +1306,7 @@ async function saveMonthly() {
             action: 'saveExpenses',
             date: date,
             expenses: transactions,
-            userEmail: userEmail  // Required for backend authorization
+            idToken: idToken
         };
         
         console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
@@ -1290,7 +1314,7 @@ async function saveMonthly() {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
         });
@@ -1624,8 +1648,8 @@ async function handleBudgetSubmit(event) {
     
     // Save to Google Sheets
     try {
-        const userEmail = getAuthUserEmail();
-        if (!userEmail) {
+        const idToken = getAuthToken();
+        if (!idToken) {
             showToast('Please sign in to continue', 'error');
             return;
         }
@@ -1639,12 +1663,12 @@ async function handleBudgetSubmit(event) {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 action: 'saveBudget',
                 budgets: budgets,
-                userEmail: userEmail  // Required for backend authorization
+                idToken: idToken
             })
         });
         

@@ -5,8 +5,8 @@
         userName: 'expenseManager_userName'
     };
 
-    // Use localStorage for persistence across sessions/tabs
-    const storage = localStorage;
+    // Use sessionStorage so ID token does not persist across browser restarts
+    const storage = sessionStorage;
 
     function getEl(id) {
         return document.getElementById(id);
@@ -26,8 +26,12 @@
     }
 
     function refreshAppData() {
-        if (typeof window.fetchCategories === 'function') {
-            window.fetchCategories().catch(err => console.error('[AUTH] fetchCategories after login failed', err));
+        if (typeof window.initializeAppAfterAuth === 'function') {
+            const ready = window.initializeAppAfterAuth();
+            if (!ready) {
+                console.warn('[AUTH] App init deferred until token is available');
+                return;
+            }
         }
         if (typeof window.loadHomeData === 'function') {
             try {
@@ -119,6 +123,9 @@
             console.log('[AUTH] No valid session found');
             clearSession();
             hideApp();
+            if (typeof window.resetAppInitialization === 'function') {
+                window.resetAppInitialization();
+            }
         }
     }
 
@@ -139,6 +146,9 @@
         }
 
         hideApp();
+        if (typeof window.resetAppInitialization === 'function') {
+            window.resetAppInitialization();
+        }
     }
 
     window.handleCredentialResponse = function handleCredentialResponse(response) {
@@ -189,6 +199,10 @@
         }
         logoutUser();
     }
+
+    // Expose shared auth storage so other modules use the same keys
+    window.AUTH_STORAGE_KEYS = STORAGE_KEYS;
+    window.AUTH_STORAGE = storage;
 
     // Expose minimal auth hooks for the app shell
     window.appAuth = {
