@@ -15,15 +15,39 @@
     function showApp() {
         const appRoot = getEl('app-root');
         const authGate = getEl('auth-gate');
-        if (appRoot) appRoot.style.display = 'block';
-        if (authGate) authGate.style.display = 'none';
+        if (appRoot) {
+            appRoot.classList.add('visible');
+            appRoot.classList.remove('hidden');
+        }
+        if (authGate) {
+            authGate.classList.add('hidden');
+            authGate.classList.remove('visible');
+        }
+    }
+
+    function refreshAppData() {
+        if (typeof window.fetchCategories === 'function') {
+            window.fetchCategories().catch(err => console.error('[AUTH] fetchCategories after login failed', err));
+        }
+        if (typeof window.loadHomeData === 'function') {
+            try {
+                window.loadHomeData();
+            } catch (err) {
+                console.error('[AUTH] loadHomeData after login failed', err);
+            }
+        }
     }
 
     function hideApp() {
         const appRoot = getEl('app-root');
         const authGate = getEl('auth-gate');
-        if (appRoot) appRoot.style.display = 'none';
-        if (authGate) authGate.style.display = 'flex';
+        if (appRoot) {
+            appRoot.classList.remove('visible');
+            appRoot.classList.add('hidden');
+        }
+        if (authGate) {
+            authGate.classList.remove('hidden');
+        }
     }
 
     function clearSession() {
@@ -90,6 +114,7 @@
         if (token && email) {
             console.log('[AUTH] Restoring session for', email);
             showApp();
+            refreshAppData();
         } else {
             console.log('[AUTH] No valid session found');
             clearSession();
@@ -114,11 +139,6 @@
         }
 
         hideApp();
-        
-        // Reload to ensure clean state
-        setTimeout(() => {
-            window.location.reload();
-        }, 500);
     }
 
     window.handleCredentialResponse = function handleCredentialResponse(response) {
@@ -143,12 +163,15 @@
 
             console.log('[AUTH] Signed in as', email);
             showApp();
+            refreshAppData();
         } catch (error) {
             console.error('[AUTH] Failed to handle credential', error);
         }
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Ensure initial gate state is consistent before any auth checks
+        hideApp();
         restoreSession();
         pollForGsiReady();
     });

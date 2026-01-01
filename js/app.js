@@ -410,9 +410,13 @@ function setupPageNavigation() {
     console.log('[PAGE_NAV] Found pages:', pages.length);
 
     pageNavBtns.forEach(btn => {
+        const targetPage = btn.getAttribute('data-page');
+        if (!targetPage) {
+            return; // skip buttons like logout without a target page
+        }
+
         btn.addEventListener('click', (e) => {
             e.preventDefault();
-            const targetPage = btn.getAttribute('data-page');
             console.log('[PAGE_NAV] Button clicked, target page:', targetPage);
 
             // Use Add flow helper so rows and defaults are initialized every time
