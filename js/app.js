@@ -12,7 +12,7 @@
  */
 const CONFIG = {
     // Replace with your deployed Apps Script Web App URL
-    BACKEND_URL: 'https://script.google.com/macros/s/AKfycby2pYr9ItXZ5nIQj1I0WSYaFFBEjLLNI_R0URQ4Xwu2k4cYeTfpJy-wpUkP_rMEsK6gsg/exec',
+    BACKEND_URL: 'https://script.google.com/macros/s/AKfycbws-83nO_YVDBgOgDe_fLAmO8V8MJOC0-YpgK-Cxfjomy8zpnXGL2yDWFTFVTCTyS64Qg/exec',
     MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June',
                   'July', 'August', 'September', 'October', 'November', 'December'],
     EXPENSE_ROWS: 5,
@@ -44,20 +44,58 @@ let appState = {
 // ====================================================
 
 /**
+ * Get authenticated user email for API authorization
+ * @returns {string|null} - User email or null if not signed in
+ */
+function getAuthUserEmail() {
+    return (window.appAuth && typeof window.appAuth.getUserEmail === 'function') 
+        ? window.appAuth.getUserEmail() 
+        : null;
+}
+
+/**
+ * Check API response for authorization errors
+ * Centralized handler for UNAUTHORIZED responses
+ * @param {Object} result - API response object
+ * @returns {boolean} - True if authorized, false if unauthorized
+ */
+function checkApiAuthorization(result) {
+    if (result && result.success === false && result.error === 'UNAUTHORIZED') {
+        console.error('[API] Unauthorized response from backend');
+        if (window.appAuth && typeof window.appAuth.handleUnauthorized === 'function') {
+            window.appAuth.handleUnauthorized('Access denied. Please sign in again.');
+        }
+        return false;
+    }
+    return true;
+}
+
+/**
  * Fetch all expense categories from backend.
  * Called during app initialization.
  */
 async function fetchCategories() {
     try {
+        const userEmail = getAuthUserEmail();
+        if (!userEmail) {
+            console.warn('[API] User not signed in, skipping fetchCategories');
+            return;
+        }
+
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'text/plain;charset=utf-8'
             },
-            body: JSON.stringify({ action: 'getCategories' })
+            body: JSON.stringify({ 
+                action: 'getCategories',
+                userEmail: userEmail  // Required for backend authorization
+            })
         });
 
         const result = await response.json();
+
+        if (!checkApiAuthorization(result)) return;
 
         if (result.success && result.categories) {
             appState.categories = result.categories;
@@ -220,6 +258,13 @@ async function fetchHomeExpensesForMonth(year, month) {
     try {
         console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
         
+        const userEmail = getAuthUserEmail();
+        if (!userEmail) {
+            console.warn('[HOME] User not signed in');
+            showToast('Please sign in to continue', 'error');
+            return;
+        }
+
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
@@ -228,12 +273,15 @@ async function fetchHomeExpensesForMonth(year, month) {
             body: JSON.stringify({
                 action: 'getExpensesByMonth',
                 year: year,
-                month: month
+                month: month,
+                userEmail: userEmail  // Required for backend authorization
             })
         });
         
         const result = await response.json();
         console.log('[HOME] Fetch result:', result);
+        
+        if (!checkApiAuthorization(result)) return;
         
         if (result.success && result.expensesByDate) {
             appState.homeExpensesByDate = result.expensesByDate;
@@ -431,6 +479,7 @@ function initializeApp() {
     initializeHomePage();
     initializeAddScreen();
     fetchCategories().catch(err => console.error('[APP] Failed to load categories:', err));
+    setupLogout();
 }
 
 /**
@@ -467,6 +516,30 @@ function setupFAB() {
     } else {
         console.warn('[FAB] FAB button not found in DOM');
     }
+}
+
+// ====================================================
+// AUTH HANDLERS
+// ====================================================
+
+function setupLogout() {
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (!logoutBtn) return;
+
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('[APP] Logout requested');
+        
+        if (window.appAuth && typeof window.appAuth.logout === 'function') {
+            window.appAuth.logout();
+        } else {
+            // Fallback: clear storage and reload
+            localStorage.removeItem('expenseManager_idToken');
+            localStorage.removeItem('expenseManager_userEmail');
+            localStorage.removeItem('expenseManager_userName');
+            window.location.reload();
+        }
+    });
 }
 
 // ====================================================
@@ -1053,6 +1126,12 @@ async function saveExpenses() {
     
     // Save using existing API
     try {
+        const userEmail = getAuthUserEmail();
+        if (!userEmail) {
+            showToast('Please sign in to continue', 'error');
+            return;
+        }
+
         const saveBtn = document.getElementById('expensesSaveBtn');
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
@@ -1060,7 +1139,8 @@ async function saveExpenses() {
         const payload = {
             action: 'saveExpenses',
             date: date,
-            expenses: expenses
+            expenses: expenses,
+            userEmail: userEmail  // Required for backend authorization
         };
         
         console.log('[ADD_SCREEN] Sending payload:', JSON.stringify(payload, null, 2));
@@ -1077,6 +1157,14 @@ async function saveExpenses() {
         
         console.log('[ADD_SCREEN] Save response status:', response.status);
         console.log('[ADD_SCREEN] Save result:', result);
+        
+        if (!checkApiAuthorization(result)) {
+            const saveBtn = document.getElementById('expensesSaveBtn');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+            return;
+        }
+        
         console.log('[ADD_SCREEN] Result success?', result.success);
         console.log('[ADD_SCREEN] Result message:', result.message);
         console.log('[ADD_SCREEN] Full result object:', JSON.stringify(result, null, 2));
@@ -1176,6 +1264,12 @@ async function saveMonthly() {
     
     // Save using existing API
     try {
+        const userEmail = getAuthUserEmail();
+        if (!userEmail) {
+            showToast('Please sign in to continue', 'error');
+            return;
+        }
+
         const saveBtn = document.getElementById('monthlySaveBtn');
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
@@ -1183,7 +1277,8 @@ async function saveMonthly() {
         const payload = {
             action: 'saveExpenses',
             date: date,
-            expenses: transactions
+            expenses: transactions,
+            userEmail: userEmail  // Required for backend authorization
         };
         
         console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
@@ -1200,6 +1295,14 @@ async function saveMonthly() {
         
         console.log('[ADD_SCREEN] Monthly save response status:', response.status);
         console.log('[ADD_SCREEN] Monthly save result:', result);
+        
+        if (!checkApiAuthorization(result)) {
+            const saveBtn = document.getElementById('monthlySaveBtn');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+            return;
+        }
+        
         console.log('[ADD_SCREEN] Result success?', result.success);
         console.log('[ADD_SCREEN] Result message:', result.message);
         console.log('[ADD_SCREEN] Full result object:', JSON.stringify(result, null, 2));
@@ -1517,6 +1620,12 @@ async function handleBudgetSubmit(event) {
     
     // Save to Google Sheets
     try {
+        const userEmail = getAuthUserEmail();
+        if (!userEmail) {
+            showToast('Please sign in to continue', 'error');
+            return;
+        }
+
         const saveBtn = form.querySelector('button[type="submit"]');
         if (saveBtn) {
             saveBtn.disabled = true;
@@ -1530,12 +1639,22 @@ async function handleBudgetSubmit(event) {
             },
             body: JSON.stringify({
                 action: 'saveBudget',
-                budgets: budgets
+                budgets: budgets,
+                userEmail: userEmail  // Required for backend authorization
             })
         });
         
         const result = await response.json();
         console.log('[BUDGET] Save result:', result);
+        
+        if (!checkApiAuthorization(result)) {
+            const saveBtn = form.querySelector('button[type="submit"]');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '💾 Save Budget';
+            }
+            return;
+        }
         
         if (result.success) {
             showToast('Budget saved successfully!', 'success');

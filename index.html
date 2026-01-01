@@ -8,7 +8,18 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div class="container">
+    <div id="auth-gate" class="auth-gate">
+        <div class="auth-card">
+            <h1 class="auth-brand-title">Expense Manager</h1>
+            <p class="auth-brand-subtitle">Personal finance tracker</p>
+            <div class="auth-divider"></div>
+            <p class="auth-instruction">Sign in to continue</p>
+            <div id="gsi-button"></div>
+            <p class="auth-footer">Access restricted to authorized users</p>
+        </div>
+    </div>
+
+    <div id="app-root" class="container">
         <!-- HEADER SECTION -->
         <header class="app-header">
             <div class="header-content">
@@ -519,6 +530,8 @@
     </div>
 
     <!-- JavaScript -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

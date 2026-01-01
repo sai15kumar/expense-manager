@@ -14,6 +14,24 @@
 const SHEET_ID = '1yeXItfT47WxpcYCff-F8uBWeMIuvN52PrGl1B4AmaFc';
 
 /**
+ * Allowed user emails for API access
+ * Only these users can call the backend APIs
+ */
+const ALLOWED_USERS = [
+  "sai15kumar@gmail.com",
+  "rubijohn88@gmail.com"
+];
+
+/**
+ * Check if a user email is authorized
+ * @param {string} email - User email to check
+ * @returns {boolean} - True if authorized
+ */
+function isAuthorized(email) {
+  return ALLOWED_USERS.includes(email);
+}
+
+/**
  * Sheet names in the Google Spreadsheet
  * Must match exactly with the actual sheet names
  */
@@ -73,6 +91,16 @@ function doPost(e) {
         const data = JSON.parse(e.postData.contents);
         const action = data.action;
         
+        // Authorization check: verify user email from request payload
+        const userEmail = data.userEmail || '';
+        if (!isAuthorized(userEmail)) {
+            console.log(`Unauthorized access attempt: ${userEmail}`);
+            return ContentService.createTextOutput(JSON.stringify({
+                success: false,
+                error: 'UNAUTHORIZED'
+            })).setMimeType(ContentService.MimeType.JSON);
+        }
+        
         console.log(`Received request: ${action}`);
         
         // Route to appropriate handler
@@ -117,11 +145,27 @@ function doPost(e) {
 }
 
 // Lightweight health check for GET requests
-function doGet() {
-    return ContentService.createTextOutput(JSON.stringify({
-        success: true,
-        message: 'Expense Manager backend is running'
-    })).setMimeType(ContentService.MimeType.JSON);
+function doGet(e) {
+    try {
+        // Authorization check: verify user email from query parameters
+        const userEmail = (e && e.parameter && e.parameter.userEmail) || '';
+        if (!isAuthorized(userEmail)) {
+            return ContentService.createTextOutput(JSON.stringify({
+                success: false,
+                error: 'UNAUTHORIZED'
+            })).setMimeType(ContentService.MimeType.JSON);
+        }
+        
+        return ContentService.createTextOutput(JSON.stringify({
+            success: true,
+            message: 'Expense Manager backend is running'
+        })).setMimeType(ContentService.MimeType.JSON);
+    } catch (error) {
+        return ContentService.createTextOutput(JSON.stringify({
+            success: false,
+            error: 'Server error'
+        })).setMimeType(ContentService.MimeType.JSON);
+    }
 }
 
 // ====================================================
