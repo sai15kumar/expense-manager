@@ -37,7 +37,9 @@ const COLUMNS = {
     },
     expenseMaster: {
         CATEGORY: 1,
-        TYPE: 2
+        TYPE: 2,
+        BUDGET_MONTHLY: 3,
+        BUDGET_YEARLY: 4
     }
 };
 
@@ -87,6 +89,12 @@ function doPost(e) {
                 break;
             case 'getExpensesByMonth':
                 response = handleGetExpensesByMonth(data);
+                break;
+            case 'getBudgets':
+                response = handleGetBudgets();
+                break;
+            case 'saveBudget':
+                response = handleSaveBudget(data);
                 break;
             default:
                 response = {
@@ -160,24 +168,30 @@ function handleGetCategories() {
                 'expense': 'Expense',
                 'income': 'Income',
                 'payoff': 'Payoff',
-                'payoffs': 'Payoff'
+                'payoffs': 'Payoff',
+                'savings': 'Savings',
+                'saving': 'Savings'
             };
             const key = (t || '').toString().trim().toLowerCase();
             return map[key] || (t || '').toString().trim() || 'Expense';
         };
 
-        // Sheet layout (as per your data):
-        // Column A = Type (Income/Expense/Payoff), Column B = Category name
-        // If they appear flipped, this logic now reads col A as category and col B as type to match observed payload.
+        // Sheet layout:
+        // Column A = Type (Income/Expense/Payoff), Column B = Category name, Column C = Monthly Budget
         for (let i = 1; i < values.length; i++) {
-            const rawCategory = values[i][0]; // what we observed as "Income", "Payoff", etc.
-            const rawType = values[i][1];     // what we observed as "Sai-Income", "Car Loan", etc.
-            const type = normalizeType(rawCategory);
-            const name = (rawType || '').toString().trim();
+            const rawType = values[i][0];     // Column A = Type
+            const rawCategory = values[i][1]; // Column B = Category name
+            const monthlyBudget = parseFloat(values[i][2]) || 0; // Column C = Monthly Budget
+            const type = normalizeType(rawType);
+            const name = (rawCategory || '').toString().trim();
 
-            console.log(`Row ${i}: rawCategory="${rawCategory}", rawType="${rawType}", type="${type}", name="${name}"`);
+            console.log(`Row ${i}: rawType="${rawType}", rawCategory="${rawCategory}", budget="${monthlyBudget}", type="${type}", name="${name}"`);
             if (name) {
-                categories.push({ name, type });
+                categories.push({ 
+                    name, 
+                    type,
+                    budget: monthlyBudget
+                });
             }
         }
 
@@ -432,9 +446,168 @@ function handleGetExpensesByMonth(data) {
     }
 }
 
+/**
+ * Handle GET BUDGETS action
+ * Fetches all budgets for each category from Expense_Master sheet
+ * 
+ * @returns {Object} - Response with budgets array
+ * Response format:
+ * {
+ *   "success": true,
+ *   "budgets": [
+ *     {"category": "Groceries", "monthlyBudget": 5000, "yearlyBudget": 60000},
+ *     ...
+ *   ]
+ * }
+ */
+function handleGetBudgets() {
+    try {
+        console.log('handleGetBudgets: Starting...');
+        const ss = SpreadsheetApp.openById(SHEET_ID);
+        const masterSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_MASTER);
+        
+        if (!masterSheet) {
+            return {
+                success: false,
+                message: `Sheet ${SHEET_NAMES.EXPENSE_MASTER} not found`
+            };
+        }
+        
+        const range = masterSheet.getDataRange();
+        const values = range.getValues();
+        console.log('handleGetBudgets: Got values, count:', values.length);
+        
+        const budgets = [];
+        
+        // Row 0 is header, data starts from row 1
+        // Column B (index 1) = Category name, Column C (index 2) = Budget Monthly, Column D (index 3) = Budget Yearly
+        for (let i = 1; i < values.length; i++) {
+            const category = (values[i][1] || '').toString().trim();
+            const monthlyBudget = parseFloat(values[i][COLUMNS.expenseMaster.BUDGET_MONTHLY - 1]) || 0;
+            const yearlyBudget = parseFloat(values[i][COLUMNS.expenseMaster.BUDGET_YEARLY - 1]) || 0;
+            
+            if (category) {
+                budgets.push({
+                    category: category,
+                    monthlyBudget: monthlyBudget,
+                    yearlyBudget: yearlyBudget
+                });
+                console.log(`handleGetBudgets: Found category "${category}" - Monthly: ${monthlyBudget}, Yearly: ${yearlyBudget}`);
+            }
+        }
+        
+        console.log('handleGetBudgets: Final budgets:', budgets.length);
+        return {
+            success: true,
+            budgets: budgets
+        };
+        
+    } catch (error) {
+        console.log('handleGetBudgets: Error caught:', error.message);
+        return {
+            success: false,
+            message: error.message
+        };
+    }
+}
+
+/**
+ * Handle SAVE BUDGET action
+ * Saves/updates budgets for categories in Expense_Master sheet
+ * 
+ * @param {Object} data - Request data containing:
+ *   - budgets (array of {category, monthlyBudget, yearlyBudget})
+ * 
+ * @returns {Object} - Response indicating success/failure
+ * Response format:
+ * {
+ *   "success": true,
+ *   "message": "Saved 5 budgets",
+ *   "count": 5
+ * }
+ */
+function handleSaveBudget(data) {
+    try {
+        data = data || {};
+        if (!data.budgets || !Array.isArray(data.budgets)) {
+            return {
+                success: false,
+                message: 'Missing required field: budgets array'
+            };
+        }
+        
+        const ss = SpreadsheetApp.openById(SHEET_ID);
+        const masterSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_MASTER);
+        
+        if (!masterSheet) {
+            return {
+                success: false,
+                message: `Sheet ${SHEET_NAMES.EXPENSE_MASTER} not found`
+            };
+        }
+        
+        const range = masterSheet.getDataRange();
+        const values = range.getValues();
+        
+        console.log(`handleSaveBudget: Received ${data.budgets.length} budgets to save`);
+        console.log(`handleSaveBudget: Sheet has ${values.length - 1} rows of data`);
+        
+        let updateCount = 0;
+        
+        // Create a map of sheet categories (trimmed lowercase) to row index for faster lookup
+        // NOTE: Column B (index 1) contains the actual category names like "Sai-Income", "Car Loan", etc.
+        const categoryMap = {};
+        for (let i = 1; i < values.length; i++) {
+            // Column B (index 1) has the category name
+            const rowCategory = (values[i][1] || '').toString().trim();
+            if (rowCategory) {
+                categoryMap[rowCategory.toLowerCase()] = i;
+                console.log(`handleSaveBudget: Found category in sheet: "${rowCategory}" at row ${i + 1}`);
+            }
+        }
+        
+        console.log(`handleSaveBudget: Category map has ${Object.keys(categoryMap).length} entries`);
+        
+        // For each budget in the request
+        for (const budget of data.budgets) {
+            if (!budget.category) {
+                continue;
+            }
+            
+            const incomingCat = (budget.category || '').toString().trim();
+            const rowIndex = categoryMap[incomingCat.toLowerCase()];
+            
+            if (rowIndex !== undefined) {
+                // Update the budget columns in this row
+                // Column C = Budget Monthly, Column D = Budget Yearly
+                masterSheet.getRange(rowIndex + 1, COLUMNS.expenseMaster.BUDGET_MONTHLY).setValue(budget.monthlyBudget || 0);
+                masterSheet.getRange(rowIndex + 1, COLUMNS.expenseMaster.BUDGET_YEARLY).setValue(budget.yearlyBudget || 0);
+                updateCount++;
+                console.log(`handleSaveBudget: Updated "${incomingCat}" (row ${rowIndex + 1}) - Monthly: ${budget.monthlyBudget}, Yearly: ${budget.yearlyBudget}`);
+            } else {
+                console.log(`handleSaveBudget: No match for category "${incomingCat}". Available: ${Object.keys(categoryMap).join(', ')}`);
+            }
+        }
+        
+        console.log(`handleSaveBudget: Updated ${updateCount} out of ${data.budgets.length} budgets`);
+        return {
+            success: true,
+            message: `Saved ${updateCount} budgets`,
+            count: updateCount
+        };
+        
+    } catch (error) {
+        console.error(`Error saving budget: ${error.message}`);
+        return {
+            success: false,
+            message: error.message
+        };
+    }
+}
+
 // ====================================================
 // UTILITY FUNCTIONS
-// ====================================================
+// =====================================================
 
 /**
  * Format date object or value to YYYY-MM-DD string
@@ -496,20 +669,20 @@ function createDefaultSheets() {
     let masterSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_MASTER);
     if (!masterSheet) {
         masterSheet = ss.insertSheet(SHEET_NAMES.EXPENSE_MASTER);
-        masterSheet.appendRow(['Category', 'Type']);
+        masterSheet.appendRow(['Category', 'Type', 'Budget (Monthly)', 'Budget (Yearly)']);
         
         // Add default categories aligned with Expense / Income / Payoff
         const defaultCategories = [
-            ['Groceries', 'Expense'],
-            ['Transport', 'Expense'],
-            ['Rent', 'Expense'],
-            ['Utilities', 'Expense'],
-            ['Dining Out', 'Expense'],
-            ['Salary', 'Income'],
-            ['Bonus', 'Income'],
-            ['Interest', 'Income'],
-            ['Debt Payment', 'Payoff'],
-            ['Credit Card', 'Payoff']
+            ['Groceries', 'Expense', 0, 0],
+            ['Transport', 'Expense', 0, 0],
+            ['Rent', 'Expense', 0, 0],
+            ['Utilities', 'Expense', 0, 0],
+            ['Dining Out', 'Expense', 0, 0],
+            ['Salary', 'Income', 0, 0],
+            ['Bonus', 'Income', 0, 0],
+            ['Interest', 'Income', 0, 0],
+            ['Debt Payment', 'Payoff', 0, 0],
+            ['Credit Card', 'Payoff', 0, 0]
         ];
         
         defaultCategories.forEach(cat => {
@@ -517,7 +690,7 @@ function createDefaultSheets() {
         });
         
         // Format header row
-        const headerRange = masterSheet.getRange(1, 1, 1, 2);
+        const headerRange = masterSheet.getRange(1, 1, 1, 4);
         headerRange.setBackground('#667eea');
         headerRange.setFontColor('#ffffff');
         headerRange.setFontWeight('bold');

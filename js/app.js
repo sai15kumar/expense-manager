@@ -12,7 +12,7 @@
  */
 const CONFIG = {
     // Replace with your deployed Apps Script Web App URL
-    BACKEND_URL: 'https://script.google.com/macros/s/AKfycbxAGyg-FWbRqEpGoJozCWWeIqP4xfWGBxuxEykseJkuOkXLu1oZyc3wBBO5yqvOPbMFoQ/exec',
+    BACKEND_URL: 'https://script.google.com/macros/s/AKfycby2pYr9ItXZ5nIQj1I0WSYaFFBEjLLNI_R0URQ4Xwu2k4cYeTfpJy-wpUkP_rMEsK6gsg/exec',
     MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June',
                   'July', 'August', 'September', 'October', 'November', 'December'],
     EXPENSE_ROWS: 5,
@@ -1349,6 +1349,12 @@ function setupPageNavigation() {
             if (targetPageEl) {
                 targetPageEl.style.display = 'block';
                 console.log('[PAGE_NAV] Showed page:', targetPage);
+                
+                // Initialize budget page when navigating to it
+                if (targetPage === 'budget') {
+                    console.log('[BUDGET] Initializing budget page...');
+                    initBudgetPage();
+                }
             } else {
                 console.error('[PAGE_NAV] Page not found:', `${targetPage}-page`);
             }
@@ -2157,3 +2163,345 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
+// ====================================================
+// BUDGET PAGE FUNCTIONALITY
+// ====================================================
+
+/**
+ * Initialize Budget Page
+ */
+function initBudgetPage() {
+    console.log('[BUDGET] Initializing budget page...');
+    console.log('[BUDGET] Categories available:', appState.categories);
+    
+    // Check if categories are loaded, if not fetch them first
+    if (!appState.categories || appState.categories.length === 0) {
+        console.log('[BUDGET] Categories not loaded, fetching...');
+        fetchCategories().then(() => {
+            populateBudgetTable();
+            loadBudgetData();
+        });
+    } else {
+        // Populate budget table from categories
+        populateBudgetTable();
+        loadBudgetData();
+    }
+    
+    // Setup form submission
+    const budgetForm = document.getElementById('budgetForm');
+    if (budgetForm) {
+        budgetForm.addEventListener('submit', handleBudgetSubmit);
+    }
+}
+
+/**
+ * Populate budget tables by type
+ */
+function populateBudgetTable() {
+    const incomeTableBody = document.getElementById('incomeTableBody');
+    const expenseTableBody = document.getElementById('expenseTableBody');
+    const payoffTableBody = document.getElementById('payoffTableBody');
+    const savingsTableBody = document.getElementById('savingsTableBody');
+    
+    // Clear existing
+    if (incomeTableBody) incomeTableBody.innerHTML = '';
+    if (expenseTableBody) expenseTableBody.innerHTML = '';
+    if (payoffTableBody) payoffTableBody.innerHTML = '';
+    if (savingsTableBody) savingsTableBody.innerHTML = '';
+    
+    console.log('[BUDGET] All categories:', appState.categories);
+    
+    // Group categories by type
+    const incomeCategories = appState.categories.filter(c => c.type === 'Income').sort((a, b) => a.name.localeCompare(b.name));
+    const expenseCategories = appState.categories.filter(c => c.type === 'Expense').sort((a, b) => a.name.localeCompare(b.name));
+    const payoffCategories = appState.categories.filter(c => c.type === 'Payoff').sort((a, b) => a.name.localeCompare(b.name));
+    const savingsCategories = appState.categories.filter(c => c.type === 'Savings').sort((a, b) => a.name.localeCompare(b.name));
+    
+    console.log('[BUDGET] Income:', incomeCategories.length, 'Expense:', expenseCategories.length, 'Payoff:', payoffCategories.length, 'Savings:', savingsCategories.length);
+    
+    // Populate each table
+    incomeCategories.forEach(cat => {
+        if (incomeTableBody) {
+            const row = createBudgetTableRow(cat.name, cat.type);
+            incomeTableBody.appendChild(row);
+        }
+    });
+    
+    expenseCategories.forEach(cat => {
+        if (expenseTableBody) {
+            const row = createBudgetTableRow(cat.name, cat.type);
+            expenseTableBody.appendChild(row);
+        }
+    });
+    
+    payoffCategories.forEach(cat => {
+        if (payoffTableBody) {
+            const row = createBudgetTableRow(cat.name, cat.type);
+            payoffTableBody.appendChild(row);
+        }
+    });
+    
+    savingsCategories.forEach(cat => {
+        if (savingsTableBody) {
+            const row = createBudgetTableRow(cat.name, cat.type);
+            savingsTableBody.appendChild(row);
+        }
+    });
+    
+    // Setup collapsible sections
+    setupBudgetSectionToggle();
+}
+
+/**
+ * Setup collapsible sections for budget tables
+ */
+function setupBudgetSectionToggle() {
+    const sectionHeaders = document.querySelectorAll('.budget-type-header');
+    
+    sectionHeaders.forEach(header => {
+        // Remove existing listeners
+        const newHeader = header.cloneNode(true);
+        header.parentNode.replaceChild(newHeader, header);
+        
+        newHeader.addEventListener('click', (e) => {
+            e.preventDefault();
+            const section = newHeader.closest('.budget-type-section');
+            
+            // Get all budget sections
+            const allSections = document.querySelectorAll('.budget-type-section');
+            
+            // Close all sections except the clicked one
+            allSections.forEach(s => {
+                if (s !== section) {
+                    s.classList.add('collapsed');
+                }
+            });
+            
+            // Toggle the clicked section
+            section.classList.toggle('collapsed');
+        });
+    });
+}
+
+/**
+ * Create budget table row for a category
+ */
+function createBudgetTableRow(categoryName, type) {
+    const tr = document.createElement('tr');
+    tr.dataset.category = categoryName;
+    tr.dataset.type = type;
+    
+    // Category column
+    const categoryCell = document.createElement('td');
+    categoryCell.textContent = categoryName;
+    tr.appendChild(categoryCell);
+    
+    // Monthly budget input column
+    const monthlyCell = document.createElement('td');
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.id = `budget-${type}-${categoryName}`;
+    input.name = `budget-${type}-${categoryName}`;
+    input.step = '0.01';
+    input.min = '0';
+    input.placeholder = '0.00';
+    input.dataset.category = categoryName;
+    input.dataset.type = type;
+    input.addEventListener('input', (e) => updateYearlyAmount(e.target));
+    monthlyCell.appendChild(input);
+    tr.appendChild(monthlyCell);
+    
+    // Yearly budget column (auto-calculated)
+    const yearlyCell = document.createElement('td');
+    yearlyCell.className = 'yearly-amount';
+    yearlyCell.id = `yearly-${type}-${categoryName}`;
+    yearlyCell.textContent = '0.00';
+    tr.appendChild(yearlyCell);
+    
+    return tr;
+}
+
+/**
+ * Update yearly amount when monthly budget changes
+ */
+function updateYearlyAmount(input) {
+    const monthlyAmount = parseFloat(input.value) || 0;
+    const yearlyAmount = monthlyAmount * 12;
+    const type = input.dataset.type;
+    const category = input.dataset.category;
+    const yearlyCell = document.getElementById(`yearly-${type}-${category}`);
+    if (yearlyCell) {
+        yearlyCell.textContent = yearlyAmount.toFixed(2);
+    }
+    
+    // Update summary cards
+    updateBudgetSummary();
+}
+
+/**
+ * Update budget summary cards with totals for each type
+ */
+function updateBudgetSummary() {
+    const incomeHeaderSummary = document.getElementById('incomeHeaderSummary');
+    const savingsHeaderSummary = document.getElementById('savingsHeaderSummary');
+    const payoffHeaderSummary = document.getElementById('payoffHeaderSummary');
+    const expenseHeaderSummary = document.getElementById('expenseHeaderSummary');
+    
+    let incomeTotal = 0;
+    let savingsTotal = 0;
+    let payoffTotal = 0;
+    let expenseTotal = 0;
+    
+    // Sum up all input values by type
+    const inputs = document.querySelectorAll('#budgetForm input[type="number"]');
+    inputs.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        const type = input.dataset.type;
+        
+        if (type === 'Income') {
+            incomeTotal += amount;
+        } else if (type === 'Savings') {
+            savingsTotal += amount;
+        } else if (type === 'Payoff') {
+            payoffTotal += amount;
+        } else if (type === 'Expense') {
+            expenseTotal += amount;
+        }
+    });
+    
+    // Update header displays
+    if (incomeHeaderSummary) incomeHeaderSummary.textContent = `₹${incomeTotal.toFixed(2)}`;
+    if (savingsHeaderSummary) savingsHeaderSummary.textContent = `₹${savingsTotal.toFixed(2)}`;
+    if (payoffHeaderSummary) payoffHeaderSummary.textContent = `₹${payoffTotal.toFixed(2)}`;
+    if (expenseHeaderSummary) expenseHeaderSummary.textContent = `₹${expenseTotal.toFixed(2)}`;
+}
+
+/**
+ * Create budget input field for a category (deprecated - keeping for compatibility)
+ */
+function createBudgetInput(categoryName, type) {
+    const div = document.createElement('div');
+    div.className = 'form-row';
+    
+    const label = document.createElement('label');
+    label.textContent = categoryName;
+    label.htmlFor = `budget-${type}-${categoryName}`;
+    
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.id = `budget-${type}-${categoryName}`;
+    input.name = `budget-${type}-${categoryName}`;
+    input.step = '0.01';
+    input.min = '0';
+    input.placeholder = '0.00';
+    input.dataset.category = categoryName;
+    input.dataset.type = type;
+    
+    div.appendChild(label);
+    div.appendChild(input);
+    
+    return div;
+}
+
+/**
+ * Load saved budget data from localStorage
+ */
+/**
+ * Load budget data from categories
+ */
+function loadBudgetData() {
+    console.log('[BUDGET] Loading budget data from categories...');
+    
+    // Populate inputs with budget values from categories
+    if (appState.categories && appState.categories.length > 0) {
+        appState.categories.forEach(cat => {
+            if (cat.budget && cat.budget > 0) {
+                const inputId = `budget-${cat.type}-${cat.name}`;
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.value = cat.budget;
+                    // Update yearly amount
+                    updateYearlyAmount(input);
+                }
+            }
+        });
+    }
+    
+    // Update summary cards
+    updateBudgetSummary();
+}
+
+/**
+ * Handle budget form submission
+ */
+async function handleBudgetSubmit(event) {
+    event.preventDefault();
+    
+    const budgets = [];
+    const form = document.getElementById('budgetForm');
+    const inputs = form.querySelectorAll('input[type="number"]');
+    
+    inputs.forEach(input => {
+        const monthlyBudget = parseFloat(input.value) || 0;
+        if (monthlyBudget > 0) {
+            const category = input.dataset.category;
+            const type = input.dataset.type;
+            const yearlyBudget = monthlyBudget * 12;
+            
+            budgets.push({
+                category: category,
+                type: type,
+                monthlyBudget: monthlyBudget,
+                yearlyBudget: yearlyBudget
+            });
+        }
+    });
+    
+    console.log('[BUDGET] Saving budget data:', budgets);
+    
+    // Save to Google Sheets
+    try {
+        const saveBtn = form.querySelector('button[type="submit"]');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+        }
+        
+        const response = await fetch(CONFIG.BACKEND_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify({
+                action: 'saveBudget',
+                budgets: budgets
+            })
+        });
+        
+        const result = await response.json();
+        console.log('[BUDGET] Save result:', result);
+        
+        if (result.success) {
+            showToast('Budget saved successfully!', 'success');
+            // Update categories to reflect new budget values
+            fetchCategories().then(() => {
+                loadBudgetData();
+            });
+        } else {
+            showToast(`Failed to save budget: ${result.message}`, 'error');
+        }
+        
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Save Budget';
+        }
+    } catch (error) {
+        console.error('[BUDGET] Error saving budget:', error);
+        showToast('Error saving budget. Please try again.', 'error');
+        const saveBtn = form.querySelector('button[type="submit"]');
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Save Budget';
+        }
+    }
+}

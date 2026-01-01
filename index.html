@@ -203,37 +203,96 @@
 
                     <form id="budgetForm" class="budget-form">
                         <!-- INCOME SECTION -->
-                        <fieldset class="budget-section">
-                            <legend>💵 Income Budget</legend>
-                            <div class="budget-category-group" id="incomeBudgets">
-                                <!-- Income categories will be populated by JS -->
+                        <div class="budget-type-section" data-type="income">
+                            <div class="budget-type-header" data-type="income">
+                                <span class="section-title">💵 Income Budget</span>
+                                <span class="section-summary" id="incomeHeaderSummary">₹0.00</span>
+                                <span class="section-toggle">▼</span>
                             </div>
-                        </fieldset>
-
-                        <!-- EXPENSE SECTION -->
-                        <fieldset class="budget-section">
-                            <legend>💸 Expense Budget</legend>
-                            <div class="budget-category-group" id="expenseBudgets">
-                                <!-- Expense categories will be populated by JS -->
+                            <div class="budget-table-container">
+                                <table class="budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Monthly Budget (₹)</th>
+                                            <th>Yearly Budget (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="incomeTableBody">
+                                        <!-- Income categories will be populated by JS -->
+                                    </tbody>
+                                </table>
                             </div>
-                        </fieldset>
-
-                        <!-- PAYOFF SECTION -->
-                        <fieldset class="budget-section">
-                            <legend>🏦 Payoff Budget</legend>
-                            <div class="budget-category-group" id="payoffBudgets">
-                                <!-- Payoff categories will be populated by JS -->
-                            </div>
-                        </fieldset>
+                        </div>
 
                         <!-- SAVINGS SECTION -->
-                        <fieldset class="budget-section">
-                            <legend>🎯 Savings Target</legend>
-                            <div class="form-row">
-                                <label>Monthly Savings Target (₹)</label>
-                                <input type="number" id="savingsTarget" step="0.01" placeholder="0.00" required>
+                        <div class="budget-type-section collapsed" data-type="savings">
+                            <div class="budget-type-header" data-type="savings">
+                                <span class="section-title">💰 Savings Budget</span>
+                                <span class="section-summary" id="savingsHeaderSummary">₹0.00</span>
+                                <span class="section-toggle">▼</span>
                             </div>
-                        </fieldset>
+                            <div class="budget-table-container">
+                                <table class="budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Monthly Budget (₹)</th>
+                                            <th>Yearly Budget (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="savingsTableBody">
+                                        <!-- Savings categories will be populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- PAYOFF SECTION -->
+                        <div class="budget-type-section collapsed" data-type="payoff">
+                            <div class="budget-type-header" data-type="payoff">
+                                <span class="section-title">🏦 Payoff Budget</span>
+                                <span class="section-summary" id="payoffHeaderSummary">₹0.00</span>
+                                <span class="section-toggle">▼</span>
+                            </div>
+                            <div class="budget-table-container">
+                                <table class="budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Monthly Budget (₹)</th>
+                                            <th>Yearly Budget (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="payoffTableBody">
+                                        <!-- Payoff categories will be populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- EXPENSE SECTION -->
+                        <div class="budget-type-section collapsed" data-type="expense">
+                            <div class="budget-type-header" data-type="expense">
+                                <span class="section-title">💸 Expense Budget</span>
+                                <span class="section-summary" id="expenseHeaderSummary">₹0.00</span>
+                                <span class="section-toggle">▼</span>
+                            </div>
+                            <div class="budget-table-container">
+                                <table class="budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Monthly Budget (₹)</th>
+                                            <th>Yearly Budget (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expenseTableBody">
+                                        <!-- Expense categories will be populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
 
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">💾 Save Budget</button>
