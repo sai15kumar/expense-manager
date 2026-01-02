@@ -292,10 +292,10 @@ function handleGetCategories() {
         };
 
         // Sheet layout:
-        // Column A = Category name, Column B = Type (Income/Expense/Payoff), Column C = Monthly Budget
+        // Column A = Type (Income/Expense/Payoff), Column B = Category name, Column C = Monthly Budget
         for (let i = 1; i < values.length; i++) {
-            const rawCategory = values[i][0]; // Column A = Category name
-            const rawType = values[i][1];     // Column B = Type
+            const rawType = values[i][0];     // Column A = Type
+            const rawCategory = values[i][1]; // Column B = Category name
             const monthlyBudget = parseFloat(values[i][2]) || 0; // Column C = Monthly Budget
             const type = normalizeType(rawType);
             const name = (rawCategory || '').toString().trim();
