@@ -1773,7 +1773,7 @@ body {
 }
 
 .budget-table-container {
-    max-height: 1000px;
+    max-height: none;
     overflow: visible;
     transition: max-height 0.3s ease, padding 0.3s ease;
 }
