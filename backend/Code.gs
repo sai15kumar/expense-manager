@@ -80,72 +80,78 @@ const OAUTH_CLIENT_ID = '443549607958-j392cki6rankqqi597sav782hg80adon.apps.goog
  */
 function verifyGoogleIdToken(idToken) {
     if (!idToken) {
-        Logger.log('verifyGoogleIdToken: Missing ID token');
+        Logger.log('[TOKEN_VERIFY] FAIL: Missing ID token');
         throw new Error('Missing ID token');
     }
 
-    const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
-    Logger.log('verifyGoogleIdToken: Calling tokeninfo endpoint');
+    const url = 'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken);
+    Logger.log('[TOKEN_VERIFY] Calling Google tokeninfo endpoint');
     
-    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    const status = response.getResponseCode();
-    const body = response.getContentText();
+    let response, status, body, tokenInfo;
+    
+    try {
+        response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+        status = response.getResponseCode();
+        body = response.getContentText();
+        Logger.log('[TOKEN_VERIFY] HTTP status: ' + status);
+    } catch (fetchError) {
+        Logger.log('[TOKEN_VERIFY] FAIL: Network error - ' + fetchError.message);
+        throw new Error('Failed to call tokeninfo endpoint');
+    }
 
-    Logger.log('verifyGoogleIdToken: Response status = ' + status);
-
-    let tokenInfo = {};
+    // Parse response
     try {
         tokenInfo = JSON.parse(body);
     } catch (parseError) {
-        Logger.log('verifyGoogleIdToken: Failed to parse response - ' + parseError.message);
+        Logger.log('[TOKEN_VERIFY] FAIL: Cannot parse response - ' + parseError.message);
         throw new Error('Invalid tokeninfo response');
     }
 
+    // Check HTTP status first
     if (status !== 200) {
-        const description = tokenInfo.error_description || tokenInfo.error || 'Token verification failed';
-        Logger.log('verifyGoogleIdToken: Verification failed - ' + description);
-        throw new Error(description);
+        const errorDesc = tokenInfo.error_description || tokenInfo.error || 'Unknown error';
+        Logger.log('[TOKEN_VERIFY] FAIL: HTTP ' + status + ' - ' + errorDesc);
+        throw new Error(errorDesc);
     }
 
-    // Log critical fields for debugging
-    Logger.log('verifyGoogleIdToken: tokenInfo.aud = "' + tokenInfo.aud + '"');
-    Logger.log('verifyGoogleIdToken: tokenInfo.email = "' + tokenInfo.email + '"');
-    Logger.log('verifyGoogleIdToken: tokenInfo.email_verified = "' + tokenInfo.email_verified + '" (type: ' + typeof tokenInfo.email_verified + ')');
+    // Log all critical fields
+    Logger.log('[TOKEN_VERIFY] email = "' + (tokenInfo.email || 'MISSING') + '"');
+    Logger.log('[TOKEN_VERIFY] email_verified = "' + (tokenInfo.email_verified || 'MISSING') + '" (type: ' + typeof tokenInfo.email_verified + ')');
+    Logger.log('[TOKEN_VERIFY] aud = "' + (tokenInfo.aud || 'MISSING') + '"');
+    Logger.log('[TOKEN_VERIFY] exp = ' + (tokenInfo.exp || 'MISSING'));
+    Logger.log('[TOKEN_VERIFY] OAUTH_CLIENT_ID = "' + OAUTH_CLIENT_ID + '"');
 
-    // Check expiration
-    const exp = parseInt(tokenInfo.exp, 10);
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    if (!exp || nowSeconds >= exp) {
-        Logger.log('verifyGoogleIdToken: Token expired (exp=' + exp + ', now=' + nowSeconds + ')');
-        throw new Error('Token expired');
-    }
-
-    // Check email exists
+    // Validate email exists
     const email = tokenInfo.email;
     if (!email) {
-        Logger.log('verifyGoogleIdToken: FAIL - Email missing in token payload');
-        throw new Error('Email missing in token payload');
+        Logger.log('[TOKEN_VERIFY] FAIL: Email missing');
+        throw new Error('Email missing in token');
     }
 
-    // Check email is verified - tokeninfo returns string "true", not boolean
-    const emailVerified = tokenInfo.email_verified;
-    if (emailVerified !== 'true') {
-        Logger.log('verifyGoogleIdToken: FAIL - Email not verified. email_verified="' + emailVerified + '" (expected string "true")');
+    // Validate email is verified (must be string "true")
+    if (tokenInfo.email_verified !== 'true') {
+        Logger.log('[TOKEN_VERIFY] FAIL: email_verified is not "true", got: ' + tokenInfo.email_verified);
         throw new Error('Email not verified');
     }
 
-    // Check audience (aud) matches our OAuth client ID exactly
-    const aud = tokenInfo.aud;
-    if (aud !== OAUTH_CLIENT_ID) {
-        Logger.log('verifyGoogleIdToken: FAIL - Audience mismatch');
-        Logger.log('  Expected: "' + OAUTH_CLIENT_ID + '"');
-        Logger.log('  Got:      "' + aud + '"');
-        Logger.log('  Match:    ' + (aud === OAUTH_CLIENT_ID));
+    // Validate audience (aud) matches exactly
+    if (tokenInfo.aud !== OAUTH_CLIENT_ID) {
+        Logger.log('[TOKEN_VERIFY] FAIL: aud mismatch');
+        Logger.log('  Expected: ' + OAUTH_CLIENT_ID);
+        Logger.log('  Got:      ' + tokenInfo.aud);
         throw new Error('Invalid audience');
     }
 
-    Logger.log('verifyGoogleIdToken: SUCCESS - Verified token for ' + email);
-    return { email, payload: tokenInfo };
+    // Validate expiration
+    const expSeconds = parseInt(tokenInfo.exp, 10);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (!expSeconds || nowSeconds >= expSeconds) {
+        Logger.log('[TOKEN_VERIFY] FAIL: Token expired (exp=' + expSeconds + ', now=' + nowSeconds + ')');
+        throw new Error('Token expired');
+    }
+
+    Logger.log('[TOKEN_VERIFY] SUCCESS: Token verified for ' + email);
+    return { email: email, payload: tokenInfo };
 }
 
 /**
@@ -197,59 +203,67 @@ const COLUMNS = {
  */
 function doPost(e) {
     try {
-        Logger.log('=== AUTH DEBUG START ===');
-        Logger.log('doPost: Raw POST body = ' + (e && e.postData && e.postData.contents));
-        Logger.log('doPost: Request received');
+        Logger.log('');
+        Logger.log('=== DOPOST REQUEST START ===');
+        Logger.log('[DOPOST] Received POST request');
         
         if (!e || !e.postData || !e.postData.contents) {
-            Logger.log('doPost: Missing POST body');
-            Logger.log('=== AUTH FAILURE ===');
-            return ContentService.createTextOutput(JSON.stringify({
-                success: false,
-                message: 'Missing POST body'
-            })).setMimeType(ContentService.MimeType.JSON);
-        }
-
-        // Parse incoming request
-        const data = JSON.parse(e.postData.contents);
-        const action = data.action;
-        Logger.log('doPost: Action = ' + action);
-
-        // Extract and verify ID token
-        const idToken = getIdToken(e);
-        if (!idToken) {
-            Logger.log('doPost: No ID token provided');
-            Logger.log('=== AUTH FAILURE ===');
+            Logger.log('[DOPOST] FAIL: Missing POST body');
             return ContentService.createTextOutput(JSON.stringify({
                 success: false,
                 error: 'UNAUTHORIZED'
             })).setMimeType(ContentService.MimeType.JSON);
         }
 
-        // Authorization: verify ID token and enforce allowlist
+        // Parse incoming request
+        let data;
+        try {
+            data = JSON.parse(e.postData.contents);
+        } catch (parseError) {
+            Logger.log('[DOPOST] FAIL: Cannot parse JSON - ' + parseError.message);
+            return ContentService.createTextOutput(JSON.stringify({
+                success: false,
+                error: 'UNAUTHORIZED'
+            })).setMimeType(ContentService.MimeType.JSON);
+        }
+        
+        const action = data.action;
+        Logger.log('[DOPOST] Action: ' + action);
+
+        // Extract ID token
+        const idToken = getIdToken(e);
+        if (!idToken) {
+            Logger.log('[DOPOST] FAIL: No ID token in request');
+            return ContentService.createTextOutput(JSON.stringify({
+                success: false,
+                error: 'UNAUTHORIZED'
+            })).setMimeType(ContentService.MimeType.JSON);
+        }
+
+        // Verify token with Google
         let verifiedEmail;
         try {
             const verification = verifyGoogleIdToken(idToken);
             verifiedEmail = verification.email;
         } catch (authError) {
-            Logger.log('doPost: Token verification failed - ' + authError.message);
-            Logger.log('=== AUTH FAILURE ===');
+            Logger.log('[DOPOST] FAIL: Token verification error - ' + authError.message);
             return ContentService.createTextOutput(JSON.stringify({
                 success: false,
                 error: 'UNAUTHORIZED'
             })).setMimeType(ContentService.MimeType.JSON);
         }
 
+        // Check allowlist
         if (!isAuthorized(verifiedEmail)) {
-            Logger.log('doPost: Email not in allowlist - ' + verifiedEmail);
-            Logger.log('=== AUTH FAILURE ===');
+            Logger.log('[DOPOST] FAIL: User not in allowlist - ' + verifiedEmail);
             return ContentService.createTextOutput(JSON.stringify({
                 success: false,
                 error: 'UNAUTHORIZED'
             })).setMimeType(ContentService.MimeType.JSON);
         }
         
-        Logger.log('doPost: Authorized request from ' + verifiedEmail + ' for action: ' + action);
+        Logger.log('[DOPOST] SUCCESS: Authorized user ' + verifiedEmail + ' calling action ' + action);
+        Logger.log('');
         
         // Route to appropriate handler
         let response;
@@ -295,46 +309,50 @@ function doPost(e) {
 // Lightweight health check for GET requests
 function doGet(e) {
     try {
-        Logger.log('doGet: Request received');
+        Logger.log('');
+        Logger.log('=== DOGET REQUEST START ===');
+        Logger.log('[DOGET] Received GET request');
         
-        // Extract and verify ID token
+        // Extract ID token
         const idToken = getIdToken(e);
         if (!idToken) {
-            Logger.log('doGet: No ID token provided');
+            Logger.log('[DOGET] FAIL: No ID token in request');
             return ContentService.createTextOutput(JSON.stringify({
                 success: false,
                 error: 'UNAUTHORIZED'
             })).setMimeType(ContentService.MimeType.JSON);
         }
 
-        // Authorization: verify ID token and enforce allowlist
+        // Verify token with Google
         let verifiedEmail;
         try {
             const verification = verifyGoogleIdToken(idToken);
             verifiedEmail = verification.email;
         } catch (authError) {
-            Logger.log('doGet: Token verification failed - ' + authError.message);
+            Logger.log('[DOGET] FAIL: Token verification error - ' + authError.message);
             return ContentService.createTextOutput(JSON.stringify({
                 success: false,
                 error: 'UNAUTHORIZED'
             })).setMimeType(ContentService.MimeType.JSON);
         }
 
+        // Check allowlist
         if (!isAuthorized(verifiedEmail)) {
-            Logger.log('doGet: Email not in allowlist - ' + verifiedEmail);
+            Logger.log('[DOGET] FAIL: User not in allowlist - ' + verifiedEmail);
             return ContentService.createTextOutput(JSON.stringify({
                 success: false,
                 error: 'UNAUTHORIZED'
             })).setMimeType(ContentService.MimeType.JSON);
         }
         
-        Logger.log('doGet: Authorized request from ' + verifiedEmail);
+        Logger.log('[DOGET] SUCCESS: Authorized user ' + verifiedEmail);
+        Logger.log('');
         return ContentService.createTextOutput(JSON.stringify({
             success: true,
             message: 'Expense Manager backend is running'
         })).setMimeType(ContentService.MimeType.JSON);
     } catch (error) {
-        Logger.log('doGet: Error - ' + error.message);
+        Logger.log('[DOGET] ERROR: ' + error.message);
         return ContentService.createTextOutput(JSON.stringify({
             success: false,
             error: 'Server error'
