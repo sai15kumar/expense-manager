@@ -1394,6 +1394,11 @@ function populateBudgetTable() {
     
     console.log('[BUDGET] All categories:', appState.categories);
     
+    // Debug: Show unique type values
+    const uniqueTypes = [...new Set(appState.categories.map(c => c.type))];
+    console.log('[BUDGET] Unique type values found:', uniqueTypes);
+    console.log('[BUDGET] Sample categories:', appState.categories.slice(0, 3));
+    
     // Group categories by type
     const incomeCategories = appState.categories.filter(c => c.type === 'Income').sort((a, b) => a.name.localeCompare(b.name));
     const expenseCategories = appState.categories.filter(c => c.type === 'Expense').sort((a, b) => a.name.localeCompare(b.name));
