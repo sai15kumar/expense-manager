@@ -56,6 +56,20 @@ function getAuthToken() {
 }
 
 /**
+ * Call Apps Script Web App with a JSON payload
+ * Sends a simple POST request without headers to avoid CORS preflight
+ * @param {Object} payload - Request payload (must include action and idToken)
+ * @returns {Promise<Object>} - Parsed JSON response from backend
+ */
+async function callAppsScript(payload) {
+    const response = await fetch(CONFIG.BACKEND_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+    return await response.json();
+}
+
+/**
  * Check API response for authorization errors
  * Centralized handler for UNAUTHORIZED responses
  * @param {Object} result - API response object
@@ -84,15 +98,10 @@ async function fetchCategories() {
             showToast('Please sign in to continue', 'error');
             return;
         }
-        const response = await fetch(CONFIG.BACKEND_URL, {
-            method: 'POST',
-            body: JSON.stringify({ 
-                action: 'getCategories',
-                idToken: idToken
-            })
+        const result = await callAppsScript({ 
+            action: 'getCategories',
+            idToken: idToken
         });
-
-        const result = await response.json();
 
         if (!checkApiAuthorization(result)) return;
 
@@ -263,17 +272,13 @@ async function fetchHomeExpensesForMonth(year, month) {
             showToast('Please sign in to continue', 'error');
             return;
         }
-        const response = await fetch(CONFIG.BACKEND_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'getExpensesByMonth',
-                year: year,
-                month: month,
-                idToken: idToken
-            })
+        const result = await callAppsScript({
+            action: 'getExpensesByMonth',
+            year: year,
+            month: month,
+            idToken: idToken
         });
         
-        const result = await response.json();
         console.log('[HOME] Fetch result:', result);
         
         if (!checkApiAuthorization(result)) return;
@@ -1169,14 +1174,9 @@ async function saveExpenses() {
             method: 'POST',
             body: JSON.stringify(payload)
         });
+        ult = await callAppsScript(payload);
         
-        const result = await response.json();
-        
-        console.log('[ADD_SCREEN] Save response status:', response.status);
-        console.log('[ADD_SCREEN] Save result:', result);
-        
-        if (!checkApiAuthorization(result)) {
-            const saveBtn = document.getElementById('expensesSaveBtn');
+        console.log('[ADD_SCREEN] Save response status: API call completed'
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
             return;
@@ -1302,17 +1302,12 @@ async function saveMonthly() {
         
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain'
-            },
-            t result = await response.json();
+            body: JSON.stringify(payload)
+        });
         
-        console.log('[ADD_SCREEN] Monthly save response status:', response.status);
-        console.log('[ADD_SCREEN] Monthly save result:', result);
+        const result = await callAppsScript(payload);
         
-        if (!checkApiAuthorization(result)) {
-            const saveBtn = document.getElementById('monthlySaveBtn');
-            saveBtn.disabled = false;
+        console.log('[ADD_SCREEN] Monthly save response status: API call completed'
             saveBtn.textContent = 'Save';
             return;
         }
@@ -1648,19 +1643,15 @@ async function handleBudgetSubmit(event) {
         
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain'
-            },
-                idToken: idToken
-            })
+            body: JSON.stringify({
+                action: 'saveBudget',
+                budgets: budgets,
+                iult = await callAppsScript({
+            action: 'saveBudget',
+            budgets: budgets,
+            idToken: idToken
         });
         
-        const result = await response.json();
-        console.log('[BUDGET] Save result:', result);
-        
-        if (!checkApiAuthorization(result)) {
-            const saveBtn = form.querySelector('button[type="submit"]');
-            if (saveBtn) {
                 saveBtn.disabled = false;
                 saveBtn.textContent = '💾 Save Budget';
             }
