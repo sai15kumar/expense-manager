@@ -1298,22 +1298,22 @@ async function saveMonthly() {
         
         console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
         
-        const monthlyResult = await callAppsScript(payload);
+        const result = await callAppsScript(payload);
         
         console.log('[ADD_SCREEN] Monthly save response status: API call completed');
         
-        if (!checkApiAuthorization(monthlyResult)) {
+        if (!checkApiAuthorization(result)) {
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
             return;
         }
         
-        console.log('[ADD_SCREEN] Result success?', monthlyResult.success);
-        console.log('[ADD_SCREEN] Result message:', monthlyResult.message);
-        console.log('[ADD_SCREEN] Full result object:', JSON.stringify(monthlyResult, null, 2));
+        console.log('[ADD_SCREEN] Result success?', result.success);
+        console.log('[ADD_SCREEN] Result message:', result.message);
+        console.log('[ADD_SCREEN] Full result object:', JSON.stringify(result, null, 2));
         
-        if (monthlyResult.success) {
-            showToast(transactions.length + ' transaction(s) saved successfully', 'success');
+        if (result.success) {
+            showToast(`${transactions.length} transaction(s) saved successfully`, 'success');
             setTimeout(() => {
                 closeAddScreen();
                 if (appState.homeSelectedMonth) {
