@@ -7,7 +7,7 @@
 // ====================================================
 
 const CONFIG = {
-     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbwzUa4UCazhDBuF2859hDg9yciWFOgVjfYS4cQpiUqkP5FQAU2f0rRAnHlhzUgekRkf4A/exec',
+     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbw5hgKpOK06kFUBSRAG7jGp6Czbp7bTX4cXw9aBhh9y-dglcM1qj7ojrR73H1oYNs96AQ/exec',
      MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June',
                         'July', 'August', 'September', 'October', 'November', 'December'],
      EXPENSE_ROWS: 5,
@@ -56,12 +56,24 @@ function getAuthToken() {
 }
 
 /**
+ * Get the current user's email address.
+ * @returns {string|null} - User email or null if not signed in
+ */
+function getUserEmail() {
+    return storage.getItem(STORAGE_KEYS.userEmail);
+}
+
+/**
  * Call Apps Script Web App with a JSON payload
  * Sends a simple POST request without headers to avoid CORS preflight
- * @param {Object} payload - Request payload (must include action and idToken)
+ * @param {Object} payload - Request payload (must include action and userEmail)
  * @returns {Promise<Object>} - Parsed JSON response from backend
  */
 async function callAppsScript(payload) {
+    const userEmail = getUserEmail();
+    if (userEmail) {
+        payload.userEmail = userEmail;
+    }
     const response = await fetch(CONFIG.BACKEND_URL, {
         method: 'POST',
         body: JSON.stringify(payload)
