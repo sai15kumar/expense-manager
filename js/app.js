@@ -73,6 +73,9 @@ async function callAppsScript(payload) {
     const userEmail = getUserEmail();
     if (userEmail) {
         payload.userEmail = userEmail;
+        console.log('[API] Sending request with userEmail:', userEmail, 'action:', payload.action);
+    } else {
+        console.warn('[API] WARNING: No userEmail found in storage');
     }
     const response = await fetch(CONFIG.BACKEND_URL, {
         method: 'POST',
