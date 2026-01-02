@@ -104,15 +104,8 @@ function checkApiAuthorization(result) {
  */
 async function fetchCategories() {
     try {
-        const idToken = getAuthToken();
-        if (!idToken) {
-            console.warn('[API] User not signed in, skipping fetchCategories');
-            showToast('Please sign in to continue', 'error');
-            return;
-        }
         const result = await callAppsScript({ 
-            action: 'getCategories',
-            idToken: idToken
+            action: 'getCategories'
         });
 
         if (!checkApiAuthorization(result)) return;
@@ -278,17 +271,10 @@ async function fetchHomeExpensesForMonth(year, month) {
     try {
         console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
         
-        const idToken = getAuthToken();
-        if (!idToken) {
-            console.warn('[HOME] User not signed in');
-            showToast('Please sign in to continue', 'error');
-            return;
-        }
         const result = await callAppsScript({
             action: 'getExpensesByMonth',
             year: year,
-            month: month,
-            idToken: idToken
+            month: month
         });
         
         console.log('[HOME] Fetch result:', result);
@@ -1163,12 +1149,6 @@ async function saveExpenses() {
     
     // Save using existing API
     try {
-        const idToken = getAuthToken();
-        if (!idToken) {
-            showToast('Please sign in to continue', 'error');
-            return;
-        }
-
         const saveBtn = document.getElementById('expensesSaveBtn');
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
@@ -1176,8 +1156,7 @@ async function saveExpenses() {
         const payload = {
             action: 'saveExpenses',
             date: date,
-            expenses: expenses,
-            idToken: idToken
+            expenses: expenses
         };
         
         console.log('[ADD_SCREEN] Sending payload:', JSON.stringify(payload, null, 2));
@@ -1291,12 +1270,6 @@ async function saveMonthly() {
     
     // Save using existing API
     try {
-        const idToken = getAuthToken();
-        if (!idToken) {
-            showToast('Please sign in to continue', 'error');
-            return;
-        }
-
         const saveBtn = document.getElementById('monthlySaveBtn');
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
@@ -1304,8 +1277,7 @@ async function saveMonthly() {
         const payload = {
             action: 'saveExpenses',
             date: date,
-            expenses: transactions,
-            idToken: idToken
+            expenses: transactions
         };
         
         console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
@@ -1637,12 +1609,6 @@ async function handleBudgetSubmit(event) {
     
     // Save to Google Sheets
     try {
-        const idToken = getAuthToken();
-        if (!idToken) {
-            showToast('Please sign in to continue', 'error');
-            return;
-        }
-
         const saveBtn = form.querySelector('button[type="submit"]');
         if (saveBtn) {
             saveBtn.disabled = true;
@@ -1651,8 +1617,7 @@ async function handleBudgetSubmit(event) {
         
         const result = await callAppsScript({
             action: 'saveBudget',
-            budgets: budgets,
-            idToken: idToken
+            budgets: budgets
         });
         
         if (!checkApiAuthorization(result)) {
