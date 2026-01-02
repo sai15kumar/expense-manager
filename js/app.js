@@ -84,12 +84,8 @@ async function fetchCategories() {
             showToast('Please sign in to continue', 'error');
             return;
         }
-
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain'
-            },
             body: JSON.stringify({ 
                 action: 'getCategories',
                 idToken: idToken
@@ -267,12 +263,8 @@ async function fetchHomeExpensesForMonth(year, month) {
             showToast('Please sign in to continue', 'error');
             return;
         }
-
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain'
-            },
             body: JSON.stringify({
                 action: 'getExpensesByMonth',
                 year: year,
@@ -1175,9 +1167,6 @@ async function saveExpenses() {
         
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain'
-            },
             body: JSON.stringify(payload)
         });
         
@@ -1316,10 +1305,7 @@ async function saveMonthly() {
             headers: {
                 'Content-Type': 'text/plain'
             },
-            body: JSON.stringify(payload)
-        });
-        
-        const result = await response.json();
+            t result = await response.json();
         
         console.log('[ADD_SCREEN] Monthly save response status:', response.status);
         console.log('[ADD_SCREEN] Monthly save result:', result);
@@ -1665,9 +1651,6 @@ async function handleBudgetSubmit(event) {
             headers: {
                 'Content-Type': 'text/plain'
             },
-            body: JSON.stringify({
-                action: 'saveBudget',
-                budgets: budgets,
                 idToken: idToken
             })
         });
