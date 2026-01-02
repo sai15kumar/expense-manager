@@ -410,6 +410,11 @@ function setupPageNavigation() {
     console.log('[PAGE_NAV] Found buttons:', pageNavBtns.length);
     console.log('[PAGE_NAV] Found pages:', pages.length);
 
+    // Hide all pages initially
+    pages.forEach(page => {
+        page.style.display = 'none';
+    });
+
     pageNavBtns.forEach(btn => {
         const targetPage = btn.getAttribute('data-page');
         if (!targetPage) {
