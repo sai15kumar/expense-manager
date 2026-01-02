@@ -88,7 +88,7 @@ async function fetchCategories() {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain'
             },
             body: JSON.stringify({ 
                 action: 'getCategories',
@@ -271,7 +271,7 @@ async function fetchHomeExpensesForMonth(year, month) {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain'
             },
             body: JSON.stringify({
                 action: 'getExpensesByMonth',
@@ -1176,7 +1176,7 @@ async function saveExpenses() {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain'
             },
             body: JSON.stringify(payload)
         });
@@ -1314,7 +1314,7 @@ async function saveMonthly() {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain'
             },
             body: JSON.stringify(payload)
         });
@@ -1663,7 +1663,7 @@ async function handleBudgetSubmit(event) {
         const response = await fetch(CONFIG.BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain'
             },
             body: JSON.stringify({
                 action: 'saveBudget',
