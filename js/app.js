@@ -421,15 +421,19 @@ function setupPageNavigation() {
             return; // skip buttons like logout without a target page
         }
 
-        btn.addEventListener('click', (e) => {
+        // Remove any existing listeners by cloning and replacing the button
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+
+        newBtn.addEventListener('click', (e) => {
             e.preventDefault();
             console.log('[PAGE_NAV] Button clicked, target page:', targetPage);
 
             // Use Add flow helper so rows and defaults are initialized every time
             if (targetPage === 'add') {
                 openAddScreen();
-                pageNavBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
+                document.querySelectorAll('.nav-rail-item').forEach(b => b.classList.remove('active'));
+                newBtn.classList.add('active');
                 return;
             }
 
@@ -456,8 +460,8 @@ function setupPageNavigation() {
             }
 
             // Update active button
-            pageNavBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            document.querySelectorAll('.nav-rail-item').forEach(b => b.classList.remove('active'));
+            newBtn.classList.add('active');
 
             console.log(`[PAGE_NAV] Switched to page: ${targetPage}`);
         });
