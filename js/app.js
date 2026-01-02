@@ -1170,13 +1170,11 @@ async function saveExpenses() {
         
         console.log('[ADD_SCREEN] Sending payload:', JSON.stringify(payload, null, 2));
         
-        const response = await fetch(CONFIG.BACKEND_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        ult = await callAppsScript(payload);
+        const result = await callAppsScript(payload);
         
-        console.log('[ADD_SCREEN] Save response status: API call completed'
+        console.log('[ADD_SCREEN] Save response status: API call completed');
+        
+        if (!checkApiAuthorization(result)) {
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
             return;
@@ -1300,14 +1298,12 @@ async function saveMonthly() {
         
         console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
         
-        const response = await fetch(CONFIG.BACKEND_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        
         const result = await callAppsScript(payload);
         
-        console.log('[ADD_SCREEN] Monthly save response status: API call completed'
+        console.log('[ADD_SCREEN] Monthly save response status: API call completed');
+        
+        if (!checkApiAuthorization(result)) {
+            saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
             return;
         }
@@ -1641,20 +1637,15 @@ async function handleBudgetSubmit(event) {
             saveBtn.textContent = 'Saving...';
         }
         
-        const response = await fetch(CONFIG.BACKEND_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'saveBudget',
-                budgets: budgets,
-                iult = await callAppsScript({
+        const result = await callAppsScript({
             action: 'saveBudget',
             budgets: budgets,
             idToken: idToken
         });
         
-                saveBtn.disabled = false;
-                saveBtn.textContent = '💾 Save Budget';
-            }
+        if (!checkApiAuthorization(result)) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Save Budget';
             return;
         }
         
