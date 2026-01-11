@@ -33,6 +33,7 @@ const storage = window.AUTH_STORAGE || sessionStorage;
  */
 let appState = {
     categories: [], // [{name, type}]
+    categoryBudgets: {}, // {categoryKey: amount}
     homeSelectedMonth: null,
     homeExpensesByDate: {},
     homeSelectedType: 'all',
@@ -119,7 +120,14 @@ async function fetchCategories() {
 
         if (result.success && result.categories) {
             appState.categories = result.categories;
+            // Store category budgets for use in summary view
+            appState.categoryBudgets = {};
+            result.categories.forEach(cat => {
+                const key = `${cat.name}|${(cat.type || 'Expense').toLowerCase()}`;
+                appState.categoryBudgets[key] = parseFloat(cat.budget) || 0;
+            });
             console.log('Categories loaded:', appState.categories);
+            console.log('Category budgets:', appState.categoryBudgets);
         } else {
             console.error('Failed to load categories:', result.message);
         }
@@ -685,11 +693,39 @@ function renderCategorySummary(year, month) {
             </div>
         `;
     } else {
-        listContainer.innerHTML = summaryItems.map((item, idx) => {
+        // Group by type for sectioned layout
+        const typeGroups = {
+            expense: [],
+            income: [],
+            savings: [],
+            payoff: []
+        };
+        
+        summaryItems.forEach(item => {
+            if (typeGroups[item.typeKey]) {
+                typeGroups[item.typeKey].push(item);
+            }
+        });
+
+        const renderCategoryCard = (item) => {
             const icon = getCategoryIcon(item.category, item.type);
             const countLabel = item.count === 1 ? '1 transaction' : `${item.count} transactions`;
             const categoryKey = `${item.category}|${item.typeKey}`;
             const isExpanded = appState.expandedCategories.has(categoryKey);
+            
+            // Get budget for this category from appState.categoryBudgets
+            const categoryBudgetAmount = appState.categoryBudgets[categoryKey] || 0;
+            let budgetPercentage = 0;
+            let percentageColor = '#9aa5b5'; // neutral
+            
+            if (categoryBudgetAmount > 0) {
+                budgetPercentage = Math.round((item.total / categoryBudgetAmount) * 100);
+                
+                // Color logic: green if good, red if over/under budget
+                const isExpenseType = item.typeKey === 'expense' || item.typeKey === 'payoff';
+                const isBad = isExpenseType ? budgetPercentage > 100 : budgetPercentage < 100;
+                percentageColor = isBad ? '#e74c3c' : '#27ae60';
+            }
             
             // Sort transactions by date (newest first)
             item.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -712,19 +748,22 @@ function renderCategorySummary(year, month) {
                 </div>
             ` : '';
             
+            const budgetIndicator = categoryBudgetAmount > 0 ? `
+                <div class="summary-card-budget" style="color: ${percentageColor};">
+                    ${budgetPercentage}%
+                </div>
+            ` : '';
+            
             return `
-                <div class="summary-row ${isExpanded ? 'expanded' : ''}" data-category-key="${categoryKey}">
-                    <div class="summary-header" data-type="${item.typeKey}">
-                        <div class="txn-icon">${icon}</div>
-                        <div class="txn-main">
-                            <div class="txn-title">${item.category}</div>
-                            <div class="txn-details">
-                                <span class="txn-notes-display">${countLabel}</span>
-                            </div>
+                <div class="summary-card ${isExpanded ? 'expanded' : ''}" data-category-key="${categoryKey}">
+                    <div class="summary-card-header" data-type="${item.typeKey}">
+                        <div class="summary-card-main">
+                            <div class="summary-card-title">${item.category}</div>
+                            <div class="summary-card-count">${countLabel}</div>
                         </div>
-                        <div class="txn-meta">
-                            <span class="transaction-type-badge ${item.typeKey}">${item.type}</span>
-                            <span class="txn-amount">₹${item.total.toFixed(2)}</span>
+                        <div class="summary-card-bottom">
+                            <div class="summary-card-amount">₹${item.total.toFixed(2)}</div>
+                            ${budgetIndicator}
                         </div>
                         <div class="expand-icon">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -735,7 +774,67 @@ function renderCategorySummary(year, month) {
                     ${detailsHtml}
                 </div>
             `;
-        }).join('');
+        };
+
+        const sections = [];
+        
+        if (typeGroups.expense.length > 0) {
+            sections.push(`
+                <div class="summary-section">
+                    <div class="summary-section-header">
+                        <span class="summary-section-title">Expenses</span>
+                        <span class="summary-section-badge expense">${typeGroups.expense.length}</span>
+                    </div>
+                    <div class="summary-grid">
+                        ${typeGroups.expense.map(renderCategoryCard).join('')}
+                    </div>
+                </div>
+            `);
+        }
+        
+        if (typeGroups.income.length > 0) {
+            sections.push(`
+                <div class="summary-section">
+                    <div class="summary-section-header">
+                        <span class="summary-section-title">Income</span>
+                        <span class="summary-section-badge income">${typeGroups.income.length}</span>
+                    </div>
+                    <div class="summary-grid">
+                        ${typeGroups.income.map(renderCategoryCard).join('')}
+                    </div>
+                </div>
+            `);
+        }
+        
+        if (typeGroups.savings.length > 0) {
+            sections.push(`
+                <div class="summary-section">
+                    <div class="summary-section-header">
+                        <span class="summary-section-title">Savings</span>
+                        <span class="summary-section-badge savings">${typeGroups.savings.length}</span>
+                    </div>
+                    <div class="summary-grid">
+                        ${typeGroups.savings.map(renderCategoryCard).join('')}
+                    </div>
+                </div>
+            `);
+        }
+        
+        if (typeGroups.payoff.length > 0) {
+            sections.push(`
+                <div class="summary-section">
+                    <div class="summary-section-header">
+                        <span class="summary-section-title">Payoffs</span>
+                        <span class="summary-section-badge payoff">${typeGroups.payoff.length}</span>
+                    </div>
+                    <div class="summary-grid">
+                        ${typeGroups.payoff.map(renderCategoryCard).join('')}
+                    </div>
+                </div>
+            `);
+        }
+        
+        listContainer.innerHTML = sections.join('');
         
         // Add click handlers for expansion
         setupSummaryExpansion();
@@ -746,13 +845,13 @@ function renderCategorySummary(year, month) {
  * Setup click handlers for expanding/collapsing summary categories
  */
 function setupSummaryExpansion() {
-    const summaryRows = document.querySelectorAll('.summary-row');
-    summaryRows.forEach(row => {
-        const header = row.querySelector('.summary-header');
+    const summaryCards = document.querySelectorAll('.summary-card');
+    summaryCards.forEach(card => {
+        const header = card.querySelector('.summary-card-header');
         if (!header) return;
         
         header.addEventListener('click', () => {
-            const categoryKey = row.dataset.categoryKey;
+            const categoryKey = card.dataset.categoryKey;
             if (!categoryKey) return;
             
             if (appState.expandedCategories.has(categoryKey)) {
