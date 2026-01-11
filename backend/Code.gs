@@ -86,8 +86,8 @@ const COLUMNS = {
         TIMESTAMP: 6
     },
     expenseMaster: {
-        CATEGORY: 1,
-        TYPE: 2,
+        TYPE: 1,
+        CATEGORY: 2,
         BUDGET_MONTHLY: 3,
         BUDGET_YEARLY: 4
     }
@@ -598,9 +598,9 @@ function handleGetBudgets() {
         const budgets = [];
         
         // Row 0 is header, data starts from row 1
-        // Column B (index 1) = Category name, Column C (index 2) = Budget Monthly, Column D (index 3) = Budget Yearly
+        // Column A (index 0) = Type, Column B (index 1) = Category, Column C (index 2) = Budget Monthly, Column D (index 3) = Budget Yearly
         for (let i = 1; i < values.length; i++) {
-            const category = (values[i][1] || '').toString().trim();
+            const category = (values[i][COLUMNS.expenseMaster.CATEGORY - 1] || '').toString().trim();
             const monthlyBudget = parseFloat(values[i][COLUMNS.expenseMaster.BUDGET_MONTHLY - 1]) || 0;
             const yearlyBudget = parseFloat(values[i][COLUMNS.expenseMaster.BUDGET_YEARLY - 1]) || 0;
             

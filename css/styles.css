@@ -2200,6 +2200,8 @@ body {
 .home-summary-card {
     position: relative;
 }
+
+.home-summary-card.expense-card {
     border-left: 3px solid var(--color-expense);
 }
 

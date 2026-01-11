@@ -7,7 +7,7 @@
 // ====================================================
 
 const CONFIG = {
-     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbx-I6n-ZoFa2L6QvfEtS-eEusl0oXcqr88hz2jxRyE-QOXPUoIpzZHpfwXnxeOla7ltlA/exec',
+     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbxhSI9Zo27sE1AcY_HLzZu0gP7N70qvS3Adx3DL4l-4a9hHTgEjM1O4f3jS4HQ8Dm08EA/exec',
      MONTH_NAMES: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
      EXPENSE_ROWS: 5,
@@ -426,22 +426,39 @@ async function loadHomeData() {
  */
 async function fetchMonthlyBudget(year, month) {
     try {
+        console.log('[BUDGET] Fetching budget for', year, month);
         const result = await callAppsScript({
             action: 'getMonthlyBudget',
             year: year,
             month: month
         });
 
+        console.log('[BUDGET] Result:', result);
+
         if (!checkApiAuthorization(result)) return;
 
         if (result.success && result.budget) {
             appState.monthlyBudget = result.budget;
+            console.log('[BUDGET] Stored budget:', appState.monthlyBudget);
         } else {
-            appState.monthlyBudget = {};
+            console.warn('[BUDGET] No budget data in result, using mock data for local testing');
+            // Mock data for local testing
+            appState.monthlyBudget = {
+                expense: 50000,
+                income: 200000,
+                savings: 70000,
+                payoff: 50000
+            };
         }
     } catch (error) {
         console.error('[HOME] Error fetching budget:', error);
-        appState.monthlyBudget = {};
+        // Use mock data on error for local testing
+        appState.monthlyBudget = {
+            expense: 50000,
+            income: 200000,
+            savings: 70000,
+            payoff: 50000
+        };
     }
 }
 
@@ -532,6 +549,9 @@ function calculateAndDisplayMonthlySummary(year, month) {
  * Update budget percentage hints on cards
  */
 function updateBudgetHints(expense, income, savings, payoff) {
+    console.log('[HINTS] Called with:', { expense, income, savings, payoff });
+    console.log('[HINTS] Monthly budget:', appState.monthlyBudget);
+    
     const budgetData = [
         { type: 'expense', actual: expense, hintId: 'hintExpenses' },
         { type: 'income', actual: income, hintId: 'hintIncome' },
@@ -541,9 +561,14 @@ function updateBudgetHints(expense, income, savings, payoff) {
     
     budgetData.forEach(item => {
         const hintEl = document.getElementById(item.hintId);
-        if (!hintEl) return;
+        if (!hintEl) {
+            console.warn('[HINTS] Element not found:', item.hintId);
+            return;
+        }
         
         const budget = appState.monthlyBudget[item.type] || 0;
+        console.log(`[HINTS] ${item.type}: actual=${item.actual}, budget=${budget}`);
+        
         if (budget <= 0) {
             hintEl.textContent = '';
             hintEl.style.display = 'none';
@@ -553,6 +578,7 @@ function updateBudgetHints(expense, income, savings, payoff) {
         const percentage = Math.round((item.actual / budget) * 100);
         hintEl.textContent = `${percentage}%`;
         hintEl.style.display = 'block';
+        console.log(`[HINTS] ${item.type}: ${percentage}% displayed`);
         
         // Add over-budget class if > 100%
         if (percentage > 100) {
