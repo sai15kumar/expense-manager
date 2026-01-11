@@ -2378,16 +2378,29 @@ body {
     border-radius: 12px;
     padding: 1rem 1.15rem;
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     border: 1px solid #f0f2f5;
     transition: all 0.2s ease;
+    cursor: default;
+}
+
+.txn-row.expandable {
+    cursor: pointer;
 }
 
 .txn-row:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     transform: translateY(-1px);
+}
+
+.txn-row-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
 }
 
 .summary-row {
@@ -2558,6 +2571,55 @@ body {
     gap: 0.4rem;
     white-space: nowrap;
     flex-shrink: 0;
+    margin-left: auto;
+}
+
+.txn-expand-icon {
+    margin-left: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: #6b7a8f;
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+.txn-row.expanded .txn-expand-icon {
+    transform: rotate(180deg);
+}
+
+.txn-expand-icon.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+    transform: none;
+}
+
+.txn-detail-list {
+    display: none;
+    flex-direction: column;
+    gap: 0.4rem;
+    background: #fafbfc;
+    padding: 0.65rem 0.85rem 0.8rem;
+    border: 1px solid #eef1f5;
+    border-radius: 10px;
+}
+
+.txn-row.expanded .txn-detail-list {
+    display: flex;
+}
+
+.txn-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: white;
+    border: 1px solid #eef1f5;
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
 }
 
 .txn-amount {

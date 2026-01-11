@@ -825,6 +825,39 @@ function renderMonthlyTransactionList(year, month) {
     const grouped = Array.from(groupsMap.entries()).sort((a, b) => new Date(b[0]) - new Date(a[0]));
     grouped.forEach(([, arr]) => arr.sort((a, b) => new Date(b.date) - new Date(a.date)));
 
+    // Helper: aggregate transactions by category (per date) and retain details
+    const aggregateByCategory = (items) => {
+        const map = new Map();
+        items.forEach(txn => {
+            const key = `${txn.typeKey}|||${txn.category}`;
+            if (!map.has(key)) {
+                map.set(key, {
+                    ...txn,
+                    amount: 0,
+                    _notes: [],
+                    transactions: []
+                });
+            }
+            const agg = map.get(key);
+            agg.amount += txn.amount;
+            if (txn.notes && txn.notes.trim()) {
+                agg._notes.push(txn.notes.trim());
+            }
+            agg.transactions.push({
+                amount: txn.amount,
+                notes: txn.notes,
+                category: txn.category,
+                date: txn.date,
+                type: txn.type,
+                typeKey: txn.typeKey
+            });
+        });
+        return Array.from(map.values()).map(agg => ({
+            ...agg,
+            notes: agg._notes.join(' • ')
+        }));
+    };
+
     // Render
     if (filteredTransactions.length === 0) {
         listContainer.innerHTML = `
@@ -835,6 +868,7 @@ function renderMonthlyTransactionList(year, month) {
         `;
     } else {
         listContainer.innerHTML = grouped.map(([date, items]) => {
+            const aggregatedItems = aggregateByCategory(items);
             const today = new Date();
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
@@ -849,26 +883,59 @@ function renderMonthlyTransactionList(year, month) {
                 dateLabel = formatDateForDisplay(date);
             }
             
-            const count = items.length;
+            const count = aggregatedItems.length;
             const countLabel = count === 1 ? '1 Transaction' : `${count} Transactions`;
             
-            const rows = items.map(txn => {
+            const rows = aggregatedItems.map(txn => {
                 const icon = getCategoryIcon(txn.category, txn.type);
                 const notes = txn.notes ? txn.notes.trim() : '';
-                const detailsHtml = notes ? `
+                const hasDetails = txn.transactions && txn.transactions.length > 1;
+                const isDisabled = txn.transactions && txn.transactions.length === 1;
+                const detailRows = hasDetails ? txn.transactions.map((detail, idx) => {
+                    const detailNotes = detail.notes && detail.notes.trim() ? `<div class="txn-detail-notes">${detail.notes.trim()}</div>` : '';
+                    const entryLabel = `Entry ${idx + 1}`;
+                    return `
+                        <div class="txn-detail-row">
+                            <div class="detail-left">
+                                <span class="detail-date">${entryLabel}</span>
+                                ${detailNotes}
+                            </div>
+                            <span class="detail-amount">₹${detail.amount.toFixed(2)}</span>
+                        </div>
+                    `;
+                }).join('') : '';
+
+                const detailListHtml = hasDetails ? `
+                    <div class="txn-detail-list">
+                        ${detailRows}
+                    </div>
+                ` : '';
+
+                const notesHtml = notes ? `
                             <div class="txn-details">
                                 <span class="txn-notes-display">${notes}</span>
                             </div>` : '';
+                const expandIcon = `
+                        <div class="txn-expand-icon${isDisabled ? ' disabled' : ''}${hasDetails ? '' : ' disabled'}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                `;
                 return `
-                    <div class="txn-row" data-type="${txn.typeKey}">
-                        <div class="txn-icon">${icon}</div>
-                        <div class="txn-main">
-                            <div class="txn-title">${txn.category}</div>${detailsHtml}
+                    <div class="txn-row${hasDetails ? ' expandable' : ''}" data-type="${txn.typeKey}">
+                        <div class="txn-row-header">
+                            <div class="txn-icon">${icon}</div>
+                            <div class="txn-main">
+                                <div class="txn-title">${txn.category}</div>${notesHtml}
+                            </div>
+                            <div class="txn-meta">
+                                <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
+                                <span class="txn-amount">₹${txn.amount.toFixed(2)}</span>
+                            </div>
+                            ${expandIcon}
                         </div>
-                        <div class="txn-meta">
-                            <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
-                            <span class="txn-amount">₹${txn.amount.toFixed(2)}</span>
-                        </div>
+                        ${detailListHtml}
                     </div>
                 `;
             }).join('');
@@ -883,7 +950,31 @@ function renderMonthlyTransactionList(year, month) {
                 </div>
             `;
         }).join('');
+
+        // Enable per-category expansion within each date group
+        setupTransactionExpansion();
     }
+}
+
+/**
+ * Enable expand/collapse for aggregated transaction rows to reveal individual entries
+ */
+function setupTransactionExpansion() {
+    const rows = document.querySelectorAll('.txn-row.expandable');
+    rows.forEach(row => {
+        const detailList = row.querySelector('.txn-detail-list');
+        const expandIcon = row.querySelector('.txn-expand-icon');
+        const header = row.querySelector('.txn-row-header');
+        if (!detailList || !detailList.children.length || !header) return;
+
+        header.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const expanded = row.classList.toggle('expanded');
+            if (expandIcon) {
+                expandIcon.classList.toggle('expanded', expanded);
+            }
+        });
+    });
 }
 
 // ====================================================

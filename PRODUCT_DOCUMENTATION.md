@@ -1,7 +1,7 @@
 # EXPENSE MANAGER - MASTER PRODUCT DOCUMENTATION
 
-**Version:** 1.0  
-**Last Updated:** Dec 31, 2025  
+**Version:** 1.1  
+**Last Updated:** Jan 11, 2026  
 **Status:** Production Ready
 
 ---
@@ -180,68 +180,85 @@ Expense Manager/
 
 **Purpose**: Core expense entry and management interface
 
-**Layout**: Split view (Desktop) / Stacked (Mobile)
+**Layout**: Two-tab interface for Expenses and Monthly transactions
 
-#### Left Side: Calendar Grid
+#### Tab 1: Expenses
 
-**Components**:
-- Month/Year header display
-- Previous/Next month navigation buttons
-- 7-column grid (Sun-Sat)
-- 6 rows of dates (42 cells total)
-- Date indicators:
-  - **Today**: Blue border
-  - **Has Expenses**: Red dot
-  - **Selected**: Gray background
-  - **Other Month**: Grayed out text
+**NEW: Dual Entry Mode**
 
-**Interactions**:
-- Click date → Opens expense management panel
-- Hover → Pointer cursor
-- Prev/Next → Changes month, fetches new expense indicators
+Users can choose between two expense entry modes:
 
-#### Right Side: Expense Management
+**Mode 1: By Date (Default)**
+- Select a date first
+- Add multiple category expenses for that date
+- Best for entering all expenses for a specific day
 
-**Tab 1: Add Expenses**
+**Mode 2: By Category**
+- Select a category first
+- Add multiple date entries for that category
+- Best for entering the same recurring expense across multiple dates
 
-**Components**:
-- Entry type tabs: Expense | Income | Savings | Payoff
-- Expense rows table (2 rows default, up to 5)
-  - Category dropdown (populated from Expense_Master)
+**Components - Date Mode**:
+- Mode selector (radio buttons: Date | Category)
+- Date input field
+- Expense rows table:
+  - Category dropdown (filtered to Expense types)
   - Amount input (number, required)
   - Notes input (text, optional)
-- "Add Row" button (shows more rows)
-- Action buttons:
-  - Save (primary button)
-  - Cancel (reset form)
-- Status message area (success/error)
+  - Remove button (✕)
+- "+ Add another expense" button
+- Save button
+
+**Components - Category Mode**:
+- Mode selector (radio buttons: Date | Category)
+- Category dropdown (filtered to Expense types)
+- Date entry rows table:
+  - Date input (pre-filled with today)
+  - Amount input (number, required)
+  - Notes input (text, optional)
+  - Remove button (✕)
+- "+ Add another date" button
+- Save button
 
 **Behavior**:
-- Category dropdown filters by selected entry type
-- All rows for same date saved together
-- Success message shows after save
-- Form resets after successful save
-- Red dot appears on calendar date
+- Mode selector allows switching between Date and Category modes
+- Switching modes resets the form
+- Category dropdown automatically filters Expense-type categories
+- Save button enables only when valid data is entered
+- Form stays on Add screen after save (resets for next entry)
+- Success message shows expense count saved
+- Dashboard updates in background
+- First row cannot be deleted (at least one row required)
 
-**Tab 2: Existing Expenses**
+**Tab 2: Monthly**
+
+**Tab 2: Monthly**
 
 **Components**:
-- Table with columns: Type | Category | Amount | Notes
-- Badge counter (shows expense count)
-- "No expenses" message if empty
+- Month selector (current month default)
+- Three collapsible sections:
+  - Income entries
+  - Savings entries  
+  - Payoff entries
+- Each section has:
+  - Category dropdown
+  - Amount input
+  - Notes input
+  - "+ Add row" button
+- Save button
 
 **Behavior**:
-- Automatically loads when date selected
-- Shows all 4 types for that date
-- Read-only view (no edit/delete yet)
-- Updates after saving new expenses
+- All monthly transactions saved together
+- Form stays on Add screen after save (resets for next entry)
+- Dashboard updates in background
 
 **Features**:
+- ✅ Dual entry mode (Date or Category)
 - ✅ Multi-row batch entry
 - ✅ Type-specific category filtering
 - ✅ Real-time validation
-- ✅ Calendar date indicators
-- ✅ Cached data for performance
+- ✅ Stay on screen after save
+- ✅ Form reset after successful save
 - ❌ Edit/delete existing expenses (future)
 
 ---
@@ -1095,20 +1112,38 @@ createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
 
 ---
 
-### Workflow 2: Daily Expense Entry
+### Workflow 2: Daily Expense Entry (Date Mode)
 
-1. User opens app (Calendar page visible)
-2. User clicks today's date on calendar
-3. Right panel shows "Add Expenses" form
-4. User selects entry type tab (default: Expense)
+1. User clicks FAB (+) button or navigates to Add page
+2. "Expenses" tab is active by default
+3. "Date" mode is selected by default
+4. Date field shows today's date
 5. User selects category from dropdown
 6. User enters amount
 7. User optionally adds notes
-8. User clicks "Save"
-9. Success message appears
-10. Form resets
-11. Red dot appears on calendar date
-12. Existing expenses tab updates
+8. User can click "+ Add another expense" to add more categories
+9. User clicks "Save"
+10. Success message appears
+11. Form resets (stays on Add screen)
+12. Dashboard updates in background
+13. User can immediately add more expenses
+
+---
+
+### Workflow 2b: Recurring Expense Entry (Category Mode)
+
+1. User clicks FAB (+) button or navigates to Add page
+2. "Expenses" tab is active by default
+3. User clicks "Category" mode selector
+4. User selects category from dropdown (e.g., "Rent")
+5. First row shows today's date
+6. User enters amount for first date
+7. User clicks "+ Add another date" to add same expense for different dates
+8. User enters amounts for each date
+9. User clicks "Save"
+10. Success message shows total expenses saved
+11. Form resets (stays on Add screen)
+12. Dashboard updates in background
 
 ---
 
