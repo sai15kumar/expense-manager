@@ -580,8 +580,14 @@ function updateBudgetHints(expense, income, savings, payoff) {
         hintEl.style.display = 'block';
         console.log(`[HINTS] ${item.type}: ${percentage}% displayed`);
         
-        // Add over-budget class if > 100%
-        if (percentage > 100) {
+        // Color logic:
+        // - Expense & Payoff: >100% is bad (red), ≤100% is good (green)
+        // - Income & Savings: <100% is bad (red), ≥100% is good (green)
+        const isBad = (item.type === 'expense' || item.type === 'payoff') 
+            ? percentage > 100 
+            : percentage < 100;
+        
+        if (isBad) {
             hintEl.classList.add('over-budget');
         } else {
             hintEl.classList.remove('over-budget');
