@@ -176,6 +176,9 @@ function doPost(e) {
             case 'getBudgets':
                 response = handleGetBudgets();
                 break;
+            case 'getMonthlyBudget':
+                response = handleGetMonthlyBudget(data);
+                break;
             case 'saveBudget':
                 response = handleSaveBudget(data);
                 break;
@@ -619,6 +622,76 @@ function handleGetBudgets() {
         
     } catch (error) {
         console.log('handleGetBudgets: Error caught:', error.message);
+        return {
+            success: false,
+            message: error.message
+        };
+    }
+}
+
+/**
+ * Handle GET MONTHLY BUDGET action
+ * Aggregates budgets by TYPE from Expense_Master sheet
+ * 
+ * @param {Object} data - Request data (year and month not used but kept for future)
+ * 
+ * @returns {Object} - Response with budget totals by type
+ * Response format:
+ * {
+ *   "success": true,
+ *   "budget": {
+ *     "expense": 50000,
+ *     "income": 100000,
+ *     "savings": 20000,
+ *     "payoff": 15000
+ *   }
+ * }
+ */
+function handleGetMonthlyBudget(data) {
+    try {
+        console.log('handleGetMonthlyBudget: Starting...');
+        const ss = SpreadsheetApp.openById(SHEET_ID);
+        const masterSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_MASTER);
+        
+        if (!masterSheet) {
+            return {
+                success: false,
+                message: `Sheet ${SHEET_NAMES.EXPENSE_MASTER} not found`
+            };
+        }
+        
+        const range = masterSheet.getDataRange();
+        const values = range.getValues();
+        console.log('handleGetMonthlyBudget: Got values, count:', values.length);
+        
+        // Initialize budget totals by type
+        const budgetByType = {
+            expense: 0,
+            income: 0,
+            savings: 0,
+            payoff: 0
+        };
+        
+        // Row 0 is header, data starts from row 1
+        // Column A (index 0) = Type, Column C (index 2) = Budget Monthly
+        for (let i = 1; i < values.length; i++) {
+            const type = (values[i][COLUMNS.expenseMaster.TYPE - 1] || '').toString().trim().toLowerCase();
+            const monthlyBudget = parseFloat(values[i][COLUMNS.expenseMaster.BUDGET_MONTHLY - 1]) || 0;
+            
+            if (type && budgetByType.hasOwnProperty(type)) {
+                budgetByType[type] += monthlyBudget;
+                console.log(`handleGetMonthlyBudget: Added ${monthlyBudget} to ${type}, total now: ${budgetByType[type]}`);
+            }
+        }
+        
+        console.log('handleGetMonthlyBudget: Final budget totals:', budgetByType);
+        return {
+            success: true,
+            budget: budgetByType
+        };
+        
+    } catch (error) {
+        console.log('handleGetMonthlyBudget: Error caught:', error.message);
         return {
             success: false,
             message: error.message
