@@ -1974,7 +1974,7 @@ async function saveExpensesByDate() {
         if (result.success) {
             showToast(`${expenses.length} expense(s) saved successfully`, 'success');
             setTimeout(() => {
-                closeAddScreen();
+                resetAddScreen();
                 if (appState.homeSelectedMonth) {
                     loadHomeData();
                 }
@@ -2105,7 +2105,7 @@ async function saveExpensesByCategory() {
         
         showToast(`${totalSaved} expense(s) saved successfully`, 'success');
         setTimeout(() => {
-            closeAddScreen();
+            resetAddScreen();
             if (appState.homeSelectedMonth) {
                 loadHomeData();
             }
@@ -2221,7 +2221,7 @@ async function saveMonthly() {
         if (result.success) {
             showToast(`${transactions.length} transaction(s) saved successfully`, 'success');
             setTimeout(() => {
-                closeAddScreen();
+                resetAddScreen();
                 if (appState.homeSelectedMonth) {
                     loadHomeData();
                 }
