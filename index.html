@@ -19,6 +19,14 @@
         </div>
     </div>
 
+    <!-- LOADING OVERLAY -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
     <div id="app-root" class="container">
         <!-- HEADER SECTION -->
         <header class="app-header">
@@ -406,27 +414,73 @@
                     <!-- EXPENSES TAB CONTENT -->
                     <div class="add-tab-content active" id="expensesTabContent">
                         <div class="add-content-scroll">
-                            <div class="form-section">
-                                <label for="expensesDate">Date</label>
-                                <input type="date" id="expensesDate" class="form-input" required>
+                            <!-- EXPENSE MODE SELECTOR -->
+                            <div class="form-section expense-mode-selector">
+                                <label>Add expenses by:</label>
+                                <div class="mode-options">
+                                    <label class="mode-radio">
+                                        <input type="radio" name="expenseMode" value="byDate" checked>
+                                        <span>Date</span>
+                                    </label>
+                                    <label class="mode-radio">
+                                        <input type="radio" name="expenseMode" value="byCategory">
+                                        <span>Category</span>
+                                    </label>
+                                </div>
                             </div>
 
-                            <div class="form-section">
-                                <table class="expense-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Category</th>
-                                            <th>Amount</th>
-                                            <th>Notes</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="expenseRowsContainer">
-                                        <!-- Rows will be added by JS -->
-                                    </tbody>
-                                </table>
-                                <button type="button" class="btn-add-row" id="addExpenseRowBtn" disabled>+ Add another expense</button>
+                            <!-- MODE 1: BY DATE (DEFAULT) -->
+                            <div id="expenseByDateMode" class="expense-mode-content">
+                                <div class="form-section">
+                                    <label for="expensesDate">Date</label>
+                                    <input type="date" id="expensesDate" class="form-input" required>
+                                </div>
+
+                                <div class="form-section">
+                                    <table class="expense-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Amount</th>
+                                                <th>Notes</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="expenseRowsContainer">
+                                            <!-- Rows will be added by JS -->
+                                        </tbody>
+                                    </table>
+                                    <button type="button" class="btn-add-row" id="addExpenseRowBtn" disabled>+ Add another expense</button>
+                                </div>
                             </div>
+
+                            <!-- MODE 2: BY CATEGORY -->
+                            <div id="expenseByCategoryMode" class="expense-mode-content hidden">
+                                <div class="form-section">
+                                    <label for="expensesCategorySelect">Category</label>
+                                    <select id="expensesCategorySelect" class="form-input" required>
+                                        <option value="">Select category</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-section">
+                                    <table class="expense-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Amount</th>
+                                                <th>Notes</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="expenseRowsByCategoryContainer">
+                                            <!-- Rows will be added by JS -->
+                                        </tbody>
+                                    </table>
+                                    <button type="button" class="btn-add-row" id="addExpenseRowByCategoryBtn" disabled>+ Add another date</button>
+                                </div>
+                            </div>
+
                             <div class="form-actions-block">
                                 <button type="button" class="btn btn-primary btn-save" id="expensesSaveBtn" disabled>Save</button>
                             </div>

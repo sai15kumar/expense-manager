@@ -133,6 +133,26 @@ async function fetchCategories() {
 // ====================================================
 
 /**
+ * Show loading overlay
+ */
+function showLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+    }
+}
+
+/**
+ * Hide loading overlay
+ */
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+}
+
+/**
  * Format date object to string (YYYY-MM-DD)
  * @param {Date} dateObj - Date object to format
  * @returns {string} - Formatted date string
@@ -399,26 +419,32 @@ function navigateToAddExpense() {
  * Load all Home page data (summary, transactions)
  */
 async function loadHomeData() {
-    const { year, month } = appState.homeSelectedMonth;
+    showLoading();
     
-    // Update month/year display
-    const monthYearDisplay = document.getElementById('homeMonthYear');
-    if (monthYearDisplay) {
-        const shortYear = String(year).slice(-2);
-        monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
+    try {
+        const { year, month } = appState.homeSelectedMonth;
+        
+        // Update month/year display
+        const monthYearDisplay = document.getElementById('homeMonthYear');
+        if (monthYearDisplay) {
+            const shortYear = String(year).slice(-2);
+            monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
+        }
+        
+        // Fetch monthly budget
+        await fetchMonthlyBudget(year, month);
+        
+        // Fetch expenses for the month
+        await fetchHomeExpensesForMonth(year, month);
+        
+        // Calculate and display summary
+        calculateAndDisplayMonthlySummary(year, month);
+        
+        // Display transaction list
+        renderMonthlyTransactionList(year, month);
+    } finally {
+        hideLoading();
     }
-    
-    // Fetch monthly budget
-    await fetchMonthlyBudget(year, month);
-    
-    // Fetch expenses for the month
-    await fetchHomeExpensesForMonth(year, month);
-    
-    // Calculate and display summary
-    calculateAndDisplayMonthlySummary(year, month);
-    
-    // Display transaction list
-    renderMonthlyTransactionList(year, month);
 }
 
 /**
@@ -971,6 +997,7 @@ function initializeAppAfterAuth() {
     setupFAB();
     setupLogout();
     fetchCategories().catch(err => console.error('[APP] Failed to load categories:', err));
+    hideLoading();
 
     authedAppInitialized = true;
     return true;
@@ -1044,13 +1071,16 @@ function setupLogout() {
 
 let addScreenState = {
     currentTab: 'expenses',
+    expenseMode: 'byDate', // 'byDate' or 'byCategory'
     expenseRows: [],
+    expenseRowsByCategory: [],
     monthlyRows: {
         income: [],
         savings: [],
         payoff: []
     },
-    rowCounter: 0
+    rowCounter: 0,
+    rowCounterByCategory: 0
 };
 
 /**
@@ -1071,15 +1101,32 @@ function initializeAddScreen() {
         addBackBtn.addEventListener('click', closeAddScreen);
     }
     
+    // Expense mode switching (By Date / By Category)
+    const modeRadios = document.querySelectorAll('input[name="expenseMode"]');
+    modeRadios.forEach(radio => {
+        radio.addEventListener('change', () => switchExpenseMode(radio.value));
+    });
+    
     // Expenses tab buttons
     const addExpenseRowBtn = document.getElementById('addExpenseRowBtn');
     if (addExpenseRowBtn) {
         addExpenseRowBtn.addEventListener('click', addExpenseRow);
     }
     
+    const addExpenseRowByCategoryBtn = document.getElementById('addExpenseRowByCategoryBtn');
+    if (addExpenseRowByCategoryBtn) {
+        addExpenseRowByCategoryBtn.addEventListener('click', addExpenseRowByCategory);
+    }
+    
     const expensesSaveBtn = document.getElementById('expensesSaveBtn');
     if (expensesSaveBtn) {
         expensesSaveBtn.addEventListener('click', saveExpenses);
+    }
+    
+    // Category dropdown change listener
+    const expensesCategorySelect = document.getElementById('expensesCategorySelect');
+    if (expensesCategorySelect) {
+        expensesCategorySelect.addEventListener('change', updateSaveButtonState);
     }
     
     // Monthly tab buttons
@@ -1166,12 +1213,18 @@ function closeAddScreen() {
 function resetAddScreen() {
     console.log('[ADD_SCREEN] Resetting...');
     addScreenState.currentTab = 'expenses';
+    addScreenState.expenseMode = 'byDate';
     addScreenState.expenseRows = [];
+    addScreenState.expenseRowsByCategory = [];
     addScreenState.monthlyRows = { income: [], savings: [], payoff: [] };
     addScreenState.rowCounter = 0;
+    addScreenState.rowCounterByCategory = 0;
 
     const expenseContainer = document.getElementById('expenseRowsContainer');
     if (expenseContainer) expenseContainer.innerHTML = '';
+    
+    const expenseByCategoryContainer = document.getElementById('expenseRowsByCategoryContainer');
+    if (expenseByCategoryContainer) expenseByCategoryContainer.innerHTML = '';
 
     ['income', 'savings', 'payoff'].forEach(type => {
         const container = document.getElementById(`${type}MonthlyRows`);
@@ -1185,6 +1238,20 @@ function resetAddScreen() {
         dateInput.valueAsDate = today;
     }
     
+    // Set category selector to default
+    const categorySelect = document.getElementById('expensesCategorySelect');
+    if (categorySelect) {
+        categorySelect.value = '';
+        if (!appState.categories || appState.categories.length === 0) {
+            console.log('[ADD_SCREEN] Categories not loaded yet, fetching...');
+            fetchCategories().then(() => {
+                populateCategoriesByType(categorySelect, 'Expense');
+            });
+        } else {
+            populateCategoriesByType(categorySelect, 'Expense');
+        }
+    }
+    
     // Set monthly selector to current month for both tabs
     const now = new Date();
     const year = now.getFullYear();
@@ -1194,6 +1261,24 @@ function resetAddScreen() {
     const monthlyMonthPicker = document.getElementById('monthlyMonthPicker');
     if (monthlyMonthPicker) {
         monthlyMonthPicker.value = monthValue;
+    }
+
+    // Reset expense mode selector to byDate
+    const modeRadios = document.querySelectorAll('input[name="expenseMode"]');
+    modeRadios.forEach(radio => {
+        radio.checked = radio.value === 'byDate';
+    });
+    switchExpenseMode('byDate');
+
+    // Reset save buttons text
+    const expensesSaveBtn = document.getElementById('expensesSaveBtn');
+    if (expensesSaveBtn) {
+        expensesSaveBtn.textContent = 'Save';
+    }
+    
+    const monthlySaveBtn = document.getElementById('monthlySaveBtn');
+    if (monthlySaveBtn) {
+        monthlySaveBtn.textContent = 'Save';
     }
 
     // Ensure at least one empty expense row is present
@@ -1235,6 +1320,70 @@ function switchAddTab(tabName) {
         }
     }
 
+    updateSaveButtonState();
+}
+
+/**
+ * Switch expense mode (By Date or By Category)
+ */
+function switchExpenseMode(mode) {
+    console.log('[ADD_SCREEN] Switching expense mode to:', mode);
+    addScreenState.expenseMode = mode;
+    
+    const byDateMode = document.getElementById('expenseByDateMode');
+    const byCategoryMode = document.getElementById('expenseByCategoryMode');
+    
+    if (mode === 'byDate') {
+        byDateMode.classList.remove('hidden');
+        byCategoryMode.classList.add('hidden');
+        
+        // Reset by-category container and rows
+        const container = document.getElementById('expenseRowsByCategoryContainer');
+        if (container) container.innerHTML = '';
+        addScreenState.expenseRowsByCategory = [];
+        addScreenState.rowCounterByCategory = 0;
+        
+        // Ensure at least one row in by-date mode
+        const dateContainer = document.getElementById('expenseRowsContainer');
+        if (dateContainer && dateContainer.children.length === 0) {
+            addExpenseRow();
+        }
+    } else {
+        byDateMode.classList.add('hidden');
+        byCategoryMode.classList.remove('hidden');
+        
+        // Ensure categories are loaded before populating dropdown
+        if (!appState.categories || appState.categories.length === 0) {
+            console.log('[ADD_SCREEN] Categories not loaded, fetching...');
+            fetchCategories().then(() => {
+                const categorySelect = document.getElementById('expensesCategorySelect');
+                if (categorySelect) {
+                    categorySelect.innerHTML = '<option value="">Select category</option>';
+                    populateCategoriesByType(categorySelect, 'Expense');
+                }
+            });
+        } else {
+            // Categories already loaded
+            const categorySelect = document.getElementById('expensesCategorySelect');
+            if (categorySelect) {
+                categorySelect.innerHTML = '<option value="">Select category</option>';
+                populateCategoriesByType(categorySelect, 'Expense');
+            }
+        }
+        
+        // Reset by-date container and rows
+        const container = document.getElementById('expenseRowsContainer');
+        if (container) container.innerHTML = '';
+        addScreenState.expenseRows = [];
+        addScreenState.rowCounter = 0;
+        
+        // Ensure at least one row in by-category mode
+        const categoryContainer = document.getElementById('expenseRowsByCategoryContainer');
+        if (categoryContainer && categoryContainer.children.length === 0) {
+            addExpenseRowByCategory();
+        }
+    }
+    
     updateSaveButtonState();
 }
 
@@ -1352,6 +1501,105 @@ function removeExpenseRow(rowId) {
         updateSaveButtonState();
         console.log('[ADD_SCREEN] Removed expense row:', rowId);
     }
+}
+
+/**
+ * Add expense row by category (Date input instead of Category)
+ */
+function addExpenseRowByCategory() {
+    const container = document.getElementById('expenseRowsByCategoryContainer');
+    const rowId = addScreenState.rowCounterByCategory++;
+    const isFirstRow = addScreenState.expenseRowsByCategory.length === 0;
+    
+    const row = document.createElement('tr');
+    row.className = 'expense-row-by-category';
+    row.dataset.rowId = rowId;
+    row.dataset.type = 'expenseByCategory';
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    row.innerHTML = `
+        <td data-label="Date">
+            <input type="date" class="row-date" data-row-id="${rowId}" value="${today}">
+        </td>
+        <td data-label="Amount">
+            <input type="number" class="row-amount" data-row-id="${rowId}" placeholder="0.00" step="0.01" min="0">
+        </td>
+        <td data-label="Notes">
+            <input type="text" class="row-notes" data-row-id="${rowId}" placeholder="Optional">
+        </td>
+        <td data-label="Action">
+            <button type="button" class="remove-btn" ${isFirstRow ? 'disabled' : ''} onclick="removeExpenseRowByCategory(${rowId})">✕</button>
+        </td>
+    `;
+    
+    container.appendChild(row);
+    
+    // Add to state
+    addScreenState.expenseRowsByCategory.push(rowId);
+    
+    // Add input listeners for enable logic
+    const inputs = row.querySelectorAll('input, select');
+    console.log(`[ADD_SCREEN] Category row ${rowId}: Found ${inputs.length} input/select elements`);
+    
+    inputs.forEach((input, index) => {
+        console.log(`[ADD_SCREEN] Category row ${rowId}: Attaching listeners to input ${index}:`, input.className);
+        
+        input.addEventListener('input', () => {
+            console.log(`[ADD_SCREEN] Category row ${rowId}: input event triggered`);
+            checkExpenseRowByCategoryInput();
+            updateSaveButtonState();
+        });
+        
+        input.addEventListener('change', () => {
+            console.log(`[ADD_SCREEN] Category row ${rowId}: change event triggered`);
+            checkExpenseRowByCategoryInput();
+            updateSaveButtonState();
+        });
+    });
+    
+    console.log('[ADD_SCREEN] Added expense row by category:', rowId);
+}
+
+/**
+ * Remove expense row by category
+ */
+function removeExpenseRowByCategory(rowId) {
+    const row = document.querySelector(`.expense-row-by-category[data-row-id="${rowId}"]`);
+    if (row) {
+        row.remove();
+        addScreenState.expenseRowsByCategory = addScreenState.expenseRowsByCategory.filter(id => id !== rowId);
+        checkExpenseRowByCategoryInput();
+        updateSaveButtonState();
+        console.log('[ADD_SCREEN] Removed expense row by category:', rowId);
+    }
+}
+
+/**
+ * Check if any expense row by category has input (to enable + button)
+ */
+function checkExpenseRowByCategoryInput() {
+    const rows = document.querySelectorAll('.expense-row-by-category');
+    const addBtn = document.getElementById('addExpenseRowByCategoryBtn');
+    
+    console.log('[ADD_SCREEN] checkExpenseRowByCategoryInput: Checking', rows.length, 'expense rows by category');
+    
+    let hasInput = false;
+    rows.forEach(row => {
+        const dateInput = row.querySelector('.row-date');
+        const amountInput = row.querySelector('.row-amount');
+        
+        if ((dateInput && dateInput.value) || (amountInput && amountInput.value)) {
+            hasInput = true;
+        }
+    });
+    
+    if (addBtn) {
+        addBtn.disabled = !hasInput;
+    }
+    
+    // Update save button state
+    updateSaveButtonState();
 }
 
 /**
@@ -1504,8 +1752,16 @@ function updateSaveButtonState() {
     
     if (addScreenState.currentTab === 'expenses') {
         const saveBtn = document.getElementById('expensesSaveBtn');
-        const hasValidRow = hasValidExpenseRow();
-        console.log('[ADD_SCREEN] Expenses tab: hasValidRow =', hasValidRow);
+        
+        // Check based on current expense mode
+        let hasValidRow = false;
+        if (addScreenState.expenseMode === 'byCategory') {
+            hasValidRow = hasValidExpenseRowByCategory();
+        } else {
+            hasValidRow = hasValidExpenseRow();
+        }
+        
+        console.log('[ADD_SCREEN] Expenses tab (mode=' + addScreenState.expenseMode + '): hasValidRow =', hasValidRow);
         if (saveBtn) {
             saveBtn.disabled = !hasValidRow;
             console.log('[ADD_SCREEN] expensesSaveBtn disabled =', saveBtn.disabled);
@@ -1522,8 +1778,44 @@ function updateSaveButtonState() {
 }
 
 /**
- * Check if there's at least one valid expense row
+ * Check if there's at least one valid expense row by category
  */
+function hasValidExpenseRowByCategory() {
+    const rows = document.querySelectorAll('.expense-row-by-category');
+    console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: Checking', rows.length, 'category rows');
+    
+    // Also need to check if category is selected
+    const categorySelect = document.getElementById('expensesCategorySelect');
+    const category = categorySelect ? categorySelect.value : '';
+    
+    if (!category) {
+        console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: No category selected');
+        return false;
+    }
+    
+    for (let row of rows) {
+        const dateInput = row.querySelector('.row-date');
+        const amountInput = row.querySelector('.row-amount');
+        
+        if (!dateInput || !amountInput) {
+            console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: Missing elements');
+            continue;
+        }
+        
+        const date = dateInput.value;
+        const amount = parseFloat(amountInput.value);
+        
+        console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: date="' + date + '", amount=' + amount + ', valid=' + (date && !isNaN(amount) && amount >= 0));
+        
+        if (date && !isNaN(amount) && amount >= 0) {
+            console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: Found valid row! Returning true');
+            return true;
+        }
+    }
+    
+    console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: No valid rows found');
+    return false;
+}
 function hasValidExpenseRow() {
     const rows = document.querySelectorAll('.expense-row');
     console.log('[ADD_SCREEN] hasValidExpenseRow: Checking', rows.length, 'expense rows');
@@ -1579,7 +1871,20 @@ function hasValidMonthlyRow() {
  * Save expenses
  */
 async function saveExpenses() {
-    console.log('[ADD_SCREEN] saveExpenses called');
+    console.log('[ADD_SCREEN] saveExpenses called with mode:', addScreenState.expenseMode);
+    
+    if (addScreenState.expenseMode === 'byDate') {
+        await saveExpensesByDate();
+    } else {
+        await saveExpensesByCategory();
+    }
+}
+
+/**
+ * Save expenses with By Date mode
+ */
+async function saveExpensesByDate() {
+    console.log('[ADD_SCREEN] saveExpensesByDate called');
     
     const dateInput = document.getElementById('expensesDate');
     const date = dateInput.value;
@@ -1681,6 +1986,132 @@ async function saveExpenses() {
         }
     } catch (error) {
         console.error('[ADD_SCREEN] Error saving expenses:', error);
+        showToast('Failed to save. Please try again.', 'error');
+        const saveBtn = document.getElementById('expensesSaveBtn');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+    }
+}
+
+/**
+ * Save expenses with By Category mode
+ */
+async function saveExpensesByCategory() {
+    console.log('[ADD_SCREEN] saveExpensesByCategory called');
+    
+    const categorySelect = document.getElementById('expensesCategorySelect');
+    const category = categorySelect.value;
+    
+    console.log('[ADD_SCREEN] Category:', category);
+    
+    if (!category) {
+        showToast('Please select a category', 'error');
+        return;
+    }
+    
+    // Collect all valid rows
+    const rows = document.querySelectorAll('.expense-row-by-category');
+    const expenses = [];
+    
+    console.log('[ADD_SCREEN] Found expense rows by category:', rows.length);
+    
+    rows.forEach((row, index) => {
+        const dateInput = row.querySelector('.row-date');
+        const amountInput = row.querySelector('.row-amount');
+        const notesInput = row.querySelector('.row-notes');
+        
+        console.log(`[ADD_SCREEN] Category row ${index}:`, {
+            dateInput: !!dateInput,
+            amountInput: !!amountInput,
+            notesInput: !!notesInput
+        });
+        
+        if (!dateInput || !amountInput || !notesInput) {
+            console.warn(`[ADD_SCREEN] Category row ${index} missing elements`);
+            return;
+        }
+        
+        const date = dateInput.value;
+        const amount = parseFloat(amountInput.value);
+        const notes = notesInput.value;
+        
+        console.log(`[ADD_SCREEN] Category row ${index} data:`, { date, amount, notes });
+        
+        if (date && !isNaN(amount) && amount >= 0) {
+            expenses.push({
+                type: 'Expense',
+                category: category,
+                amount: amount,
+                notes: notes || '',
+                date: date
+            });
+        }
+    });
+    
+    console.log('[ADD_SCREEN] Collected expenses by category:', expenses);
+    
+    if (expenses.length === 0) {
+        showToast('Please add at least one valid entry', 'error');
+        return;
+    }
+    
+    console.log('[ADD_SCREEN] Saving expenses by category:', expenses);
+    
+    // Save using existing API with multiple dates
+    try {
+        const saveBtn = document.getElementById('expensesSaveBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        
+        // Group expenses by date and save
+        const expensesByDate = {};
+        expenses.forEach(exp => {
+            if (!expensesByDate[exp.date]) {
+                expensesByDate[exp.date] = [];
+            }
+            expensesByDate[exp.date].push({
+                type: 'Expense',
+                category: exp.category,
+                amount: exp.amount,
+                notes: exp.notes
+            });
+        });
+        
+        // Send each date's expenses separately to API
+        let totalSaved = 0;
+        for (const [date, dateExpenses] of Object.entries(expensesByDate)) {
+            const payload = {
+                action: 'saveExpenses',
+                date: date,
+                expenses: dateExpenses
+            };
+            
+            console.log('[ADD_SCREEN] Sending payload for date', date, ':', JSON.stringify(payload, null, 2));
+            
+            const result = await callAppsScript(payload);
+            
+            if (!checkApiAuthorization(result)) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save';
+                return;
+            }
+            
+            if (result.success) {
+                totalSaved += dateExpenses.length;
+            } else {
+                throw new Error(`Failed to save for date ${date}`);
+            }
+        }
+        
+        showToast(`${totalSaved} expense(s) saved successfully`, 'success');
+        setTimeout(() => {
+            closeAddScreen();
+            if (appState.homeSelectedMonth) {
+                loadHomeData();
+            }
+        }, 1500);
+    } catch (error) {
+        console.error('[ADD_SCREEN] Error saving expenses by category:', error);
         showToast('Failed to save. Please try again.', 'error');
         const saveBtn = document.getElementById('expensesSaveBtn');
         saveBtn.disabled = false;
