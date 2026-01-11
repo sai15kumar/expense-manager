@@ -2076,6 +2076,21 @@ body {
     border-radius: 8px;
     transition: all 0.2s ease;
     min-height: 42px;
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.home-month-display {
+    flex: 1;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #2f3a45;
+    text-align: center;
+    padding: 0.65rem 0.85rem;
+    pointer-events: none;
 }
 
 .home-month-picker:hover {
@@ -2599,6 +2614,8 @@ body {
     font-weight: 300;
     line-height: 1;
 }
+
+
 
 /* RESPONSIVE ADJUSTMENTS FOR HOME */
 @media (min-width: 768px) {

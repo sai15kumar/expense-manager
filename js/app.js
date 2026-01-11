@@ -8,8 +8,8 @@
 
 const CONFIG = {
      BACKEND_URL: 'https://script.google.com/macros/s/AKfycbyeZZW7d28kKrsdJ7wZZsXVJ0MI0N5S0dVhydM-SWwfb9z9oh3udF1JZO_S354Sg8VMUQ/exec',
-     MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'],
+     MONTH_NAMES: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
      EXPENSE_ROWS: 5,
      DATE_FORMAT: 'YYYY-MM-DD'
 };
@@ -376,9 +376,15 @@ function handleMonthPickerChange(event) {
  */
 function updateMonthPicker() {
     const monthPicker = document.getElementById('homeMonthPicker');
+    const monthDisplay = document.getElementById('homeMonthYear');
     if (monthPicker) {
         const { year, month } = appState.homeSelectedMonth;
         monthPicker.value = `${year}-${String(month).padStart(2, '0')}`;
+    }
+    if (monthDisplay) {
+        const { year, month } = appState.homeSelectedMonth;
+        const shortYear = String(year).slice(-2);
+        monthDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
     }
 }
 
@@ -398,7 +404,8 @@ async function loadHomeData() {
     // Update month/year display
     const monthYearDisplay = document.getElementById('homeMonthYear');
     if (monthYearDisplay) {
-        monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${year}`;
+        const shortYear = String(year).slice(-2);
+        monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
     }
     
     // Fetch monthly budget
@@ -1138,6 +1145,24 @@ function resetAddScreen() {
         const container = document.getElementById(`${type}MonthlyRows`);
         if (container) container.innerHTML = '';
     });
+    
+    // Set main date field to today
+    const dateInput = document.getElementById('expensesDate');
+    if (dateInput) {
+        const today = new Date();
+        dateInput.valueAsDate = today;
+    }
+    
+    // Set monthly selector to current month for both tabs
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const monthValue = `${year}-${month}`;
+    
+    const monthlyMonthPicker = document.getElementById('monthlyMonthPicker');
+    if (monthlyMonthPicker) {
+        monthlyMonthPicker.value = monthValue;
+    }
 
     // Ensure at least one empty expense row is present
     addExpenseRow();

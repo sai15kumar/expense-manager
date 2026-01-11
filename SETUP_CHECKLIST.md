@@ -349,5 +349,5 @@ You've successfully set up Expense Manager!
 
 ---
 
-**Last Updated:** December 30, 2025
+**Last Updated:** Dec 30, 2025
 **Version:** 1.0
