@@ -2114,11 +2114,32 @@ body {
     flex-direction: column;
     gap: 0.5rem;
     box-shadow: 0 1px 3px var(--color-shadow);
-    transition: transform 0.2s ease;
+    border: 1px solid var(--color-border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .home-summary-card:active {
     transform: scale(0.98);
+}
+
+.home-summary-card[data-type] {
+    cursor: pointer;
+}
+
+.home-summary-card[data-type]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(44, 62, 80, 0.12);
+}
+
+.home-summary-card[data-type]:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+}
+
+.home-summary-card.selected {
+    border-color: var(--color-accent);
+    box-shadow: 0 10px 24px rgba(59, 126, 161, 0.18);
+    background: #f7fbff;
 }
 
 .home-summary-card .card-icon {
@@ -2194,42 +2215,83 @@ body {
     gap: 0.75rem;
 }
 
-.transaction-card {
-    background: white;
+.home-transaction-list .empty-state {
+    align-items: flex-start;
+    text-align: left;
+}
+
+.txn-date-group {
+    background: #fafbfc;
+    border: 1px solid var(--color-border);
     border-radius: 10px;
-    padding: 1rem;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    padding: 0.5rem 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.txn-date-header {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #8a95a5;
+    margin-bottom: 0.35rem;
+}
+
+.txn-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #eceff2;
+    gap: 0.75rem;
 }
 
-.transaction-card-left {
+.txn-row:last-child {
+    border-bottom: none;
+}
+
+.txn-main {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    min-width: 0;
 }
 
-.transaction-date {
-    font-size: 0.85rem;
-    color: #999;
-    font-weight: 500;
-}
-
-.transaction-category {
-    font-size: 1rem;
-    color: #333;
+.txn-category {
+    font-size: 0.95rem;
     font-weight: 600;
+    color: #2c3e50;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.txn-notes {
+    font-size: 0.8rem;
+    color: #6b7a8f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.txn-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.txn-amount {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #1f2d3d;
 }
 
 .transaction-type-badge {
     display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 500;
     text-transform: uppercase;
-    margin-top: 0.25rem;
 }
 
 .transaction-type-badge.expense {

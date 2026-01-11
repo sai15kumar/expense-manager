@@ -34,7 +34,8 @@ const storage = window.AUTH_STORAGE || sessionStorage;
 let appState = {
     categories: [], // [{name, type}]
     homeSelectedMonth: null,
-    homeExpensesByDate: {}
+    homeExpensesByDate: {},
+    homeSelectedType: 'all'
 };
 
 // ====================================================
@@ -185,12 +186,69 @@ function initializeHomePage() {
     if (homeNextBtn) homeNextBtn.addEventListener('click', () => changeHomeMonth(1));
     if (homeMonthPicker) homeMonthPicker.addEventListener('change', handleMonthPickerChange);
     if (homeAddBtn) homeAddBtn.addEventListener('click', navigateToAddExpense);
+
+    // Enable summary cards as filter toggles
+    setupHomeSummaryFilters();
     
     // Set initial picker value
     updateMonthPicker();
     
     // Load Home data
     loadHomeData();
+}
+
+/**
+ * Setup click/keyboard handlers for summary cards to filter transactions
+ */
+function setupHomeSummaryFilters() {
+    const cards = document.querySelectorAll('.home-summary-card[data-type]');
+    if (!cards.length) return;
+
+    cards.forEach(card => {
+        const type = (card.dataset.type || '').toLowerCase();
+
+        card.addEventListener('click', () => handleHomeSummarySelect(type));
+        card.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleHomeSummarySelect(type);
+            }
+        });
+    });
+
+    updateHomeSummarySelection(appState.homeSelectedType);
+}
+
+/**
+ * Toggle the selected summary card filter and re-render list
+ */
+function handleHomeSummarySelect(type) {
+    const normalizedType = type || 'all';
+    const nextType = appState.homeSelectedType === normalizedType ? 'all' : normalizedType;
+    appState.homeSelectedType = nextType;
+
+    updateHomeSummarySelection(nextType);
+
+    if (appState.homeSelectedMonth) {
+        const { year, month } = appState.homeSelectedMonth;
+        renderMonthlyTransactionList(year, month);
+    } else {
+        renderMonthlyTransactionList();
+    }
+}
+
+/**
+ * Reflect active filter state on the summary cards
+ */
+function updateHomeSummarySelection(selectedType = 'all') {
+    const activeType = (selectedType || 'all').toLowerCase();
+
+    document.querySelectorAll('.home-summary-card[data-type]').forEach(card => {
+        const cardType = (card.dataset.type || '').toLowerCase();
+        const isActive = activeType !== 'all' && activeType === cardType;
+        card.classList.toggle('selected', isActive);
+        card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
 }
 
 /**
@@ -360,9 +418,12 @@ function renderMonthlyTransactionList(year, month) {
     if (appState.homeExpensesByDate) {
         Object.entries(appState.homeExpensesByDate).forEach(([date, expenses]) => {
             expenses.forEach(expense => {
+                const type = expense.type || expense.Type || 'Expense';
+                const normalizedType = (type || '').toLowerCase();
                 allTransactions.push({
                     date: date,
-                    type: expense.type || expense.Type || 'Expense',
+                    type: type,
+                    typeKey: normalizedType,
                     category: expense.category || expense.Category || 'Uncategorized',
                     amount: parseFloat(expense.amount || expense.Amount || 0),
                     notes: expense.notes || expense.Notes || ''
@@ -371,28 +432,59 @@ function renderMonthlyTransactionList(year, month) {
         });
     }
     
+    const selectedType = (appState.homeSelectedType || 'all').toLowerCase();
+    const filteredTransactions = allTransactions.filter(txn => {
+        return selectedType === 'all' ? true : txn.typeKey === selectedType;
+    });
+
     // Sort by date (newest first)
-    allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
+    filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const hasFilter = selectedType !== 'all';
+
+    // Group by date (already newest-first list); grouping keeps order
+    const groupsMap = new Map();
+    filteredTransactions.forEach(txn => {
+        if (!groupsMap.has(txn.date)) {
+            groupsMap.set(txn.date, []);
+        }
+        groupsMap.get(txn.date).push(txn);
+    });
+
+    const grouped = Array.from(groupsMap.entries()).sort((a, b) => new Date(b[0]) - new Date(a[0]));
+    grouped.forEach(([, arr]) => arr.sort((a, b) => new Date(b.date) - new Date(a.date)));
+
     // Render
-    if (allTransactions.length === 0) {
+    if (filteredTransactions.length === 0) {
         listContainer.innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">📭</div>
-                <p>No transactions for this month</p>
+                <p>${hasFilter ? 'No transactions for this filter' : 'No transactions for this month'}</p>
             </div>
         `;
     } else {
-        listContainer.innerHTML = allTransactions.map(txn => {
-            const displayDate = formatDateForDisplay(txn.date);
-            return `
-                <div class="transaction-card">
-                    <div class="transaction-card-left">
-                        <div class="transaction-date">${displayDate}</div>
-                        <div class="transaction-category">${txn.category}</div>
-                        <span class="transaction-type-badge ${txn.type.toLowerCase()}">${txn.type}</span>
+        listContainer.innerHTML = grouped.map(([date, items]) => {
+            const displayDate = formatDateForDisplay(date);
+            const rows = items.map(txn => {
+                const note = txn.notes ? `<span class="txn-notes">${txn.notes}</span>` : '';
+                return `
+                    <div class="txn-row">
+                        <div class="txn-main">
+                            <span class="txn-category">${txn.category}</span>
+                            ${note}
+                        </div>
+                        <div class="txn-meta">
+                            <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
+                            <span class="txn-amount">₹${txn.amount.toFixed(2)}</span>
+                        </div>
                     </div>
-                    <div class="transaction-amount">₹${txn.amount.toFixed(2)}</div>
+                `;
+            }).join('');
+
+            return `
+                <div class="txn-date-group">
+                    <div class="txn-date-header">${displayDate}</div>
+                    ${rows}
                 </div>
             `;
         }).join('');
