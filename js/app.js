@@ -35,7 +35,10 @@ let appState = {
     categories: [], // [{name, type}]
     homeSelectedMonth: null,
     homeExpensesByDate: {},
-    homeSelectedType: 'all'
+    homeSelectedType: 'all',
+    homeViewMode: 'summary', // 'transactions' or 'summary'
+    expandedCategories: new Set(), // Track expanded category keys in summary view
+    monthlyBudget: {} // {expense: amount, income: amount, savings: amount, payoff: amount}
 };
 
 // ====================================================
@@ -154,6 +157,53 @@ function formatDateForDisplay(dateString) {
 }
 
 /**
+ * Get icon emoji for category
+ * @param {string} category - Category name
+ * @param {string} type - Transaction type
+ * @returns {string} - Emoji icon
+ */
+function getCategoryIcon(category, type) {
+    const icons = {
+        // Common categories
+        'Food': '🍽️',
+        'Transport': '🚗',
+        'Shopping': '🛒',
+        'Entertainment': '🎬',
+        'Bills': '📄',
+        'Health': '⚕️',
+        'Education': '📚',
+        'Groceries': '🛒',
+        'Dining': '🍽️',
+        'Travel': '✈️',
+        'Salary': '💰',
+        'Investment': '📈',
+        'Gift': '🎁',
+        'Rent': '🏠',
+        'Utilities': '💡',
+        'Insurance': '🛡️',
+        'Subscription': '📱',
+        'Savings': '🏦',
+        'Payoff': '💳'
+    };
+    
+    // Match by category first
+    for (const [key, icon] of Object.entries(icons)) {
+        if (category.toLowerCase().includes(key.toLowerCase())) {
+            return icon;
+        }
+    }
+    
+    // Fallback by type
+    const typeKey = (type || '').toLowerCase();
+    if (typeKey === 'income') return '💰';
+    if (typeKey === 'expense') return '💸';
+    if (typeKey === 'savings') return '🏦';
+    if (typeKey === 'payoff') return '💳';
+    
+    return '📊';
+}
+
+/**
  * Fetch expenses for an entire month
  * (For future feature: monthly summary)
  * @param {number} year - Year
@@ -189,6 +239,9 @@ function initializeHomePage() {
 
     // Enable summary cards as filter toggles
     setupHomeSummaryFilters();
+    
+    // Setup view toggle buttons
+    setupViewToggle();
     
     // Set initial picker value
     updateMonthPicker();
@@ -248,6 +301,39 @@ function updateHomeSummarySelection(selectedType = 'all') {
         const isActive = activeType !== 'all' && activeType === cardType;
         card.classList.toggle('selected', isActive);
         card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+
+/**
+ * Setup view toggle buttons between Transactions and Summary
+ */
+function setupViewToggle() {
+    const toggleBtns = document.querySelectorAll('.view-toggle .toggle-btn');
+    const titleEl = document.getElementById('transactionListTitle');
+    if (!toggleBtns.length) return;
+
+    toggleBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const view = btn.dataset.view;
+            if (view === appState.homeViewMode) return;
+
+            appState.homeViewMode = view;
+            
+            // Update heading
+            if (titleEl) {
+                titleEl.textContent = view === 'summary' ? 'Summary' : 'Transactions';
+            }
+            
+            // Update active state
+            toggleBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Re-render
+            if (appState.homeSelectedMonth) {
+                const { year, month } = appState.homeSelectedMonth;
+                renderMonthlyTransactionList(year, month);
+            }
+        });
     });
 }
 
@@ -315,6 +401,9 @@ async function loadHomeData() {
         monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${year}`;
     }
     
+    // Fetch monthly budget
+    await fetchMonthlyBudget(year, month);
+    
     // Fetch expenses for the month
     await fetchHomeExpensesForMonth(year, month);
     
@@ -323,6 +412,30 @@ async function loadHomeData() {
     
     // Display transaction list
     renderMonthlyTransactionList(year, month);
+}
+
+/**
+ * Fetch monthly budget for the selected month
+ */
+async function fetchMonthlyBudget(year, month) {
+    try {
+        const result = await callAppsScript({
+            action: 'getMonthlyBudget',
+            year: year,
+            month: month
+        });
+
+        if (!checkApiAuthorization(result)) return;
+
+        if (result.success && result.budget) {
+            appState.monthlyBudget = result.budget;
+        } else {
+            appState.monthlyBudget = {};
+        }
+    } catch (error) {
+        console.error('[HOME] Error fetching budget:', error);
+        appState.monthlyBudget = {};
+    }
 }
 
 /**
@@ -365,7 +478,7 @@ async function fetchHomeExpensesForMonth(year, month) {
 }
 
 /**
- * Calculate and display monthly summary totals
+ * Calculate and display monthly summary totals with budget percentages
  */
 function calculateAndDisplayMonthlySummary(year, month) {
     let totalExpense = 0;
@@ -403,12 +516,205 @@ function calculateAndDisplayMonthlySummary(year, month) {
     if (incomeEl) incomeEl.textContent = `₹${totalIncome.toFixed(2)}`;
     if (savingsEl) savingsEl.textContent = `₹${totalSavings.toFixed(2)}`;
     if (payoffEl) payoffEl.textContent = `₹${totalPayoff.toFixed(2)}`;
+    
+    // Update percentage hints
+    updateBudgetHints(totalExpense, totalIncome, totalSavings, totalPayoff);
+}
+
+/**
+ * Update budget percentage hints on cards
+ */
+function updateBudgetHints(expense, income, savings, payoff) {
+    const budgetData = [
+        { type: 'expense', actual: expense, hintId: 'hintExpenses' },
+        { type: 'income', actual: income, hintId: 'hintIncome' },
+        { type: 'savings', actual: savings, hintId: 'hintSavings' },
+        { type: 'payoff', actual: payoff, hintId: 'hintPayoffs' }
+    ];
+    
+    budgetData.forEach(item => {
+        const hintEl = document.getElementById(item.hintId);
+        if (!hintEl) return;
+        
+        const budget = appState.monthlyBudget[item.type] || 0;
+        if (budget <= 0) {
+            hintEl.textContent = '';
+            hintEl.style.display = 'none';
+            return;
+        }
+        
+        const percentage = Math.round((item.actual / budget) * 100);
+        hintEl.textContent = `${percentage}%`;
+        hintEl.style.display = 'block';
+        
+        // Add over-budget class if > 100%
+        if (percentage > 100) {
+            hintEl.classList.add('over-budget');
+        } else {
+            hintEl.classList.remove('over-budget');
+        }
+    });
+}
+
+/**
+ * Render category-wise summary view
+ */
+function renderCategorySummary(year, month) {
+    const listContainer = document.getElementById('homeTransactionList');
+    if (!listContainer) return;
+
+    // Collect all transactions
+    const allTransactions = [];
+    if (appState.homeExpensesByDate) {
+        Object.entries(appState.homeExpensesByDate).forEach(([date, expenses]) => {
+            expenses.forEach(expense => {
+                const type = expense.type || expense.Type || 'Expense';
+                const normalizedType = (type || '').toLowerCase();
+                allTransactions.push({
+                    date: date,
+                    type: type,
+                    typeKey: normalizedType,
+                    category: expense.category || expense.Category || 'Uncategorized',
+                    amount: parseFloat(expense.amount || expense.Amount || 0),
+                    notes: expense.notes || expense.Notes || ''
+                });
+            });
+        });
+    }
+
+    const selectedType = (appState.homeSelectedType || 'all').toLowerCase();
+    const filteredTransactions = allTransactions.filter(txn => {
+        return selectedType === 'all' ? true : txn.typeKey === selectedType;
+    });
+
+    // Group by category and collect transactions
+    const categoryMap = new Map();
+    filteredTransactions.forEach(txn => {
+        const key = `${txn.category}|${txn.typeKey}`;
+        if (!categoryMap.has(key)) {
+            categoryMap.set(key, {
+                category: txn.category,
+                type: txn.type,
+                typeKey: txn.typeKey,
+                total: 0,
+                count: 0,
+                transactions: []
+            });
+        }
+        const entry = categoryMap.get(key);
+        entry.total += txn.amount;
+        entry.count += 1;
+        entry.transactions.push(txn);
+    });
+
+    const summaryItems = Array.from(categoryMap.values()).sort((a, b) => b.total - a.total);
+
+    const hasFilter = selectedType !== 'all';
+
+    // Render
+    if (summaryItems.length === 0) {
+        listContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <p>${hasFilter ? 'No transactions for this filter' : 'No transactions for this month'}</p>
+            </div>
+        `;
+    } else {
+        listContainer.innerHTML = summaryItems.map((item, idx) => {
+            const icon = getCategoryIcon(item.category, item.type);
+            const countLabel = item.count === 1 ? '1 transaction' : `${item.count} transactions`;
+            const categoryKey = `${item.category}|${item.typeKey}`;
+            const isExpanded = appState.expandedCategories.has(categoryKey);
+            
+            // Sort transactions by date (newest first)
+            item.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            const detailsHtml = isExpanded ? `
+                <div class="summary-details">
+                    ${item.transactions.map(txn => {
+                        const notes = txn.notes ? txn.notes.trim() : '';
+                        const detailsLine = notes ? `<div class="txn-detail-notes">${notes}</div>` : '';
+                        return `
+                            <div class="summary-detail-row">
+                                <div class="detail-left">
+                                    <span class="detail-date">${formatDateForDisplay(txn.date)}</span>
+                                    ${detailsLine}
+                                </div>
+                                <span class="detail-amount">₹${txn.amount.toFixed(2)}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            ` : '';
+            
+            return `
+                <div class="summary-row ${isExpanded ? 'expanded' : ''}" data-category-key="${categoryKey}">
+                    <div class="summary-header" data-type="${item.typeKey}">
+                        <div class="txn-icon">${icon}</div>
+                        <div class="txn-main">
+                            <div class="txn-title">${item.category}</div>
+                            <div class="txn-details">
+                                <span class="txn-notes-display">${countLabel}</span>
+                            </div>
+                        </div>
+                        <div class="txn-meta">
+                            <span class="transaction-type-badge ${item.typeKey}">${item.type}</span>
+                            <span class="txn-amount">₹${item.total.toFixed(2)}</span>
+                        </div>
+                        <div class="expand-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                    ${detailsHtml}
+                </div>
+            `;
+        }).join('');
+        
+        // Add click handlers for expansion
+        setupSummaryExpansion();
+    }
+}
+
+/**
+ * Setup click handlers for expanding/collapsing summary categories
+ */
+function setupSummaryExpansion() {
+    const summaryRows = document.querySelectorAll('.summary-row');
+    summaryRows.forEach(row => {
+        const header = row.querySelector('.summary-header');
+        if (!header) return;
+        
+        header.addEventListener('click', () => {
+            const categoryKey = row.dataset.categoryKey;
+            if (!categoryKey) return;
+            
+            if (appState.expandedCategories.has(categoryKey)) {
+                appState.expandedCategories.delete(categoryKey);
+            } else {
+                appState.expandedCategories.add(categoryKey);
+            }
+            
+            // Re-render
+            if (appState.homeSelectedMonth) {
+                const { year, month } = appState.homeSelectedMonth;
+                renderCategorySummary(year, month);
+            }
+        });
+    });
 }
 
 /**
  * Render monthly transaction list
  */
 function renderMonthlyTransactionList(year, month) {
+    // Check view mode and delegate to appropriate renderer
+    if (appState.homeViewMode === 'summary') {
+        renderCategorySummary(year, month);
+        return;
+    }
+
     const listContainer = document.getElementById('homeTransactionList');
     
     if (!listContainer) return;
@@ -464,14 +770,35 @@ function renderMonthlyTransactionList(year, month) {
         `;
     } else {
         listContainer.innerHTML = grouped.map(([date, items]) => {
-            const displayDate = formatDateForDisplay(date);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const txnDate = new Date(date);
+            
+            let dateLabel;
+            if (txnDate.toDateString() === today.toDateString()) {
+                dateLabel = 'Today';
+            } else if (txnDate.toDateString() === yesterday.toDateString()) {
+                dateLabel = 'Yesterday';
+            } else {
+                dateLabel = formatDateForDisplay(date);
+            }
+            
+            const count = items.length;
+            const countLabel = count === 1 ? '1 Transaction' : `${count} Transactions`;
+            
             const rows = items.map(txn => {
-                const note = txn.notes ? `<span class="txn-notes">${txn.notes}</span>` : '';
+                const icon = getCategoryIcon(txn.category, txn.type);
+                const notes = txn.notes ? txn.notes.trim() : '';
+                const detailsHtml = notes ? `
+                            <div class="txn-details">
+                                <span class="txn-notes-display">${notes}</span>
+                            </div>` : '';
                 return `
-                    <div class="txn-row">
+                    <div class="txn-row" data-type="${txn.typeKey}">
+                        <div class="txn-icon">${icon}</div>
                         <div class="txn-main">
-                            <span class="txn-category">${txn.category}</span>
-                            ${note}
+                            <div class="txn-title">${txn.category}</div>${detailsHtml}
                         </div>
                         <div class="txn-meta">
                             <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
@@ -483,7 +810,10 @@ function renderMonthlyTransactionList(year, month) {
 
             return `
                 <div class="txn-date-group">
-                    <div class="txn-date-header">${displayDate}</div>
+                    <div class="txn-date-header">
+                        <span class="txn-date-label">${dateLabel}</span>
+                        <span class="txn-count">${countLabel}</span>
+                    </div>
                     ${rows}
                 </div>
             `;

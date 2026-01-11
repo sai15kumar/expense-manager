@@ -110,6 +110,7 @@
                                 </div>
                                 <div class="card-label">Expenses</div>
                                 <div class="card-amount" id="homeTotalExpenses">₹0</div>
+                                <div class="card-hint" id="hintExpenses"></div>
                             </div>
                             <div class="home-summary-card income-card" data-type="income" role="button" tabindex="0" aria-pressed="false">
                                 <div class="card-icon">
@@ -121,6 +122,7 @@
                                 </div>
                                 <div class="card-label">Income</div>
                                 <div class="card-amount" id="homeTotalIncome">₹0</div>
+                                <div class="card-hint" id="hintIncome"></div>
                             </div>
                             <div class="home-summary-card savings-card" data-type="savings" role="button" tabindex="0" aria-pressed="false">
                                 <div class="card-icon">
@@ -135,6 +137,7 @@
                                 </div>
                                 <div class="card-label">Savings</div>
                                 <div class="card-amount" id="homeTotalSavings">₹0</div>
+                                <div class="card-hint" id="hintSavings"></div>
                             </div>
                             <div class="home-summary-card payoff-card" data-type="payoff" role="button" tabindex="0" aria-pressed="false">
                                 <div class="card-icon">
@@ -149,13 +152,20 @@
                                 </div>
                                 <div class="card-label">Payoffs</div>
                                 <div class="card-amount" id="homeTotalPayoffs">₹0</div>
+                                <div class="card-hint" id="hintPayoffs"></div>
                             </div>
                         </div>
                     </section>
 
                     <!-- TRANSACTION LIST SECTION -->
                     <section class="home-transactions-section">
-                        <h3>Transactions</h3>
+                        <div class="section-header-with-toggle">
+                            <h3 id="transactionListTitle">Summary</h3>
+                            <div class="view-toggle">
+                                <button class="toggle-btn active" data-view="summary">Summary</button>
+                                <button class="toggle-btn" data-view="transactions">Transactions</button>
+                            </div>
+                        </div>
                         <div id="homeTransactionList" class="home-transaction-list">
                             <!-- Will be populated by JS -->
                             <div class="empty-state">
