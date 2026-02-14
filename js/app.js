@@ -146,6 +146,21 @@ function hideLoading() {
 }
 
 /**
+ * Guard against unauthorized API responses and trigger auth flow
+ * @param {Object} result - API response payload
+ * @returns {boolean} - True if authorized, false if blocked
+ */
+function checkApiAuthorization(result) {
+    const isUnauthorized = !result || result.error === 'UNAUTHORIZED' || result.success === false && result.error === 'UNAUTHORIZED';
+    if (!isUnauthorized) return true;
+
+    if (window.appAuth && typeof window.appAuth.handleUnauthorized === 'function') {
+        window.appAuth.handleUnauthorized('Access denied. Please sign in again.');
+    }
+    return false;
+}
+
+/**
  * Format date object to string (YYYY-MM-DD)
  * @param {Date} dateObj - Date object to format
  * @returns {string} - Formatted date string
