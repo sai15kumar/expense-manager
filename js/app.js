@@ -89,7 +89,30 @@ async function callAppsScript(payload) {
         body: JSON.stringify(payload)
     });
     return await response.json();
-            const { totalExpense, totalIncome, totalSavings, totalPayoff } = getHomeTotals();
+}
+
+/**
+ * Fetch category metadata and budgets
+ */
+async function fetchCategories() {
+    try {
+        const result = await callAppsScript({ action: 'getCategories' });
+
+        if (!checkApiAuthorization(result)) return;
+
+        if (result.success && Array.isArray(result.categories)) {
+            appState.categories = result.categories;
+
+            // Build category budget lookup for summary views
+            const budgetMap = {};
+            result.categories.forEach((category) => {
+                const name = (category.name || '').toString().trim();
+                const typeKey = (category.type || '').toString().trim().toLowerCase();
+                if (!name || !typeKey) return;
+                const categoryKey = `${name}|${typeKey}`;
+                budgetMap[categoryKey] = parseFloat(category.budget) || 0;
+            });
+            appState.categoryBudgets = budgetMap;
         } else {
             console.error('Failed to load categories:', result.message);
         }
