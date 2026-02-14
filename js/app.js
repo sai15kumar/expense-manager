@@ -543,6 +543,12 @@ function calculateAndDisplayMonthlySummary(year, month) {
     let totalIncome = 0;
     let totalSavings = 0;
     let totalPayoff = 0;
+
+    const isCreditCardPayoff = (expense) => {
+        const category = (expense.category || expense.Category || '').toString().toLowerCase();
+        const notes = (expense.notes || expense.Notes || '').toString().toLowerCase();
+        return category.includes('credit card') || notes.includes('credit card');
+    };
     
     // Sum up all expenses for the month
     if (appState.homeExpensesByDate) {
@@ -558,7 +564,9 @@ function calculateAndDisplayMonthlySummary(year, month) {
                 } else if (type === 'savings') {
                     totalSavings += amount;
                 } else if (type === 'payoff') {
-                    totalPayoff += amount;
+                    if (!isCreditCardPayoff(expense)) {
+                        totalPayoff += amount;
+                    }
                 }
             });
         });
