@@ -2162,11 +2162,11 @@ body {
 }
 
 .home-main-container.yearly-view .home-year-picker {
-    display: inline-flex;
+    display: inline-flex !important;
 }
 
 .home-main-container.yearly-view .home-month-display {
-    display: none;
+    display: none !important;
 }
 
 .home-month-picker:hover {
@@ -2202,6 +2202,7 @@ body {
     color: #8a95a5;
     background: transparent;
     border: none;
+    appearance: none;
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -2413,6 +2414,7 @@ body {
     color: #8a95a5;
     background: transparent;
     border: none;
+    appearance: none;
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
