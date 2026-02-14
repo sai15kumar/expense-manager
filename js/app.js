@@ -544,10 +544,19 @@ function calculateAndDisplayMonthlySummary(year, month) {
     let totalSavings = 0;
     let totalPayoff = 0;
 
+    const normalizeText = (value) => value
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+
     const isCreditCardPayoff = (expense) => {
-        const category = (expense.category || expense.Category || '').toString().toLowerCase();
-        const notes = (expense.notes || expense.Notes || '').toString().toLowerCase();
-        return category.includes('credit card') || notes.includes('credit card');
+        const category = normalizeText(expense.category || expense.Category || '');
+        const notes = normalizeText(expense.notes || expense.Notes || '');
+        const combined = `${category} ${notes}`;
+
+        return combined.includes('creditcard')
+            || combined.includes('cardpayment')
+            || /cc/.test(combined);
     };
     
     // Sum up all expenses for the month
