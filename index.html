@@ -96,6 +96,7 @@
                             </svg>
                         </button>
                         <input type="month" id="homeMonthPicker" class="home-month-picker">
+                        <input type="number" id="homeYearPicker" class="home-year-picker" min="2000" max="2100" step="1" aria-label="Select year">
                         <span id="homeMonthYear" class="home-month-display"></span>
                         <button class="btn btn-nav" id="homeNextMonth" aria-label="Next month">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -104,9 +105,14 @@
                         </button>
                     </section>
 
+                    <section class="home-period-toggle" aria-label="Summary period">
+                        <button class="period-btn active" data-period="month">Monthly</button>
+                        <button class="period-btn" data-period="year">Yearly</button>
+                    </section>
+
                     <!-- MONTHLY SUMMARY SECTION -->
                     <section class="home-summary-section">
-                        <h3>Monthly Summary</h3>
+                        <h3 id="homeSummaryTitle">Monthly Summary</h3>
                         <div class="home-summary-grid">
                             <div class="home-summary-card expense-card" data-type="expense" role="button" tabindex="0" aria-pressed="false">
                                 <div class="card-icon">

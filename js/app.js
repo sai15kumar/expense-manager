@@ -35,9 +35,11 @@ let appState = {
     categories: [], // [{name, type}]
     categoryBudgets: {}, // {categoryKey: amount}
     homeSelectedMonth: null,
+    homeSelectedYear: null,
     homeExpensesByDate: {},
     homeSelectedType: 'all',
     homeViewMode: 'summary', // 'transactions' or 'summary'
+    homeViewPeriod: 'month', // 'month' or 'year'
     expandedCategories: new Set(), // Track expanded category keys in summary view
     monthlyBudget: {} // {expense: amount, income: amount, savings: amount, payoff: amount}
 };
@@ -87,47 +89,7 @@ async function callAppsScript(payload) {
         body: JSON.stringify(payload)
     });
     return await response.json();
-}
-
-/**
- * Check API response for authorization errors
- * Centralized handler for UNAUTHORIZED responses
- * @param {Object} result - API response object
- * @returns {boolean} - True if authorized, false if unauthorized
- */
-function checkApiAuthorization(result) {
-    if (result && result.success === false && result.error === 'UNAUTHORIZED') {
-        console.error('[API] Unauthorized response from backend');
-        if (window.appAuth && typeof window.appAuth.handleUnauthorized === 'function') {
-            window.appAuth.handleUnauthorized('Access denied. Please sign in again.');
-        }
-        return false;
-    }
-    return true;
-}
-
-/**
- * Fetch all expense categories from backend.
- * Called during app initialization.
- */
-async function fetchCategories() {
-    try {
-        const result = await callAppsScript({ 
-            action: 'getCategories'
-        });
-
-        if (!checkApiAuthorization(result)) return;
-
-        if (result.success && result.categories) {
-            appState.categories = result.categories;
-            // Store category budgets for use in summary view
-            appState.categoryBudgets = {};
-            result.categories.forEach(cat => {
-                const key = `${cat.name}|${(cat.type || 'Expense').toLowerCase()}`;
-                appState.categoryBudgets[key] = parseFloat(cat.budget) || 0;
-            });
-            console.log('Categories loaded:', appState.categories);
-            console.log('Category budgets:', appState.categoryBudgets);
+            const { totalExpense, totalIncome, totalSavings, totalPayoff } = getHomeTotals();
         } else {
             console.error('Failed to load categories:', result.message);
         }
@@ -253,16 +215,19 @@ function initializeHomePage() {
         year: now.getFullYear(),
         month: now.getMonth() + 1 // 1-12
     };
+    appState.homeSelectedYear = now.getFullYear();
     
     // Setup event listeners
     const homePrevBtn = document.getElementById('homePrevMonth');
     const homeNextBtn = document.getElementById('homeNextMonth');
     const homeMonthPicker = document.getElementById('homeMonthPicker');
+    const homeYearPicker = document.getElementById('homeYearPicker');
     const homeAddBtn = document.getElementById('homeAddBtn');
     
     if (homePrevBtn) homePrevBtn.addEventListener('click', () => changeHomeMonth(-1));
     if (homeNextBtn) homeNextBtn.addEventListener('click', () => changeHomeMonth(1));
     if (homeMonthPicker) homeMonthPicker.addEventListener('change', handleMonthPickerChange);
+    if (homeYearPicker) homeYearPicker.addEventListener('change', handleYearPickerChange);
     if (homeAddBtn) homeAddBtn.addEventListener('click', navigateToAddExpense);
 
     // Enable summary cards as filter toggles
@@ -270,9 +235,14 @@ function initializeHomePage() {
     
     // Setup view toggle buttons
     setupViewToggle();
+
+    // Setup period toggle buttons
+    setupHomePeriodToggle();
     
     // Set initial picker value
     updateMonthPicker();
+    updateYearPicker();
+    updateHomePeriodUI();
     
     // Load Home data
     loadHomeData();
@@ -310,12 +280,7 @@ function handleHomeSummarySelect(type) {
 
     updateHomeSummarySelection(nextType);
 
-    if (appState.homeSelectedMonth) {
-        const { year, month } = appState.homeSelectedMonth;
-        renderMonthlyTransactionList(year, month);
-    } else {
-        renderMonthlyTransactionList();
-    }
+    renderHomeTransactionList();
 }
 
 /**
@@ -357,10 +322,29 @@ function setupViewToggle() {
             btn.classList.add('active');
 
             // Re-render
-            if (appState.homeSelectedMonth) {
-                const { year, month } = appState.homeSelectedMonth;
-                renderMonthlyTransactionList(year, month);
-            }
+            renderHomeTransactionList();
+        });
+    });
+}
+
+/**
+ * Setup toggle buttons between Monthly and Yearly summary
+ */
+function setupHomePeriodToggle() {
+    const toggleBtns = document.querySelectorAll('.home-period-toggle .period-btn');
+    if (!toggleBtns.length) return;
+
+    toggleBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const period = btn.dataset.period;
+            if (!period || period === appState.homeViewPeriod) return;
+
+            appState.homeViewPeriod = period;
+            toggleBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            updateHomePeriodUI();
+            loadHomeData();
         });
     });
 }
@@ -369,11 +353,19 @@ function setupViewToggle() {
  * Change month on Home page
  */
 function changeHomeMonth(direction) {
+    if (appState.homeViewPeriod === 'year') {
+        const nextYear = (appState.homeSelectedYear || new Date().getFullYear()) + direction;
+        appState.homeSelectedYear = nextYear;
+        updateYearPicker();
+        loadHomeData();
+        return;
+    }
+
     const { year, month } = appState.homeSelectedMonth;
-    
+
     let newMonth = month + direction;
     let newYear = year;
-    
+
     if (newMonth < 1) {
         newMonth = 12;
         newYear--;
@@ -381,7 +373,7 @@ function changeHomeMonth(direction) {
         newMonth = 1;
         newYear++;
     }
-    
+
     appState.homeSelectedMonth = { year: newYear, month: newMonth };
     updateMonthPicker();
     loadHomeData();
@@ -391,11 +383,23 @@ function changeHomeMonth(direction) {
  * Handle month picker change
  */
 function handleMonthPickerChange(event) {
+    if (appState.homeViewPeriod === 'year') return;
     const value = event.target.value; // Format: "2025-12"
     if (!value) return;
     
     const [year, month] = value.split('-').map(Number);
     appState.homeSelectedMonth = { year, month };
+    loadHomeData();
+}
+
+/**
+ * Handle year picker change
+ */
+function handleYearPickerChange(event) {
+    const value = parseInt(event.target.value, 10);
+    if (!value || Number.isNaN(value)) return;
+
+    appState.homeSelectedYear = value;
     loadHomeData();
 }
 
@@ -417,6 +421,41 @@ function updateMonthPicker() {
 }
 
 /**
+ * Update year picker input value
+ */
+function updateYearPicker() {
+    const yearPicker = document.getElementById('homeYearPicker');
+    if (yearPicker && appState.homeSelectedYear) {
+        yearPicker.value = appState.homeSelectedYear;
+    }
+}
+
+/**
+ * Update UI state for month/year period
+ */
+function updateHomePeriodUI() {
+    const homeContainer = document.querySelector('.home-main-container');
+    const monthDisplay = document.getElementById('homeMonthYear');
+    const summaryTitle = document.getElementById('homeSummaryTitle');
+
+    if (homeContainer) {
+        homeContainer.classList.toggle('yearly-view', appState.homeViewPeriod === 'year');
+    }
+
+    if (summaryTitle) {
+        summaryTitle.textContent = appState.homeViewPeriod === 'year' ? 'Yearly Summary' : 'Monthly Summary';
+    }
+
+    if (appState.homeViewPeriod === 'year') {
+        if (monthDisplay && appState.homeSelectedYear) {
+            monthDisplay.textContent = `${appState.homeSelectedYear}`;
+        }
+    } else {
+        updateMonthPicker();
+    }
+}
+
+/**
  * Navigate to Add screen
  */
 function navigateToAddExpense() {
@@ -430,26 +469,37 @@ async function loadHomeData() {
     showLoading();
     
     try {
-        const { year, month } = appState.homeSelectedMonth;
-        
-        // Update month/year display
-        const monthYearDisplay = document.getElementById('homeMonthYear');
-        if (monthYearDisplay) {
-            const shortYear = String(year).slice(-2);
-            monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
+        if (appState.homeViewPeriod === 'year') {
+            const year = appState.homeSelectedYear || new Date().getFullYear();
+            appState.homeSelectedYear = year;
+            updateYearPicker();
+            updateHomePeriodUI();
+
+            await fetchHomeExpensesForYear(year);
+            calculateAndDisplayYearlySummary(year);
+            renderHomeTransactionList();
+        } else {
+            const { year, month } = appState.homeSelectedMonth;
+
+            // Update month/year display
+            const monthYearDisplay = document.getElementById('homeMonthYear');
+            if (monthYearDisplay) {
+                const shortYear = String(year).slice(-2);
+                monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
+            }
+
+            // Fetch monthly budget
+            await fetchMonthlyBudget(year, month);
+
+            // Fetch expenses for the month
+            await fetchHomeExpensesForMonth(year, month);
+
+            // Calculate and display summary
+            calculateAndDisplayMonthlySummary(year, month);
+
+            // Display transaction list
+            renderHomeTransactionList();
         }
-        
-        // Fetch monthly budget
-        await fetchMonthlyBudget(year, month);
-        
-        // Fetch expenses for the month
-        await fetchHomeExpensesForMonth(year, month);
-        
-        // Calculate and display summary
-        calculateAndDisplayMonthlySummary(year, month);
-        
-        // Display transaction list
-        renderMonthlyTransactionList(year, month);
     } finally {
         hideLoading();
     }
@@ -536,50 +586,51 @@ async function fetchHomeExpensesForMonth(year, month) {
 }
 
 /**
+ * Fetch expenses for an entire year (aggregated by date)
+ */
+async function fetchHomeExpensesForYear(year) {
+    appState.homeExpensesByDate = {};
+
+    try {
+        for (let month = 1; month <= 12; month += 1) {
+            console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
+
+            const result = await callAppsScript({
+                action: 'getExpensesByMonth',
+                year: year,
+                month: month
+            });
+
+            if (!checkApiAuthorization(result)) return;
+
+            if (result.success && result.expensesByDate) {
+                Object.entries(result.expensesByDate).forEach(([date, expenses]) => {
+                    if (!appState.homeExpensesByDate[date]) {
+                        appState.homeExpensesByDate[date] = [];
+                    }
+                    appState.homeExpensesByDate[date].push(...expenses);
+                });
+            } else if (result.success && result.expenses) {
+                result.expenses.forEach(expense => {
+                    const date = expense.date || expense.Date;
+                    if (!appState.homeExpensesByDate[date]) {
+                        appState.homeExpensesByDate[date] = [];
+                    }
+                    appState.homeExpensesByDate[date].push(expense);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('[HOME] Error fetching yearly expenses:', error);
+        appState.homeExpensesByDate = {};
+    }
+}
+
+/**
  * Calculate and display monthly summary totals with budget percentages
  */
 function calculateAndDisplayMonthlySummary(year, month) {
-    let totalExpense = 0;
-    let totalIncome = 0;
-    let totalSavings = 0;
-    let totalPayoff = 0;
-
-    const normalizeText = (value) => value
-        .toString()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '');
-
-    const isCreditCardPayoff = (expense) => {
-        const category = normalizeText(expense.category || expense.Category || '');
-        const notes = normalizeText(expense.notes || expense.Notes || '');
-        const combined = `${category} ${notes}`;
-
-        return combined.includes('creditcard')
-            || combined.includes('cardpayment')
-            || /cc/.test(combined);
-    };
-    
-    // Sum up all expenses for the month
-    if (appState.homeExpensesByDate) {
-        Object.values(appState.homeExpensesByDate).forEach(expenses => {
-            expenses.forEach(expense => {
-                const amount = parseFloat(expense.amount || expense.Amount || 0);
-                const type = (expense.type || expense.Type || '').toLowerCase();
-                
-                if (type === 'expense') {
-                    totalExpense += amount;
-                } else if (type === 'income') {
-                    totalIncome += amount;
-                } else if (type === 'savings') {
-                    totalSavings += amount;
-                } else if (type === 'payoff') {
-                    if (!isCreditCardPayoff(expense)) {
-                        totalPayoff += amount;
-                    }
-                }
-            });
-        });
-    }
+    const { totalExpense, totalIncome, totalSavings, totalPayoff } = getHomeTotals();
     
     // Update DOM
     const expenseEl = document.getElementById('homeTotalExpenses');
@@ -597,9 +648,82 @@ function calculateAndDisplayMonthlySummary(year, month) {
 }
 
 /**
+ * Calculate and display yearly summary totals
+ */
+function calculateAndDisplayYearlySummary(year) {
+    const { totalExpense, totalIncome, totalSavings, totalPayoff } = getHomeTotals();
+
+    const expenseEl = document.getElementById('homeTotalExpenses');
+    const incomeEl = document.getElementById('homeTotalIncome');
+    const savingsEl = document.getElementById('homeTotalSavings');
+    const payoffEl = document.getElementById('homeTotalPayoffs');
+
+    if (expenseEl) expenseEl.textContent = `₹${totalExpense.toFixed(2)}`;
+    if (incomeEl) incomeEl.textContent = `₹${totalIncome.toFixed(2)}`;
+    if (savingsEl) savingsEl.textContent = `₹${totalSavings.toFixed(2)}`;
+    if (payoffEl) payoffEl.textContent = `₹${totalPayoff.toFixed(2)}`;
+
+    clearBudgetHints();
+}
+
+/**
+ * Compute totals from currently loaded home expenses
+ */
+function getHomeTotals() {
+    let totalExpense = 0;
+    let totalIncome = 0;
+    let totalSavings = 0;
+    let totalPayoff = 0;
+
+    if (appState.homeExpensesByDate) {
+        Object.values(appState.homeExpensesByDate).forEach(expenses => {
+            expenses.forEach(expense => {
+                const amount = parseFloat(expense.amount || expense.Amount || 0);
+                const type = (expense.type || expense.Type || '').toLowerCase();
+
+                if (type === 'expense') {
+                    totalExpense += amount;
+                } else if (type === 'income') {
+                    totalIncome += amount;
+                } else if (type === 'savings') {
+                    totalSavings += amount;
+                } else if (type === 'payoff') {
+                    if (!isCreditCardPayoff(expense)) {
+                        totalPayoff += amount;
+                    }
+                }
+            });
+        });
+    }
+
+    return { totalExpense, totalIncome, totalSavings, totalPayoff };
+}
+
+function normalizeText(value) {
+    return value
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function isCreditCardPayoff(expense) {
+    const category = normalizeText(expense.category || expense.Category || '');
+    const notes = normalizeText(expense.notes || expense.Notes || '');
+    const combined = `${category} ${notes}`;
+
+    return combined.includes('creditcard')
+        || combined.includes('cardpayment')
+        || /\bcc\b/.test(combined);
+}
+
+/**
  * Update budget percentage hints on cards
  */
 function updateBudgetHints(expense, income, savings, payoff) {
+    if (appState.homeViewPeriod === 'year') {
+        clearBudgetHints();
+        return;
+    }
     console.log('[HINTS] Called with:', { expense, income, savings, payoff });
     console.log('[HINTS] Monthly budget:', appState.monthlyBudget);
     
@@ -643,6 +767,16 @@ function updateBudgetHints(expense, income, savings, payoff) {
         } else {
             hintEl.classList.remove('over-budget');
         }
+    });
+}
+
+function clearBudgetHints() {
+    ['hintExpenses', 'hintIncome', 'hintSavings', 'hintPayoffs'].forEach(id => {
+        const hintEl = document.getElementById(id);
+        if (!hintEl) return;
+        hintEl.textContent = '';
+        hintEl.style.display = 'none';
+        hintEl.classList.remove('over-budget');
     });
 }
 
@@ -878,12 +1012,17 @@ function setupSummaryExpansion() {
             }
             
             // Re-render
-            if (appState.homeSelectedMonth) {
-                const { year, month } = appState.homeSelectedMonth;
-                renderCategorySummary(year, month);
-            }
+            renderHomeTransactionList();
         });
     });
+}
+
+/**
+ * Render monthly transaction list
+ */
+function renderHomeTransactionList() {
+    const { year, month } = appState.homeSelectedMonth || {};
+    renderMonthlyTransactionList(year, month);
 }
 
 /**
@@ -976,10 +1115,11 @@ function renderMonthlyTransactionList(year, month) {
 
     // Render
     if (filteredTransactions.length === 0) {
+        const emptyScope = appState.homeViewPeriod === 'year' ? 'year' : 'month';
         listContainer.innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">📭</div>
-                <p>${hasFilter ? 'No transactions for this filter' : 'No transactions for this month'}</p>
+                <p>${hasFilter ? 'No transactions for this filter' : `No transactions for this ${emptyScope}`}</p>
             </div>
         `;
     } else {
