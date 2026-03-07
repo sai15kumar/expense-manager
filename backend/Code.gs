@@ -107,6 +107,65 @@ function generateTxnId() {
     return `txn_${timestamp}_${randomPart}`;
 }
 
+/**
+ * One-time migration helper.
+ * Ensures all existing rows in Expense_Log have an ID and Status.
+ * Does NOT overwrite existing IDs.
+ * Uses batch update for performance.
+ * @returns {{success: boolean, migrated: number}}
+ */
+function migrateExpenseLog() {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_LOG);
+    if (!sheet) {
+        Logger.log('migrateExpenseLog: Sheet not found: ' + SHEET_NAMES.EXPENSE_LOG);
+        return { success: false, migrated: 0 };
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+        Logger.log('migrateExpenseLog: No data rows to migrate');
+        return { success: true, migrated: 0 };
+    }
+
+    // Ensure the sheet has at least enough columns for our schema
+    const requiredCols = COLUMNS.expenseLog.STATUS;
+    if (sheet.getLastColumn() < requiredCols) {
+        sheet.insertColumnsAfter(sheet.getLastColumn(), requiredCols - sheet.getLastColumn());
+    }
+
+    const range = sheet.getRange(2, 1, lastRow - 1, requiredCols);
+    const values = range.getValues();
+    let migrated = 0;
+
+    values.forEach((row) => {
+        const idIndex = COLUMNS.expenseLog.ID - 1;
+        const statusIndex = COLUMNS.expenseLog.STATUS - 1;
+
+        const currentId = (row[idIndex] || '').toString().trim();
+        const currentStatus = (row[statusIndex] || '').toString().trim();
+
+        let changed = false;
+        if (!currentId) {
+            row[idIndex] = generateTxnId();
+            changed = true;
+        }
+
+        if (!currentStatus) {
+            row[statusIndex] = 'ACTIVE';
+            changed = true;
+        }
+
+        if (changed) {
+            migrated += 1;
+        }
+    });
+
+    range.setValues(values);
+    Logger.log(`migrateExpenseLog: Migrated ${migrated} rows`);
+    return { success: true, migrated };
+}
+
 // ====================================================
 // MAIN ENDPOINT HANDLER
 // ====================================================
@@ -198,6 +257,9 @@ function doPost(e) {
                 break;
             case 'deleteExpense':
                 response = handleDeleteExpense(data);
+                break;
+            case 'migrateExpenseLog':
+                response = handleMigrateExpenseLog();
                 break;
             default:
                 response = {
@@ -873,6 +935,28 @@ function handleDeleteExpense(data) {
         };
     } catch (error) {
         console.error(`Error deleting expense: ${error.message}`);
+        return {
+            success: false,
+            message: error.message
+        };
+    }
+}
+
+/**
+ * Handle MIGRATE EXPENSE LOG action.
+ * Runs the one-time `migrateExpenseLog()` routine and returns how many rows were updated.
+ *
+ * @returns {Object} - { success: boolean, migrated: number }
+ */
+function handleMigrateExpenseLog() {
+    try {
+        const result = migrateExpenseLog();
+        return {
+            success: result.success === true,
+            migrated: result.migrated || 0
+        };
+    } catch (error) {
+        console.error(`Error running migrateExpenseLog: ${error.message}`);
         return {
             success: false,
             message: error.message
