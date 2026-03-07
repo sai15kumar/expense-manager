@@ -252,6 +252,9 @@ function doPost(e) {
             case 'getMonthlyBudget':
                 response = handleGetMonthlyBudget(data);
                 break;
+            case 'getDashboardData':
+                response = handleGetDashboardData(data);
+                break;
             case 'saveBudget':
                 response = handleSaveBudget(data);
                 break;
@@ -742,6 +745,119 @@ function handleGetBudgets() {
  *   }
  * }
  */
+function handleGetDashboardData(data) {
+    try {
+        data = data || {};
+        const year = parseInt(data.year);
+        const month = parseInt(data.month);
+        if (!year || !month) {
+            return {
+                success: false,
+                message: 'Missing required fields: year and month'
+            };
+        }
+
+        return getDashboardData(year, month);
+    } catch (error) {
+        console.error(`Error in handleGetDashboardData: ${error.message}`);
+        return {
+            success: false,
+            message: error.message
+        };
+    }
+}
+
+/**
+ * Fetch dashboard data in a single call.
+ * Reads categories, budgets, and expenses for the given year/month.
+ *
+ * @param {number} year
+ * @param {number} month
+ * @returns {Object}
+ */
+function getDashboardData(year, month) {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+
+    // Read master sheet and expense log sheet in one go
+    const masterSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_MASTER);
+    const logSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_LOG);
+
+    if (!masterSheet || !logSheet) {
+        const missing = [];
+        if (!masterSheet) missing.push(SHEET_NAMES.EXPENSE_MASTER);
+        if (!logSheet) missing.push(SHEET_NAMES.EXPENSE_LOG);
+        return {
+            success: false,
+            message: `Missing sheet(s): ${missing.join(', ')}`
+        };
+    }
+
+    // Read all rows once per sheet
+    const masterValues = masterSheet.getDataRange().getValues();
+    const logValues = logSheet.getDataRange().getValues();
+
+    // Build categories list and budget totals
+    const categories = [];
+    const budget = {
+        expense: 0,
+        income: 0,
+        savings: 0,
+        payoff: 0
+    };
+
+    for (let i = 1; i < masterValues.length; i++) {
+        const typeRaw = (masterValues[i][COLUMNS.expenseMaster.TYPE - 1] || '').toString().trim();
+        const categoryRaw = (masterValues[i][COLUMNS.expenseMaster.CATEGORY - 1] || '').toString().trim();
+        const monthlyBudget = parseFloat(masterValues[i][COLUMNS.expenseMaster.BUDGET_MONTHLY - 1]) || 0;
+
+        const type = (typeRaw || '').toString().trim();
+        const name = (categoryRaw || '').toString().trim();
+        if (name) {
+            categories.push({ name, type });
+        }
+
+        const typeKey = (type || '').toLowerCase();
+        if (budget.hasOwnProperty(typeKey)) {
+            budget[typeKey] += monthlyBudget;
+        }
+    }
+
+    // Build expenses by date for requested month
+    const expensesByDate = {};
+    for (let i = 1; i < logValues.length; i++) {
+        const row = logValues[i];
+        const status = (row[COLUMNS.expenseLog.STATUS - 1] || '').toString().trim().toUpperCase();
+        if (status === 'DELETED') continue;
+
+        const rowDate = row[COLUMNS.expenseLog.DATE - 1];
+        const dateString = formatDateToString(rowDate);
+        if (!dateString) continue;
+
+        const [rowYear, rowMonth] = dateString.split('-').map(Number);
+        if (rowYear !== year || rowMonth !== month) continue;
+
+        const expense = {
+            id: (row[COLUMNS.expenseLog.ID - 1] || '').toString(),
+            type: row[COLUMNS.expenseLog.TYPE - 1] || '',
+            category: row[COLUMNS.expenseLog.CATEGORY - 1] || '',
+            amount: parseFloat(row[COLUMNS.expenseLog.AMOUNT - 1]) || 0,
+            notes: row[COLUMNS.expenseLog.NOTES - 1] || ''
+        };
+
+        if (!expensesByDate[dateString]) {
+            expensesByDate[dateString] = [];
+        }
+        expensesByDate[dateString].push(expense);
+    }
+
+    return {
+        success: true,
+        categories,
+        budget,
+        expensesByDate
+    };
+}
+
 function handleGetMonthlyBudget(data) {
     try {
         console.log('handleGetMonthlyBudget: Starting...');

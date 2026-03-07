@@ -7,7 +7,7 @@
 // ====================================================
 
 const CONFIG = {
-     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbxHJXFlbiviPylsANyA_GnLEsH9dI_3djyc7sj2bR8Dg6nxrp-vWgpZSRXJB-qzq4ASsQ/exec',
+     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbzHtuclMIkSGSubCN783SYdmuWvnLv7-Elh1vABObfXvnjKv5J7-Avom3xWPoj1zYhgPw/exec',
      MONTH_NAMES: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
      EXPENSE_ROWS: 5,
@@ -541,7 +541,7 @@ function navigateToAddExpense() {
  */
 async function loadHomeData() {
     showLoading();
-    
+
     try {
         if (appState.homeViewPeriod === 'year') {
             const year = appState.homeSelectedYear || new Date().getFullYear();
@@ -549,6 +549,7 @@ async function loadHomeData() {
             updateYearPicker();
             updateHomePeriodUI();
 
+            // Yearly view still uses the existing per-year API
             await fetchHomeExpensesForYear(year);
             calculateAndDisplayYearlySummary(year);
             renderHomeTransactionList();
@@ -562,17 +563,30 @@ async function loadHomeData() {
                 monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
             }
 
-            // Fetch monthly budget
-            await fetchMonthlyBudget(year, month);
+            // Fetch dashboard data (single API call)
+            const result = await callAppsScript({
+                action: 'getDashboardData',
+                year: year,
+                month: month
+            });
 
-            // Fetch expenses for the month
-            await fetchHomeExpensesForMonth(year, month);
+            if (!checkApiAuthorization(result)) return;
 
-            // Calculate and display summary
-            calculateAndDisplayMonthlySummary(year, month);
+            if (result && result.success) {
+                appState.categories = Array.isArray(result.categories) ? result.categories : [];
+                appState.monthlyBudget = result.budget || {
+                    expense: 0,
+                    income: 0,
+                    savings: 0,
+                    payoff: 0
+                };
+                appState.homeExpensesByDate = result.expensesByDate || {};
 
-            // Display transaction list
-            renderHomeTransactionList();
+                calculateAndDisplayMonthlySummary(year, month);
+                renderHomeTransactionList();
+            } else {
+                console.error('[HOME] Failed to load dashboard data:', result && result.message);
+            }
         }
     } finally {
         hideLoading();
