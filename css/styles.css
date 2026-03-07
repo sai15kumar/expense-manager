@@ -907,6 +907,31 @@ body {
     transform: scale(0.98);
 }
 
+/* Transaction delete icon button styling */
+.delete-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--color-text-secondary);
+    padding: 0.1rem 0.3rem;
+    border-radius: 6px;
+    transition: color 0.15s ease, background 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.delete-btn:hover {
+    color: var(--color-expense);
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.delete-btn:active {
+    transform: scale(0.95);
+}
+
 .btn-close {
     background-color: transparent;
     color: white;

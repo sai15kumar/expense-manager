@@ -96,14 +96,20 @@ async function callAppsScript(payload) {
  * @param {string} id - Transaction ID
  */
 async function deleteExpense(id) {
-    if (!id) return false;
+    if (!id) {
+        console.warn('[DELETE] Missing id');
+        return false;
+    }
 
     // Confirmation dialog
     const confirmed = window.confirm('Delete this expense?');
     if (!confirmed) return false;
 
+    console.log('[DELETE] Attempting delete for id:', id);
+
     try {
         const result = await callAppsScript({ action: 'deleteExpense', id });
+        console.log('[DELETE] API response:', result);
         if (!checkApiAuthorization(result)) return false;
 
         if (result && result.success) {
@@ -1238,7 +1244,7 @@ function renderMonthlyTransactionList(year, month) {
                             </div>
                             <div class="detail-meta">
                                 <span class="detail-amount">₹${detail.amount.toFixed(2)}</span>
-                                <button class="txn-delete-btn" type="button" data-id="${detail.id}">Delete</button>
+                                <button class="delete-btn" type="button" data-id="${detail.id}" title="Delete expense">🗑</button>
                             </div>
                         </div>
                     `;
@@ -1261,7 +1267,7 @@ function renderMonthlyTransactionList(year, month) {
                             </svg>
                         </div>
                 `;
-                const deleteBtnHtml = txn.id ? `<button class="txn-delete-btn" type="button" data-id="${txn.id}">Delete</button>` : '';
+                const deleteBtnHtml = txn.id ? `<button class="delete-btn" type="button" data-id="${txn.id}" title="Delete expense">🗑</button>` : '';
                 return `
                     <div class="txn-row${hasDetails ? ' expandable' : ''}" data-type="${txn.typeKey}">
                         <div class="txn-row-header">
@@ -1271,10 +1277,10 @@ function renderMonthlyTransactionList(year, month) {
                             </div>
                             <div class="txn-meta">
                                 <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
-                                <span class="txn-amount">₹${txn.amount.toFixed(2)}</span>
-                                ${deleteBtnHtml}
-                            </div>
-                            ${expandIcon}
+                        <div class="transaction-actions">
+                            <span class="amount">₹${txn.amount.toFixed(2)}</span>
+                            ${deleteBtnHtml}
+                        </div>
                         </div>
                         ${detailListHtml}
                     </div>
@@ -1323,7 +1329,7 @@ function setupTransactionExpansion() {
  * Attach delete handlers to rendered transaction rows
  */
 function setupTransactionDeleteButtons() {
-    const deleteButtons = document.querySelectorAll('.txn-delete-btn');
+    const deleteButtons = document.querySelectorAll('.delete-btn');
     deleteButtons.forEach(btn => {
         btn.addEventListener('click', async (event) => {
             event.stopPropagation();
