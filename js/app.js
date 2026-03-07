@@ -92,6 +92,36 @@ async function callAppsScript(payload) {
 }
 
 /**
+ * Delete a transaction by ID (soft delete via backend)
+ * @param {string} id - Transaction ID
+ */
+async function deleteExpense(id) {
+    if (!id) return false;
+
+    // Confirmation dialog
+    const confirmed = window.confirm('Delete this expense?');
+    if (!confirmed) return false;
+
+    try {
+        const result = await callAppsScript({ action: 'deleteExpense', id });
+        if (!checkApiAuthorization(result)) return false;
+
+        if (result && result.success) {
+            showToast('Expense deleted', 'success');
+            await loadHomeData();
+            return true;
+        }
+
+        showToast(result.message || 'Failed to delete expense', 'error');
+        return false;
+    } catch (error) {
+        console.error('[DELETE] Error deleting expense:', error);
+        showToast('Failed to delete expense', 'error');
+        return false;
+    }
+}
+
+/**
  * Fetch category metadata and budgets
  */
 async function fetchCategories() {
@@ -830,9 +860,14 @@ function renderCategorySummary(year, month) {
     if (appState.homeExpensesByDate) {
         Object.entries(appState.homeExpensesByDate).forEach(([date, expenses]) => {
             expenses.forEach(expense => {
+                const status = (expense.status || expense.Status || '').toString().trim().toUpperCase();
+                if (status === 'DELETED') return; // Skip deleted rows
+
                 const type = expense.type || expense.Type || 'Expense';
                 const normalizedType = (type || '').toLowerCase();
                 allTransactions.push({
+                    id: expense.id || expense.ID || '',
+                    status: status || 'ACTIVE',
                     date: date,
                     type: type,
                     typeKey: normalizedType,
@@ -1082,9 +1117,14 @@ function renderMonthlyTransactionList(year, month) {
     if (appState.homeExpensesByDate) {
         Object.entries(appState.homeExpensesByDate).forEach(([date, expenses]) => {
             expenses.forEach(expense => {
+                const status = (expense.status || expense.Status || '').toString().trim().toUpperCase();
+                if (status === 'DELETED') return; // Skip deleted rows
+
                 const type = expense.type || expense.Type || 'Expense';
                 const normalizedType = (type || '').toLowerCase();
                 allTransactions.push({
+                    id: expense.id || expense.ID || '',
+                    status: status || 'ACTIVE',
                     date: date,
                     type: type,
                     typeKey: normalizedType,
@@ -1137,6 +1177,7 @@ function renderMonthlyTransactionList(year, month) {
                 agg._notes.push(txn.notes.trim());
             }
             agg.transactions.push({
+                id: txn.id || txn.ID || '',
                 amount: txn.amount,
                 notes: txn.notes,
                 category: txn.category,
@@ -1147,6 +1188,7 @@ function renderMonthlyTransactionList(year, month) {
         });
         return Array.from(map.values()).map(agg => ({
             ...agg,
+            id: (agg.transactions && agg.transactions.length > 0) ? agg.transactions[0].id : '',
             notes: agg._notes.join(' • ')
         }));
     };
@@ -1194,7 +1236,10 @@ function renderMonthlyTransactionList(year, month) {
                                 <span class="detail-date">${entryLabel}</span>
                                 ${detailNotes}
                             </div>
-                            <span class="detail-amount">₹${detail.amount.toFixed(2)}</span>
+                            <div class="detail-meta">
+                                <span class="detail-amount">₹${detail.amount.toFixed(2)}</span>
+                                <button class="txn-delete-btn" type="button" data-id="${detail.id}">Delete</button>
+                            </div>
                         </div>
                     `;
                 }).join('') : '';
@@ -1216,6 +1261,7 @@ function renderMonthlyTransactionList(year, month) {
                             </svg>
                         </div>
                 `;
+                const deleteBtnHtml = txn.id ? `<button class="txn-delete-btn" type="button" data-id="${txn.id}">Delete</button>` : '';
                 return `
                     <div class="txn-row${hasDetails ? ' expandable' : ''}" data-type="${txn.typeKey}">
                         <div class="txn-row-header">
@@ -1226,6 +1272,7 @@ function renderMonthlyTransactionList(year, month) {
                             <div class="txn-meta">
                                 <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
                                 <span class="txn-amount">₹${txn.amount.toFixed(2)}</span>
+                                ${deleteBtnHtml}
                             </div>
                             ${expandIcon}
                         </div>
@@ -1247,6 +1294,7 @@ function renderMonthlyTransactionList(year, month) {
 
         // Enable per-category expansion within each date group
         setupTransactionExpansion();
+        setupTransactionDeleteButtons();
     }
 }
 
@@ -1267,6 +1315,21 @@ function setupTransactionExpansion() {
             if (expandIcon) {
                 expandIcon.classList.toggle('expanded', expanded);
             }
+        });
+    });
+}
+
+/**
+ * Attach delete handlers to rendered transaction rows
+ */
+function setupTransactionDeleteButtons() {
+    const deleteButtons = document.querySelectorAll('.txn-delete-btn');
+    deleteButtons.forEach(btn => {
+        btn.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const id = btn.dataset.id;
+            if (!id) return;
+            await deleteExpense(id);
         });
     });
 }

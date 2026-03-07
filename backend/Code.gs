@@ -74,16 +74,18 @@ const SHEET_NAMES = {
 
 /**
  * Column indices in sheets (1-based)
- * Expense_Log columns: Date, Type, Category, Amount, Notes, Timestamp
+ * Expense_Log columns: ID, Date, Type, Category, Amount, Notes, Timestamp, Status
  */
 const COLUMNS = {
     expenseLog: {
-        DATE: 1,
-        TYPE: 2,
-        CATEGORY: 3,
-        AMOUNT: 4,
-        NOTES: 5,
-        TIMESTAMP: 6
+        ID: 1,
+        DATE: 2,
+        TYPE: 3,
+        CATEGORY: 4,
+        AMOUNT: 5,
+        NOTES: 6,
+        TIMESTAMP: 7,
+        STATUS: 8
     },
     expenseMaster: {
         TYPE: 1,
@@ -92,6 +94,18 @@ const COLUMNS = {
         BUDGET_YEARLY: 4
     }
 };
+
+/**
+ * Generate unique transaction IDs for expense entries.
+ * Format: txn_<milliseconds>_<3 random base36 chars>
+ * Example: txn_171000234234_kd2
+ * @returns {string}
+ */
+function generateTxnId() {
+    const timestamp = new Date().getTime();
+    const randomPart = Math.random().toString(36).substring(2, 5);
+    return `txn_${timestamp}_${randomPart}`;
+}
 
 // ====================================================
 // MAIN ENDPOINT HANDLER
@@ -181,6 +195,9 @@ function doPost(e) {
                 break;
             case 'saveBudget':
                 response = handleSaveBudget(data);
+                break;
+            case 'deleteExpense':
+                response = handleDeleteExpense(data);
                 break;
             default:
                 response = {
@@ -372,16 +389,19 @@ function handleSaveExpenses(data) {
             if (!expense.category || !expense.amount) {
                 continue; // Skip invalid entries
             }
-            
+
+            const id = generateTxnId();
             const row = [
+                id,                                    // ID
                 data.date,                              // Date
                 expense.type || 'Expense',              // Type
                 expense.category,                       // Category
                 parseFloat(expense.amount),             // Amount
                 expense.notes || '',                    // Notes
-                now.toISOString()                       // Timestamp
+                now.toISOString(),                      // Timestamp
+                'ACTIVE'                                // Status
             ];
-            
+
             logSheet.appendRow(row);
             savedCount++;
         }
@@ -442,23 +462,29 @@ function handleGetExpenses(data) {
         const range = logSheet.getDataRange();
         const values = range.getValues();
         
-        // Filter expenses by date
+        // Filter expenses by date (ignore deleted rows)
         const expenses = [];
         for (let i = 1; i < values.length; i++) {
-            const rowDate = values[i][COLUMNS.expenseLog.DATE - 1];
-            
-            // Convert date to string format (YYYY-MM-DD)
-            const dateString = formatDateToString(rowDate);
-            
-            if (dateString === data.date) {
-                expenses.push({
-                    type: values[i][COLUMNS.expenseLog.TYPE - 1],
-                    category: values[i][COLUMNS.expenseLog.CATEGORY - 1],
-                    amount: parseFloat(values[i][COLUMNS.expenseLog.AMOUNT - 1]),
-                    notes: values[i][COLUMNS.expenseLog.NOTES - 1] || '',
-                    timestamp: values[i][COLUMNS.expenseLog.TIMESTAMP - 1]
-                });
+            const row = values[i];
+            const status = (row[COLUMNS.expenseLog.STATUS - 1] || '').toString().trim().toUpperCase();
+            if (status === 'DELETED') {
+                continue;
             }
+
+            const rowDate = row[COLUMNS.expenseLog.DATE - 1];
+            const dateString = formatDateToString(rowDate);
+            if (dateString !== data.date) {
+                continue;
+            }
+
+            expenses.push({
+                id: row[COLUMNS.expenseLog.ID - 1] || '',
+                type: row[COLUMNS.expenseLog.TYPE - 1],
+                category: row[COLUMNS.expenseLog.CATEGORY - 1],
+                amount: parseFloat(row[COLUMNS.expenseLog.AMOUNT - 1]),
+                notes: row[COLUMNS.expenseLog.NOTES - 1] || '',
+                timestamp: row[COLUMNS.expenseLog.TIMESTAMP - 1]
+            });
         }
         
         return {
@@ -527,7 +553,13 @@ function handleGetExpensesByMonth(data) {
         const month = parseInt(data.month);
         
         for (let i = 1; i < values.length; i++) {
-            const rowDate = values[i][COLUMNS.expenseLog.DATE - 1];
+            const row = values[i];
+            const status = (row[COLUMNS.expenseLog.STATUS - 1] || '').toString().trim().toUpperCase();
+            if (status === 'DELETED') {
+                continue;
+            }
+
+            const rowDate = row[COLUMNS.expenseLog.DATE - 1];
             const dateString = formatDateToString(rowDate);
             
             // Check if date is in requested month
@@ -539,11 +571,12 @@ function handleGetExpensesByMonth(data) {
                 }
                 
                 expensesByDate[dateString].push({
-                    type: values[i][COLUMNS.expenseLog.TYPE - 1],
-                    category: values[i][COLUMNS.expenseLog.CATEGORY - 1],
-                    amount: parseFloat(values[i][COLUMNS.expenseLog.AMOUNT - 1]),
-                    notes: values[i][COLUMNS.expenseLog.NOTES - 1] || '',
-                    timestamp: values[i][COLUMNS.expenseLog.TIMESTAMP - 1]
+                    id: row[COLUMNS.expenseLog.ID - 1] || '',
+                    type: row[COLUMNS.expenseLog.TYPE - 1],
+                    category: row[COLUMNS.expenseLog.CATEGORY - 1],
+                    amount: parseFloat(row[COLUMNS.expenseLog.AMOUNT - 1]),
+                    notes: row[COLUMNS.expenseLog.NOTES - 1] || '',
+                    timestamp: row[COLUMNS.expenseLog.TIMESTAMP - 1]
                 });
             }
         }
@@ -793,6 +826,60 @@ function handleSaveBudget(data) {
     }
 }
 
+/**
+ * Handle DELETE EXPENSE action
+ * Marks an expense record as DELETED (soft delete) by updating the Status column.
+ * 
+ * @param {Object} data - Request data containing:
+ *   - id (transaction ID)
+ * @returns {Object} - Response indicating success/failure
+ */
+function handleDeleteExpense(data) {
+    try {
+        data = data || {};
+        if (!data.id) {
+            return {
+                success: false,
+                message: 'Missing required field: id'
+            };
+        }
+
+        const ss = SpreadsheetApp.openById(SHEET_ID);
+        const logSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_LOG);
+
+        if (!logSheet) {
+            return {
+                success: false,
+                message: `Sheet ${SHEET_NAMES.EXPENSE_LOG} not found`
+            };
+        }
+
+        const values = logSheet.getDataRange().getValues();
+        const targetId = data.id.toString();
+
+        for (let i = 1; i < values.length; i++) {
+            const rowId = (values[i][COLUMNS.expenseLog.ID - 1] || '').toString();
+            if (rowId === targetId) {
+                logSheet.getRange(i + 1, COLUMNS.expenseLog.STATUS).setValue('DELETED');
+                return {
+                    success: true
+                };
+            }
+        }
+
+        return {
+            success: false,
+            message: `Expense ID not found: ${targetId}`
+        };
+    } catch (error) {
+        console.error(`Error deleting expense: ${error.message}`);
+        return {
+            success: false,
+            message: error.message
+        };
+    }
+}
+
 // ====================================================
 // UTILITY FUNCTIONS
 // =====================================================
@@ -845,9 +932,9 @@ function createDefaultSheets() {
     let expenseLogSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_LOG);
     if (!expenseLogSheet) {
         expenseLogSheet = ss.insertSheet(SHEET_NAMES.EXPENSE_LOG);
-        expenseLogSheet.appendRow(['Date', 'Type', 'Category', 'Amount', 'Notes', 'Timestamp']);
+        expenseLogSheet.appendRow(['ID', 'Date', 'Type', 'Category', 'Amount', 'Notes', 'Timestamp', 'Status']);
         // Format header row
-        const headerRange = expenseLogSheet.getRange(1, 1, 1, 6);
+        const headerRange = expenseLogSheet.getRange(1, 1, 1, 8);
         headerRange.setBackground('#667eea');
         headerRange.setFontColor('#ffffff');
         headerRange.setFontWeight('bold');

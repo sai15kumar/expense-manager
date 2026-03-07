@@ -36,19 +36,19 @@ A lightweight, cloud-powered personal finance tracker that helps users record an
 
 ### Key Characteristics
 
-- **Calendar-First Design**: All transactions are tied to specific dates
-- **No Authentication Required**: Ready to use immediately
-- **Cloud Storage**: Data stored in your personal Google Sheet
-- **Mobile-First**: Optimized for smartphone use
+- **Dashboard-First Design**: Monthly/yearly summary and transaction feed are the primary entry points
+- **Google Sign-In Required**: Access is restricted to an allowlisted set of users via Google Identity Services
+- **Cloud Storage**: Data stored securely in your personal Google Sheet
+- **Mobile-First**: Optimized UI for smartphone use
 - **Zero Dependencies**: Pure HTML/CSS/JavaScript - no frameworks
-- **Free & Open Source**: Complete data ownership
+- **Free & Open Source**: Complete data ownership and full transparency
 
 ### Target Users
 
 - Individuals tracking personal finances
 - Small household expense monitoring
 - Users wanting simple, fast expense entry
-- People who prefer calendar-based organization
+- People who want quick entry and summary views without complex setup
 - Those seeking Google Sheets integration
 
 ---
@@ -57,24 +57,30 @@ A lightweight, cloud-powered personal finance tracker that helps users record an
 
 ### High-Level Architecture
 
+The application is a serverless web app. The frontend runs entirely in the user's browser and communicates with a Google Apps Script backend via JSON POST requests. Authentication is handled via Google Identity Services and request access is restricted by an allowlist in the backend.
+
 ```
-┌─────────────────┐
-│   User Browser  │
-│   (Frontend)    │
-└────────┬────────┘
-         │ HTTP POST (JSON)
-         ▼
-┌─────────────────┐
-│ Google Apps     │
-│ Script Backend  │
-│   (Code.gs)     │
-└────────┬────────┘
-         │ Read/Write
-         ▼
-┌─────────────────┐
-│ Google Sheets   │
-│   (Database)    │
-└─────────────────┘
+┌──────────────────────┐
+│  User Browser (UI)   │
+│  • Google Sign-In    │
+│  • Dashboard + Forms │
+└──────────┬───────────┘
+           │ HTTPS JSON
+           ▼
+┌──────────────────────┐
+│ Google Apps Script   │
+│  (Code.gs)           │
+│  • Auth & allowlist  │
+│  • API router        │
+│  • Sheets I/O        │
+└──────────┬───────────┘
+           │ Sheets API
+           ▼
+┌──────────────────────┐
+│ Google Sheets        │
+│  • Expense_Log       │
+│  • Expense_Master    │
+└──────────────────────┘
 ```
 
 ### Technology Stack
@@ -106,48 +112,58 @@ A lightweight, cloud-powered personal finance tracker that helps users record an
 
 ```
 Expense Manager/
-├── index.html              # Main HTML structure
+├── index.html                  # Main app UI + page layout
 ├── css/
-│   └── styles.css         # All styling (mobile-first)
+│   └── styles.css              # Mobile-first styling and responsive layout
 ├── js/
-│   └── app.js            # All application logic
+│   ├── app.js                  # Core UI logic, state, API integration
+│   └── auth.js                 # Google Sign-In and session management
 ├── backend/
-│   └── Code.gs           # Google Apps Script backend
-├── README.md             # Project overview
-├── DEPLOYMENT_GUIDE.md   # Setup instructions
-├── SETUP_CHECKLIST.md    # Step-by-step checklist
-├── QUICK_REFERENCE.md    # Quick reference guide
-└── PRODUCT_DOCUMENTATION.md  # This file
+│   └── Code.gs                 # Google Apps Script backend API
+├── README.md                   # Project overview and quick start
+├── DEPLOYMENT_GUIDE.md         # Setup & deployment instructions
+├── SETUP_CHECKLIST.md          # Setup checklist
+├── QUICK_REFERENCE.md          # Quick reference guide
+├── PRODUCT_DOCUMENTATION.md    # This file
 ```
 
 ### Code Organization
 
 #### index.html Structure
+- **Auth Gate**: Google Sign-In prompt (shown until authentication succeeds)
 - **Header**: App title, notifications, logout
-- **Navigation**: 4-page tabs (Dashboard, Calendar, Budget, Settings)
-- **Main Content**: 4 page containers (only one visible at a time)
-- **Scripts**: Single app.js file
+- **Navigation Rail**: Dashboard, Budget, Settings
+- **Floating Action Button (FAB)**: Quick access to Add entry screen
+- **Main Content**: Four page containers (Dashboard, Add, Budget, Settings)
 
-#### app.js Structure (1108 lines)
-1. **Configuration** (Lines 1-20): Constants, backend URL
-2. **State Management** (Lines 22-39): appState object
-3. **DOM References** (Lines 41-72): Element selectors
-4. **Initialization** (Lines 74-135): Setup functions
-5. **Expense Management** (Lines 137-357): CRUD operations
-6. **Calendar Functions** (Lines 359-608): Rendering, navigation
-7. **Form Functions** (Lines 610-744): Row management, validation
-8. **Save/Fetch Operations** (Lines 746-918): API calls
-9. **Utilities** (Lines 920-1071): Date formatting, helpers
-10. **Page Navigation** (Lines 1073-1108): Page switching
+#### app.js Structure (≈3000 lines)
+1. **Configuration**: Constants, backend URL, UI defaults
+2. **State Management**: `appState` holds categories, budgets, selections, and UI mode state
+3. **Auth Integration**: Token handling and API auth checks
+4. **Home / Dashboard**: Monthly/yearly summary rendering, filtering, and transaction list
+5. **Add Screen**: Dual entry modes (By Date / By Category), row management, save logic
+6. **Budget Page**: Budget table rendering, input handling, and save flow
+7. **Settings & Helpers**: Logout, toast notifications, UI helpers
+8. **API Integration**: `callAppsScript` wrapper + response handling
 
-#### Code.gs Structure (602 lines)
-1. **Configuration** (Lines 1-40): Sheet IDs, constants
-2. **Main Handler** (Lines 42-112): doPost router
-3. **Get Categories** (Lines 114-148): Fetch Expense_Master
-4. **Save Expenses** (Lines 150-254): Write to Expense_Log
-5. **Get Expenses** (Lines 256-344): Fetch by date
-6. **Get Expenses by Month** (Lines 346-488): Fetch entire month
-7. **Utilities** (Lines 490-602): Validation, formatting
+#### auth.js Structure
+- **Google Identity Services Integration** (sign-in button, token handling)
+- **Session Storage** (ID token, email, name)
+- **UI Gate**: Show/hide app content based on auth state
+- **Logout & Token Revocation**
+
+#### Code.gs Structure (≈960 lines)
+1. **Configuration**: Sheet IDs, allowlist, column constants
+2. **Auth Helpers**: Validate incoming user email against allowlist
+3. **Main handler**: `doPost` router for actions
+4. **Core actions**:
+   - `getCategories` (fetch categories + budget fields)
+   - `saveExpenses` (append transactions)
+   - `getExpenses` (by date)
+   - `getExpensesByMonth` (batch fetch by month)
+   - `getMonthlyBudget` (aggregate by type)
+   - `saveBudget` (update budget fields)
+5. **Utility helpers**: Date formatting, sheet helpers, validation
 
 ---
 
@@ -155,163 +171,95 @@ Expense Manager/
 
 ### Page 1: Dashboard (📊)
 
-**Purpose**: Visual overview of financial status
+**Purpose**: Provide an at-a-glance financial summary and quick access to transactions.
 
-**Components**:
-- Month selector dropdown (Current/Last/YTD/Custom)
-- Monthly summary cards (Income, Expenses, Payoffs, Savings)
-- Budget vs Actual comparison bars
-- Category breakdown chart placeholder
-- Annual summary cards (YTD Income/Expenses/Payoffs/Savings)
-
-**Current Status**: 
-- ✅ HTML structure complete
-- ⚠️ JavaScript implementation pending
-- 🔴 No data visualization yet
-
-**Features**:
-- Summary aggregation (not yet implemented)
-- Budget comparison (not yet implemented)
-- Visual charts (placeholder only)
-
----
-
-### Page 2: Calendar (📅) - PRIMARY PAGE
-
-**Purpose**: Core expense entry and management interface
-
-**Layout**: Two-tab interface for Expenses and Monthly transactions
-
-#### Tab 1: Expenses
-
-**NEW: Dual Entry Mode**
-
-Users can choose between two expense entry modes:
-
-**Mode 1: By Date (Default)**
-- Select a date first
-- Add multiple category expenses for that date
-- Best for entering all expenses for a specific day
-
-**Mode 2: By Category**
-- Select a category first
-- Add multiple date entries for that category
-- Best for entering the same recurring expense across multiple dates
-
-**Components - Date Mode**:
-- Mode selector (radio buttons: Date | Category)
-- Date input field
-- Expense rows table:
-  - Category dropdown (filtered to Expense types)
-  - Amount input (number, required)
-  - Notes input (text, optional)
-  - Remove button (✕)
-- "+ Add another expense" button
-- Save button
-
-**Components - Category Mode**:
-- Mode selector (radio buttons: Date | Category)
-- Category dropdown (filtered to Expense types)
-- Date entry rows table:
-  - Date input (pre-filled with today)
-  - Amount input (number, required)
-  - Notes input (text, optional)
-  - Remove button (✕)
-- "+ Add another date" button
-- Save button
-
-**Behavior**:
-- Mode selector allows switching between Date and Category modes
-- Switching modes resets the form
-- Category dropdown automatically filters Expense-type categories
-- Save button enables only when valid data is entered
-- Form stays on Add screen after save (resets for next entry)
-- Success message shows expense count saved
-- Dashboard updates in background
-- First row cannot be deleted (at least one row required)
-
-**Tab 2: Monthly**
-
-**Tab 2: Monthly**
-
-**Components**:
-- Month selector (current month default)
-- Three collapsible sections:
-  - Income entries
-  - Savings entries  
-  - Payoff entries
-- Each section has:
-  - Category dropdown
-  - Amount input
-  - Notes input
-  - "+ Add row" button
-- Save button
-
-**Behavior**:
-- All monthly transactions saved together
-- Form stays on Add screen after save (resets for next entry)
-- Dashboard updates in background
-
-**Features**:
-- ✅ Dual entry mode (Date or Category)
-- ✅ Multi-row batch entry
-- ✅ Type-specific category filtering
-- ✅ Real-time validation
-- ✅ Stay on screen after save
-- ✅ Form reset after successful save
-- ❌ Edit/delete existing expenses (future)
-
----
-
-### Page 3: Budget (💰)
-
-**Purpose**: Set monthly budget targets for each category
-
-**Components**:
-- Section headers for each type (Income, Expense, Savings, Payoff)
-- Budget input fields for each category
-- Save button
-- Status message area
-
-**Behavior**:
-- Categories auto-populated from Expense_Master
-- Budget values saved per category
-- Used for Dashboard comparisons (future)
+**Key Components**:
+- **Month + Year Selector**: Switch between months or jump to a year
+- **Period Toggle**: Monthly / Yearly views
+- **Summary Cards**: Total Expenses, Income, Savings, Payoffs
+- **Filter by Type**: Tap a card to filter transaction list
+- **View Toggle**: Switch between Summary and Transaction list
+- **Transaction List**: Detailed list of transactions for the selected period
+- **Floating Action Button (FAB)**: Open add screen to log new transactions
 
 **Current Status**:
-- ✅ Form structure complete
-- ✅ Categories populated dynamically
-- ⚠️ Save functionality basic (no validation)
-- 🔴 No budget vs actual comparison yet
+- ✅ Fully implemented
+- ✅ Data loaded from backend
+- ✅ Filters and view toggles work
+- ✅ Monthly/yearly budget aggregation
+
+---
+
+### Page 2: Add Transaction (➕)
+
+**Purpose**: Quickly add new expenses/transfers using flexible entry modes.
+
+**Modes**:
+- **Expenses (default)**: Add multiple expenses in one go.
+- **Monthly**: Add recurring/monthly transactions (Income, Savings, Payoff).
+
+#### Expenses Mode
+
+**Sub-modes**:
+- **By Date**: Add multiple categories for the same date
+- **By Category**: Add the same category across multiple dates
+
+**Key Features**:
+- Dynamic row addition (up to 5 active rows per session)
+- Validation on required fields (date/category/amount)
+- Save button becomes active only when valid data exists
+- Success toast and automatic refresh of dashboard data
+
+#### Monthly Mode
+
+**Purpose**: Add a batch of monthly transactions in a single save.
+
+**Key Features**:
+- Month picker (for selecting the target month)
+- Sections for Income, Savings, Payoff
+- Collapsible sections for cleaner UX
+- Adds multiple rows per section
+- Save persists all data in a single API call
+
+---
+
+### Page 3: Budget Configuration (💰)
+
+**Purpose**: Configure budget targets per category.
+
+**Key Components**:
+- Budget table grouped by type (Income / Expense / Savings / Payoff)
+- Monthly budget input per category
+- Auto-calculated yearly budget (monthly × 12)
+- Total budgets shown on section headers
+
+**Behavior**:
+- Loads categories from backend (Expense_Master)
+- Inputs persist on save via backend `saveBudget` API
+- Budget values are used to generate the monthly summary totals
+
+**Current Status**:
+- ✅ Fully implemented
+- ✅ Categories and budgets load correctly
+- ✅ Budget save works (updates Expense_Master)
 
 ---
 
 ### Page 4: Settings (⚙️)
 
-**Purpose**: App configuration and information
+**Purpose**: Application settings and information.
 
 **Sections**:
-
 1. **Data Management**
-   - Export data button (future)
-   - Clear all data button (future)
-   - Backup reminder
-
-2. **Display Preferences**
-   - Currency selection (future)
-   - Date format (future)
-   - Theme toggle (future)
-
-3. **About**
-   - App version
+   - Export data (placeholder)
+   - Clear all data (placeholder)
+2. **About**
+   - App version and last updated
    - Links to documentation
-   - Credits
 
 **Current Status**:
-- ✅ HTML structure
-- 🔴 All features pending implementation
-
----
+- ✅ UI implemented
+- 🔴 Export/clear features are placeholders
 
 ## 5. DATA MODELS
 
@@ -398,12 +346,14 @@ appState = {
 
 ```javascript
 {
+    id: "txn_171000234234_kd2",   // Unique transaction ID
     date: "2025-12-31",          // YYYY-MM-DD
     type: "Expense",             // Entry type
     category: "Food",            // Category name
     amount: 250,                 // Number
     notes: "Lunch at restaurant", // Optional string
-    timestamp: "2025-12-31 14:30:00"  // Auto-generated
+    timestamp: "2025-12-31 14:30:00",  // Auto-generated
+    status: "ACTIVE"             // ACTIVE or DELETED
 }
 ```
 
@@ -413,305 +363,331 @@ appState = {
 
 ### Endpoint Configuration
 
-**URL**: Single Apps Script Web App URL  
-**Method**: POST (all requests)  
-**Content-Type**: `application/json` or `text/plain;charset=utf-8`
+**URL**: Single Google Apps Script Web App URL (configured in `js/app.js`)
+**Method**: POST (all requests)
+**Content-Type**: `application/json`
+
+> 📌 **Authentication**: All requests must include a valid signed-in Google user email. The frontend automatically adds `userEmail` (from the ID token) to each request.
+>
+> ✅ **Important:** Requests are sent without custom headers to avoid CORS preflight. The backend validates access using the provided `userEmail` and the allowlist in `Code.gs`.
 
 ### Request Format
 
-All requests use same URL with different `action` parameter:
+All requests use the same URL and are differentiated by an `action` parameter:
 
 ```json
 {
-    "action": "actionName",
-    ...additional parameters
+  "action": "getCategories",
+  "userEmail": "user@example.com",
+  ...additional parameters depending on action
+}
+```
+
+### Common Error Response (Unauthorized)
+
+```json
+{
+  "success": false,
+  "error": "UNAUTHORIZED"
 }
 ```
 
 ---
 
-### API 1: Get Categories
+### API: getCategories
 
-**Purpose**: Fetch all available categories from Expense_Master
+**Purpose**: Fetch all categories (including budget targets) from `Expense_Master`.
 
 **Request**:
 ```json
 {
-    "action": "getCategories"
+  "action": "getCategories",
+  "userEmail": "user@example.com"
 }
 ```
 
 **Response (Success)**:
 ```json
 {
-    "success": true,
-    "categories": [
-        {"name": "Food", "type": "Expense"},
-        {"name": "Transport", "type": "Expense"},
-        {"name": "Salary", "type": "Income"}
-    ]
-}
-```
-
-**Response (Error)**:
-```json
-{
-    "success": false,
-    "message": "Error description"
+  "success": true,
+  "categories": [
+    {"name": "Food", "type": "Expense", "budget": 5000},
+    {"name": "Salary", "type": "Income", "budget": 0}
+  ]
 }
 ```
 
 **Frontend Usage**:
-- Called on app initialization
-- Populates category dropdowns
-- Cached in `appState.categories`
+- Called during initialization
+- Populates dropdowns and budget tables
 
 ---
 
-### API 2: Save Expenses
+### API: saveExpenses
 
-**Purpose**: Save one or more expenses for a specific date
+**Purpose**: Save one or more expenses for a given date.
 
 **Request**:
 ```json
 {
-    "action": "saveExpenses",
-    "date": "2025-12-31",
-    "expenses": [
-        {
-            "type": "Expense",
-            "category": "Food",
-            "amount": 250,
-            "notes": "Lunch"
-        },
-        {
-            "type": "Expense",
-            "category": "Transport",
-            "amount": 50,
-            "notes": ""
-        }
-    ]
+  "action": "saveExpenses",
+  "userEmail": "user@example.com",
+  "date": "2025-12-31",
+  "expenses": [
+    {"type": "Expense", "category": "Food", "amount": 250, "notes": "Lunch"},
+    {"type": "Expense", "category": "Transport", "amount": 50, "notes": ""}
+  ]
 }
 ```
 
 **Response (Success)**:
 ```json
 {
-    "success": true,
-    "saved": 2,
-    "date": "2025-12-31",
-    "message": "2 expense(s) saved for 2025-12-31"
+  "success": true,
+  "saved": 2,
+  "date": "2025-12-31",
+  "message": "2 expense(s) saved for 2025-12-31"
 }
 ```
-
-**Response (Error)**:
-```json
-{
-    "success": false,
-    "message": "Invalid data: amount must be positive"
-}
-```
-
-**Backend Processing**:
-1. Validates date format
-2. Validates each expense object
-3. Adds timestamp to each expense
-4. Appends rows to Expense_Log sheet
-5. Returns confirmation
 
 ---
 
-### API 3: Get Expenses
+### API: getExpenses
 
-**Purpose**: Retrieve all expenses for a specific date
+**Purpose**: Retrieve all expenses for a specific date.
 
 **Request**:
 ```json
 {
-    "action": "getExpenses",
-    "date": "2025-12-31"
+  "action": "getExpenses",
+  "userEmail": "user@example.com",
+  "date": "2025-12-31"
 }
 ```
 
 **Response (Success)**:
 ```json
 {
-    "success": true,
-    "date": "2025-12-31",
-    "expenses": [
-        {
-            "date": "2025-12-31",
-            "type": "Expense",
-            "category": "Food",
-            "amount": 250,
-            "notes": "Lunch",
-            "timestamp": "2025-12-31 14:30:00"
-        }
-    ]
-}
-```
-
-**Response (No Data)**:
-```json
-{
-    "success": true,
-    "date": "2025-12-31",
-    "expenses": []
-}
-```
-
-**Frontend Usage**:
-- Called when user selects a date
-- Updates "Existing Expenses" tab
-- Cached in `appState.expensesByDate[date]`
-
----
-
-### API 4: Get Expenses by Month
-
-**Purpose**: Fetch all expenses for an entire month (optimized for calendar indicators)
-
-**Request**:
-```json
-{
-    "action": "getExpensesByMonth",
-    "year": 2025,
-    "month": 12
-}
-```
-
-**Response (Success)**:
-```json
-{
-    "success": true,
-    "year": 2025,
-    "month": 12,
-    "expensesByDate": {
-        "2025-12-01": [expense1, expense2],
-        "2025-12-15": [expense3],
-        "2025-12-31": [expense4, expense5, expense6]
+  "success": true,
+  "date": "2025-12-31",
+  "expenses": [
+    {
+      "date": "2025-12-31",
+      "type": "Expense",
+      "category": "Food",
+      "amount": 250,
+      "notes": "Lunch",
+      "timestamp": "2025-12-31 14:30:00"
     }
+  ]
 }
 ```
-
-**Response (No Data)**:
-```json
-{
-    "success": true,
-    "year": 2025,
-    "month": 12,
-    "expensesByDate": {}
-}
-```
-
-**Frontend Usage**:
-- Called when month changes in calendar
-- Updates red dots on calendar dates
-- Populates `appState.hasExpensesByDate`
-- Deferred/background execution to avoid blocking
 
 ---
+
+### API: getExpensesByMonth
+
+**Purpose**: Fetch all expenses for a month (grouped by date).
+
+**Request**:
+```json
+{
+  "action": "getExpensesByMonth",
+  "userEmail": "user@example.com",
+  "year": 2025,
+  "month": 12
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "year": 2025,
+  "month": 12,
+  "expensesByDate": {
+    "2025-12-01": [/* expenses */],
+    "2025-12-15": [/* expenses */]
+  }
+}
+```
+
+---
+
+### API: getMonthlyBudget
+
+**Purpose**: Aggregate monthly budgets by type (Expense/Income/Savings/Payoff).
+
+**Request**:
+```json
+{
+  "action": "getMonthlyBudget",
+  "userEmail": "user@example.com",
+  "year": 2025,
+  "month": 12
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "budget": {
+    "expense": 50000,
+    "income": 120000,
+    "savings": 20000,
+    "payoff": 15000
+  }
+}
+```
+
+---
+
+### API: saveBudget
+
+**Purpose**: Update monthly & yearly budget values for categories in `Expense_Master`.
+
+**Request**:
+```json
+{
+  "action": "saveBudget",
+  "userEmail": "user@example.com",
+  "budgets": [
+    {"category": "Food", "type": "Expense", "monthlyBudget": 5000, "yearlyBudget": 60000},
+    {"category": "Salary", "type": "Income", "monthlyBudget": 50000, "yearlyBudget": 600000}
+  ]
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Saved 2 budgets",
+  "count": 2
+}
+```
+
+---
+
+### API: deleteExpense
+
+**Purpose**: Soft-delete an expense by setting its Status to `DELETED` (it will no longer appear in queries).
+
+**Request**:
+```json
+{
+  "action": "deleteExpense",
+  "userEmail": "user@example.com",
+  "id": "txn_171000234234_kd2"
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "success": true
+}
+```
 
 ## 7. FRONTEND COMPONENTS
 
-### Header Component
+### Authentication Gate
+
+Before the app loads, users must sign in with Google:
+- Sign-in is handled by **Google Identity Services** (GSI)
+- The UI shows an auth gate until a valid ID token is available
+- Upon successful sign-in, the app fetches categories and initializes the dashboard
+
+### Header
 
 **Elements**:
-- App title (h1)
-- Notification button (🔔)
-- Logout button (🚪)
+- Application title (Expense Manager)
+- Notification button (placeholder)
+- Logout button
 
 **Behavior**:
-- Notifications: Shows alert (placeholder)
-- Logout: Confirms before action (placeholder)
+- **Logout** clears session storage and hides the app UI
+- **Notifications** are currently placeholders (can be extended)
 
 ---
 
-### Page Navigation
+### Navigation Rail
 
 **Elements**:
-- 4 tab buttons: Dashboard | Calendar | Budget | Settings
+- Dashboard
+- Budget
+- Settings
 
 **Behavior**:
-- Click → Hides all pages, shows target page
-- Active tab gets `.active` class (blue background)
-- Default: Dashboard active on load
-- Calendar page hidden by default (display: none)
-
-**Implementation**:
-```javascript
-// setupPageNavigation() function
-// Listens to data-page attribute
-// Toggles display: block/none
-```
+- Click switches the visible page
+- Active item gets `.active` class for highlight
+- The floating action button (FAB) opens the Add screen regardless of current page
 
 ---
 
-### Calendar Component
+### Dashboard (Home) Components
 
-**Structure**:
-```
-calendar-section
-  ├── calendar-header (Month/Year + Nav buttons)
-  └── calendar-container
-      └── calendar-grid
-          ├── day-header x 7 (Sun-Sat)
-          └── calendar-dates (42 date cells)
-```
+**Summary Cards**:
+- Expense / Income / Savings / Payoff cards
+- Tap a card to filter the transaction list
 
-**Date Cell States**:
-- `.calendar-date` - Base class
-- `.today` - Blue border + bold
-- `.has-expense` - Red dot (::after pseudo-element)
-- `.selected` - Gray background
-- `.other-month` - Light gray text, not clickable
+**Period Controls**:
+- Month picker + year input
+- Toggle between monthly and yearly views
 
-**Rendering Process**:
-1. Clear previous dates
-2. Calculate first day of month
-3. Add padding from previous month
-4. Add current month dates (1-31)
-5. Add padding for next month
-6. Total 42 cells (6 rows × 7 days)
+**Transaction List**:
+- Shows a list of transactions for the selected period
+- Supports filtering by type (via summary cards)
 
 ---
 
-### Expense Form Component
+### Add Transaction Screen
 
-**Structure**:
-```
-expense-entry-panel
-  ├── entry-tabs (Expense/Income/Savings/Payoff)
-  └── form
-      ├── expense-rows (table)
-      │   └── row (Category | Amount | Notes)
-      ├── add-row button
-      └── action buttons (Save | Cancel)
-```
+**Tab Structure**:
+- **Expenses**: Default tab for logging expense transactions
+- **Monthly**: For recording recurring transactions (income/savings/payoff)
 
-**Row Management**:
-- Default: 2 rows visible
-- Click "Add Row": Shows up to 5 rows total
-- Each row has unique index (data-row-index)
-- Hidden input stores current entry type
+**Expenses Tab**:
+- **Mode toggle**: By Date or By Category
+- Dynamic rows with category, amount, and notes
+- Save button enables when valid rows exist
 
-**Validation**:
-- Category: Required, must exist in categories
-- Amount: Required, must be positive number
-- Notes: Optional
-- At least one complete row required to save
-
-**Save Process**:
-1. Gather all rows with data
-2. Validate each row
-3. Package as JSON
-4. POST to backend
-5. Show status message
-6. Reset form on success
-7. Reload existing expenses
-8. Update calendar indicator
+**Monthly Tab**:
+- Month picker
+- Collapsible sections for Income, Savings, Payoff
+- Each section contains dynamic rows (category + amount)
+- Save persists all entered rows in one operation
 
 ---
+
+### Budget Page
+
+**Purpose**: Configure monthly & yearly budgets per category.
+
+**Components**:
+- Table per type (Income, Expense, Savings, Payoff)
+- Monthly budget input (number)
+- Auto-calculated yearly budget (monthly × 12)
+- Summary totals displayed in section headers
+
+**Behavior**:
+- Loads categories/budgets from backend
+- Saves user-entered budgets via API
+- Updates dashboard summary totals after saving
+
+---
+
+### Settings Page
+
+**Sections**:
+- Data management (export/clear placeholders)
+- About & version info
+
+**Behavior**:
+- Logout is available via header button
+- Link placeholders for privacy and terms
+
 
 ### Existing Expenses List
 
@@ -731,369 +707,190 @@ expenses-list-table
 
 ## 8. STATE MANAGEMENT
 
-### appState Object (Global)
+### Primary State Stores
 
-**Purpose**: Single source of truth for application state
+The app uses two primary state objects:
 
-#### Properties
+#### `appState`
+Stored globally in `js/app.js`, `appState` holds data used across the entire application.
 
-**currentDate** (Date object)
-- Current month being viewed in calendar
-- Updated by prev/next month buttons
-- Default: new Date() (today)
+- `categories` – Loaded from backend (`getCategories`); each item includes `name`, `type`, and `budget`
+- `categoryBudgets` – Mapping for quick budget lookup: `{ "Food|Expense": 5000 }`
+- `homeSelectedMonth` – `{ year: 2026, month: 3 }` (1–12)
+- `homeSelectedYear` – Current year used in yearly view
+- `homeExpensesByDate` – Expenses grouped by date in the current period
+- `homeSelectedType` – Filter selection: `"all"|"expense"|"income"|"savings"|"payoff"`
+- `homeViewMode` – UI mode: `"summary"` or `"transactions"`
+- `homeViewPeriod` – Time window: `"month"` or `"year"`
+- `expandedCategories` – Set of category keys expanded in summary view
+- `monthlyBudget` – Aggregated budget totals by type (expense/income/savings/payoff)
 
-**selectedDate** (String | null)
-- Currently selected date in YYYY-MM-DD format
-- Drives expense form and display
-- Null when no date selected
+#### `addScreenState`
+Controls state for the Add screen:
 
-**categories** (Array of Objects)
-- All available categories from Expense_Master
-- Structure: `[{name: "Food", type: "Expense"}, ...]`
-- Populated on app initialization
-- Used to populate dropdowns
-
-**expensesByDate** (Object)
-- Cache of fetched expenses
-- Key: date string (YYYY-MM-DD)
-- Value: array of expense objects
-- Example: `{"2025-12-31": [exp1, exp2]}`
-- Prevents redundant API calls
-
-**hasExpensesByDate** (Object)
-- Quick lookup for calendar indicators
-- Key: date string
-- Value: boolean (true if expenses exist)
-- Example: `{"2025-12-31": true}`
-- Updated when month fetched
-
-**expenseRowCount** (Number)
-- Number of currently visible expense rows (2-5)
-- Starts at 2, increases with "Add Row"
-- Resets to 2 on form reset
-
-**activeEntryType** (String)
-- Currently selected entry type
-- Values: "Expense" | "Income" | "Savings" | "Payoff"
-- Default: "Expense"
-- Filters category dropdown
-
-**isFetchingMonth** (Boolean)
-- Prevents duplicate month fetch requests
-- Set to true during fetch
-- Reset to false after completion
+- `currentTab` – `"expenses"` or `"monthly"`
+- `expenseMode` – `"byDate"` or `"byCategory"`
+- `expenseRows` / `expenseRowsByCategory` – Arrays of row metadata
+- `monthlyRows` – Grouped by type (income, savings, payoff)
 
 ---
 
 ### State Update Patterns
 
-#### Date Selection Flow
-```
-User clicks calendar date
-  → selectDate() updates appState.selectedDate
-  → openExpenseManagement() triggered
-  → fetchExpensesForDate() called
-  → expensesByDate[date] cached
-  → UI updates with expense data
-```
+#### Dashboard Refresh
+- User changes month/year or toggles period
+- `loadHomeData()` fetches budgets and expenses
+- Summary cards and transaction list are re-rendered
 
-#### Month Navigation Flow
-```
-User clicks prev/next month
-  → goToPreviousMonth/NextMonth()
-  → appState.currentDate updated
-  → renderCalendar() called
-  → fetchExpensesForMonth() triggered (deferred)
-  → hasExpensesByDate updated
-  → Calendar dots appear
-```
+#### Transaction Filtering
+- Tapping a summary card updates `homeSelectedType`
+- Transaction list is re-rendered with the selected type filter
 
-#### Save Expense Flow
-```
-User submits form
-  → saveExpenses() validates data
-  → POST to backend
-  → On success:
-     - Status message shown
-     - expensesByDate[date] invalidated
-     - fetchExpensesForDate() refresh
-     - hasExpensesByDate[date] = true
-     - Calendar dot appears
-```
+#### Add Screen Saves
+- When transactions are saved, the app reloads dashboard data via `loadHomeData()`
+- This keeps dashboard totals and transaction lists in sync
 
 ---
 
 ## 9. CORE FUNCTIONS
 
-### Initialization Functions
+### Application Initialization
 
-#### initializeApp()
-**Purpose**: Bootstrap application on page load  
-**Called By**: DOMContentLoaded event  
+#### `initializeAppAfterAuth()`
+**Purpose**: Initialize the app only after authentication is confirmed.
+
+**Process**:
+1. Validates that an ID token exists in session storage
+2. Calls `initializeHomePage()` and `initializeAddScreen()`
+3. Sets up navigation (page switching and FAB)
+4. Fetches categories (including budgets) from backend
+
+#### `initializeHomePage()`
+**Purpose**: Setup the dashboard view.
+
 **Actions**:
-1. Fetch categories from backend
-2. Render calendar for current month
-3. Setup event listeners
-4. Log success
+- Initialize month/year pickers and navigation buttons
+- Set up summary card filters and view toggles
+- Load initial monthly data (`loadHomeData()`)
 
-```javascript
-function initializeApp() {
-    console.log('Initializing Expense Manager...');
-    fetchCategories();
-    renderCalendar();
-    setupEventListeners();
-    console.log('App initialized successfully');
-}
-```
+#### `initializeAddScreen()`
+**Purpose**: Setup the Add Transaction screen.
 
----
-
-#### setupEventListeners()
-**Purpose**: Attach all event listeners  
-**Listeners**:
-- Calendar navigation (prev/next month)
-- Header actions (notifications, logout)
-- Form buttons (save, cancel, add row)
-- Entry type tabs
-- Details tabs (Add/Existing)
-- Budget form submit
-
----
-
-#### setupPageNavigation()
-**Purpose**: Handle page tab switching  
-**Logic**:
-- Get all `.page-nav-btn` and `.page` elements
-- Listen for tab clicks
-- Hide all pages, show target page
-- Update active class on buttons
-
----
-
-### Calendar Functions
-
-#### renderCalendar()
-**Purpose**: Render calendar grid for current month  
-**Complexity**: High (180+ lines)
-
-**Process**:
-1. Get year/month from appState.currentDate
-2. Update month/year display
-3. Clear previous calendar dates
-4. Calculate first day of month (0-6)
-5. Calculate last day of month (28-31)
-6. Add previous month padding dates
-7. Add current month dates (with indicators)
-8. Add next month padding dates
-9. Append all cells to container
-10. Trigger deferred fetchExpensesForMonth()
-
-**Date Cell Creation**:
-```javascript
-createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
-```
-
----
-
-#### fetchExpensesForMonth()
-**Purpose**: Fetch all expenses for current month (background)  
-**Async**: Yes  
-**Deferred**: Yes (called 100ms after calendar render)
-
-**Process**:
-1. Check isFetchingMonth flag (prevent duplicates)
-2. Get year/month from appState.currentDate
-3. POST to backend with getExpensesByMonth action
-4. Parse response
-5. Update hasExpensesByDate for each date with expenses
-6. Re-render calendar to show dots
-
-**Fallback**: If backend doesn't support month fetch, falls back to individual date fetches
-
----
-
-#### selectDate(dateString, dateCell)
-**Purpose**: Handle user clicking a calendar date  
 **Actions**:
-1. Update appState.selectedDate
-2. Remove previous selection highlight
-3. Add selection to clicked cell
-4. Open expense management panel
+- Setup tab navigation (Expenses / Monthly)
+- Setup expense mode selector (By Date / By Category)
+- Attach listeners to add-row buttons and save buttons
+- Reset form state when opening
 
 ---
 
-#### goToPreviousMonth() / goToNextMonth()
-**Purpose**: Navigate calendar months  
-**Actions**:
-1. Increment/decrement appState.currentDate
-2. Call renderCalendar()
-3. Clear form selection
+### Dashboard / Home Functions
+
+#### `loadHomeData()`
+**Purpose**: Load dashboard data for the selected period.
+
+**Behaviour**:
+- Shows loading overlay
+- For monthly view:
+  - Fetches monthly budget (`getMonthlyBudget`)
+  - Fetches expenses by month (`getExpensesByMonth`)
+  - Calculates summary totals and updates UI
+- For yearly view:
+  - Fetches all months for the year
+  - Aggregates totals and renders yearly summary
+
+#### `fetchHomeExpensesForMonth(year, month)`
+**Purpose**: Load all expenses for a given month (grouped by date).
+
+**Details**:
+- Calls backend `getExpensesByMonth`
+- Stores results in `appState.homeExpensesByDate`
+
+#### `renderHomeTransactionList()`
+**Purpose**: Render the transaction list based on state and filters.
+
+**Behaviour**:
+- Uses `homeSelectedType` and `homeViewMode` to determine list contents
+- Renders either a compact summary view or detailed transaction list
 
 ---
 
-### Expense Management Functions
+### Add Screen Functions
 
-#### openExpenseManagement(dateString)
-**Purpose**: Open right-side expense panel for selected date  
-**Actions**:
-1. Update appState.selectedDate
-2. Update panel title with formatted date
-3. Load existing expenses
-4. Reset form for new entries
-5. Switch to "Add Expenses" tab
+#### `saveExpenses()`
+**Purpose**: Save entered expenses (either by date or by category).
 
----
+**Flow**:
+- Validates the current mode (`byDate` or `byCategory`)
+- Collects valid rows and constructs one or more API payloads
+- Calls backend `saveExpenses` for each affected date
+- On success, resets the form and reloads dashboard data
 
-#### loadExistingExpenses(dateString)
-**Purpose**: Load and display expenses for a specific date  
-**Async**: Yes  
-**Process**:
-1. Check cache (appState.expensesByDate)
-2. If not cached, call fetchExpensesForDate()
-3. Display in "Existing Expenses" tab table
-4. Update badge counter
+#### `resetAddScreen()`
+**Purpose**: Clear form inputs and reset internal state for the Add screen.
 
 ---
 
-#### fetchExpensesForDate(dateString)
-**Purpose**: Fetch expenses from backend for specific date  
-**Async**: Yes  
-**Process**:
-1. POST to backend with getExpenses action
-2. Parse response
-3. Cache in appState.expensesByDate[date]
-4. Update hasExpensesByDate
-5. Call displayExistingExpenses()
+### Budget Page Functions
+
+#### `initBudgetPage()`
+**Purpose**: Initialize budget UI for the Budget page.
+
+**Flow**:
+- Ensures categories are loaded
+- Builds budget table rows grouped by type
+- Loads existing budget values into inputs
+- Attaches form submit handler
+
+#### `handleBudgetSubmit()`
+**Purpose**: Save budget values to the backend.
+
+**Flow**:
+- Collects budget values from inputs
+- Sends to backend `saveBudget`
+- On success, reloads categories and updates UI
 
 ---
 
-#### displayExistingExpenses(expenses)
-**Purpose**: Render expenses in table  
-**Process**:
-1. Clear existing table rows
-2. If no expenses, show "no data" message
-3. Else, create table row for each expense
-4. Update badge counter
+### API Utilities
+
+#### `callAppsScript(payload)`
+**Purpose**: Send a JSON request to the backend API.
+
+**Behavior**:
+- Adds `userEmail` from session storage (if available)
+- Sends POST request with JSON body
+- Returns parsed JSON response
+- Avoids CORS preflight by omitting custom headers
+
+#### `checkApiAuthorization(result)`
+**Purpose**: Detect and handle unauthorized API responses.
+
+**Behavior**:
+- Checks for `result.error === 'UNAUTHORIZED'`
+- Triggers auth logout and user notification if unauthorized
 
 ---
 
-### Form Functions
+### Formatting & UI Helpers
 
-#### createExpenseRows()
-**Purpose**: Initialize expense form with empty rows  
-**Actions**:
-1. Clear existing rows
-2. Set expenseRowCount to 2
-3. Create 2 empty rows
+#### `formatDateToString(dateObj)`
+**Purpose**: Convert a Date object to `YYYY-MM-DD` string.
 
----
+#### `formatDateForDisplay(dateString)`
+**Purpose**: Convert a `YYYY-MM-DD` string into a user-friendly format (e.g., “Tue, Mar 03, 2026”).
 
-#### createAndAppendExpenseRow(rowNumber)
-**Purpose**: Create single expense row  
-**Components**:
-- Hidden type input
-- Category select (populated from appState.categories)
-- Amount input (type="number", min="0", step="0.01")
-- Notes input (type="text")
+#### `showToast(message, type)`
+**Purpose**: Display a temporary toast message.
+
+**Types**: `success`, `error`
 
 ---
 
-#### addExpenseRow()
-**Purpose**: Add one more row to form (max 5)  
-**Process**:
-1. Check if < 5 rows
-2. Increment expenseRowCount
-3. Create new row
+### Category Helpers
 
----
-
-#### setEntryType(type)
-**Purpose**: Switch between Expense/Income/Savings/Payoff tabs  
-**Actions**:
-1. Update activeEntryType
-2. Update tab active classes
-3. Update all hidden type inputs in rows
-4. Filter category dropdowns by type
-
----
-
-#### updateCategoryDropdowns()
-**Purpose**: Filter categories based on active entry type  
-**Process**:
-1. Get all category selects
-2. Clear options
-3. Add filtered categories matching activeEntryType
-4. Add "Select Category" placeholder
-
----
-
-#### resetExpenseForm()
-**Purpose**: Clear all form inputs  
-**Actions**:
-1. Clear all select/input values
-2. Hide status message
-3. Reset to 2 rows
-
----
-
-### Save/Fetch Functions
-
-#### saveExpenses(event)
-**Purpose**: Save form data to backend  
-**Async**: Yes  
-**Process**:
-1. Prevent form default
-2. Validate selectedDate exists
-3. Gather all rows with data
-4. Validate each row (category + amount required)
-5. Package as JSON
-6. POST to backend
-7. Show success/error status
-8. On success:
-   - Reset form
-   - Invalidate cache
-   - Refresh existing expenses
-   - Update calendar indicator
-
----
-
-#### fetchCategories()
-**Purpose**: Load categories from backend  
-**Async**: Yes  
-**Process**:
-1. POST to backend with getCategories action
-2. Parse response
-3. Store in appState.categories
-4. Call createExpenseRows() to populate dropdowns
-
----
-
-### Utility Functions
-
-#### formatDateToString(dateObj)
-**Purpose**: Convert Date object to YYYY-MM-DD  
-**Returns**: String
-
-```javascript
-"2025-12-31"
-```
-
----
-
-#### formatDateForDisplay(dateString)
-**Purpose**: Format date for user-friendly display  
-**Returns**: String
-
-```javascript
-"Tuesday, Dec 31, 2025"
-```
-
----
-
-#### showStatus(message, type)
-**Purpose**: Display status message  
-**Types**: 'success' | 'error'  
-**Duration**: 3 seconds auto-hide
+#### `getCategoryIcon(category, type)`
+**Purpose**: Return a small emoji icon based on category/type.
 
 ---
 
@@ -1101,80 +898,53 @@ createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
 
 ### Workflow 1: First Time Setup
 
-1. User deploys backend to Google Apps Script
-2. User configures Google Sheet with Expense_Master data
-3. User updates BACKEND_URL in app.js
-4. User hosts frontend files
-5. User opens app URL
-6. Categories load automatically
-7. Calendar renders with current month
-8. User ready to enter expenses
+1. Configure your Google Sheet with two tabs: `Expense_Master` and `Expense_Log` (see schema in section 5)
+2. Copy the Google Sheet ID and update `SHEET_ID` in `backend/Code.gs`
+3. Deploy the Apps Script project as a Web App (execute as: Me, access: Anyone)
+4. Copy the deployment URL and set `CONFIG.BACKEND_URL` in `js/app.js`
+5. Deploy the frontend files to a static host (GitHub Pages, Firebase, etc.)
+6. Open the app URL and sign in with an authorized Google account
+7. The app loads categories and shows the dashboard
 
 ---
 
-### Workflow 2: Daily Expense Entry (Date Mode)
+### Workflow 2: Logging Expenses (By Date)
 
-1. User clicks FAB (+) button or navigates to Add page
-2. "Expenses" tab is active by default
-3. "Date" mode is selected by default
-4. Date field shows today's date
-5. User selects category from dropdown
-6. User enters amount
-7. User optionally adds notes
-8. User can click "+ Add another expense" to add more categories
-9. User clicks "Save"
-10. Success message appears
-11. Form resets (stays on Add screen)
-12. Dashboard updates in background
-13. User can immediately add more expenses
+1. Click the **+ (FAB)** button or navigate to the **Add** screen
+2. Confirm the **Expenses** tab is selected
+3. Ensure **Date** mode is selected
+4. Pick a date and fill in category, amount, and optional notes
+5. Add extra rows as needed
+6. Click **Save**
+7. A success toast appears and the dashboard refreshes
 
 ---
 
-### Workflow 2b: Recurring Expense Entry (Category Mode)
+### Workflow 3: Logging Multiple Dates for One Category (By Category)
 
-1. User clicks FAB (+) button or navigates to Add page
-2. "Expenses" tab is active by default
-3. User clicks "Category" mode selector
-4. User selects category from dropdown (e.g., "Rent")
-5. First row shows today's date
-6. User enters amount for first date
-7. User clicks "+ Add another date" to add same expense for different dates
-8. User enters amounts for each date
-9. User clicks "Save"
-10. Success message shows total expenses saved
-11. Form resets (stays on Add screen)
-12. Dashboard updates in background
-
----
-
-### Workflow 3: Viewing Past Expenses
-
-1. User navigates to desired month (prev/next buttons)
-2. User clicks date with red dot indicator
-3. User switches to "Existing Expenses" tab
-4. All expenses for that date displayed in table
-5. User can see Type, Category, Amount, Notes
+1. Open the **Add** screen and select **Expenses**
+2. Switch to **Category** mode
+3. Pick a category and fill in date/amount/notes rows
+4. Click **Save**
+5. The app saves entries for each date, then refreshes the dashboard
 
 ---
 
 ### Workflow 4: Budget Configuration
 
-1. User clicks "Budget" tab in navigation
-2. Budget form loads with all categories
-3. User enters monthly budget for each category
-4. User clicks "Save Budget"
-5. Success message appears
-6. Budget data saved for future comparisons
+1. Navigate to the **Budget** page
+2. Enter monthly budget amounts for each category
+3. Optionally review the auto-calculated yearly totals
+4. Click **Save Budget**
+5. The app saves values to the sheet and updates the dashboard totals
 
 ---
 
-### Workflow 5: Month Navigation
+### Workflow 5: Signing Out
 
-1. User clicks "❮" previous month button
-2. Calendar re-renders with previous month
-3. Background fetch loads expense indicators
-4. Red dots appear on dates with expenses
-5. User can click any date to view/add expenses
+1. Click the **Logout** button in the header
+2. The session is cleared and the auth gate is shown
+3. (Optional) Re-sign in with another authorized account
 
 ---
 
@@ -1203,7 +973,7 @@ createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
 
 **Load Time**:
 - Initial load: < 2 seconds (on 3G)
-- Calendar render: < 100ms
+- Dashboard render: < 100ms
 - Form interaction: Instant
 
 **Data Caching**:
@@ -1212,10 +982,10 @@ createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
 - Month indicators: Fetched on month change
 
 **API Call Frequency**:
-- Page load: 1 call (getCategories)
-- Month change: 1 call (getExpensesByMonth)
-- Date select: 1 call if not cached
-- Save: 1 call (saveExpenses)
+- Page load: 2–3 calls (getCategories + getMonthlyBudget + getExpensesByMonth)
+- Month/year change: 2 calls (getMonthlyBudget + getExpensesByMonth)
+- Save expense: 1 call (saveExpenses)
+- Save budget: 1 call (saveBudget)
 
 ---
 
@@ -1229,7 +999,7 @@ createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
 
 /* Tablets (768px+) */
 @media (min-width: 768px) {
-    /* Calendar switches to split layout */
+    /* Layout adjustments for wider screens */
 }
 
 /* Desktop (992px+) */
@@ -1244,13 +1014,13 @@ createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
 ### Code Metrics
 
 **Frontend**:
-- HTML: ~380 lines
-- CSS: ~1800 lines
-- JavaScript: ~1108 lines
-- Total: ~3288 lines
+- HTML: ~620 lines
+- CSS: ~3300 lines
+- JavaScript: ~2770 lines
+- Total: ~6690 lines
 
 **Backend**:
-- Google Apps Script: ~602 lines
+- Google Apps Script: ~925 lines
 
 **Documentation**:
 - README: ~250 lines
@@ -1272,7 +1042,7 @@ createDateCell(day, isOtherMonth, dateString, isToday, hasExpense, isSelected)
 5. **No Recurring Expenses**: Must enter manually each time
 6. **No Multi-Currency**: Single currency only
 7. **No Offline Mode**: Requires internet connection
-8. **No User Authentication**: No login/security
+8. **No per-user data isolation**: App uses allowlist-based Google Sign-In (secure), but all users share the same data sheet.
 9. **No Data Export**: Can't download as CSV/PDF
 10. **No Budget Alerts**: Budget tracking not implemented
 11. **No Expense Editing**: After save, can't change
@@ -1416,16 +1186,17 @@ const CONFIG = {
 
 ### Expense_Log Sheet Structure
 
-| A (Date) | B (Type) | C (Category) | D (Amount) | E (Notes) | F (Timestamp) |
-|----------|----------|-------------|-----------|-----------|---------------|
-| 2025-12-31 | Expense | Food | 250 | Lunch | 2025-12-31 14:30:00 |
-| 2025-12-31 | Income | Salary | 50000 | Monthly | 2025-12-31 09:00:00 |
+| A (ID) | B (Date) | C (Type) | D (Category) | E (Amount) | F (Notes) | G (Timestamp) | H (Status) |
+|--------|----------|----------|-------------|-----------|-----------|---------------|------------|
+| txn_171000234234_kd2 | 2025-12-31 | Expense | Food | 250 | Lunch | 2025-12-31 14:30:00 | ACTIVE |
+| txn_171000234235_abc | 2025-12-31 | Income | Salary | 50000 | Monthly | 2025-12-31 09:00:00 | ACTIVE |
 
 **Requirements**:
-- Header row must match exactly
+- Header row must match exactly (ID first, Status last)
 - Date format: YYYY-MM-DD
 - Amount: Numbers only (no currency symbols)
 - Timestamp: Auto-generated by backend
+- Status can be `ACTIVE` or `DELETED` (blank is treated as ACTIVE)
 
 ---
 
@@ -1492,19 +1263,20 @@ const CONFIG = {
 
 ---
 
-### Calendar Dots Not Appearing
+### Dashboard Data Not Updating
 
-**Symptoms**: Expenses saved but no red dots  
+**Symptoms**: Dashboard totals do not update after saving expenses or budgets.
+
 **Causes**:
-- getExpensesByMonth not implemented
-- Month fetch failing
-- Date format mismatch
+- API call failed (network or authorization)
+- Backend returned an error
+- Data format mismatch in the sheet
 
 **Solutions**:
-1. Check console for month fetch errors
-2. Verify date format in sheet (YYYY-MM-DD)
-3. Navigate away and back to month
-4. Refresh page
+1. Open browser console and check for API errors
+2. Ensure the signed-in email is allowlisted in the backend (`ALLOWED_USERS`)
+3. Verify date format in the sheet is `YYYY-MM-DD`
+4. Refresh the page after making sheet changes
 
 ---
 
@@ -1516,13 +1288,14 @@ const CONFIG = {
 # Get Categories
 curl -X POST "YOUR_DEPLOYMENT_URL" \
   -H "Content-Type: application/json" \
-  -d '{"action":"getCategories"}'
+  -d '{"action":"getCategories","userEmail":"you@example.com"}'
 
 # Save Expenses
 curl -X POST "YOUR_DEPLOYMENT_URL" \
   -H "Content-Type: application/json" \
   -d '{
     "action":"saveExpenses",
+    "userEmail":"you@example.com",
     "date":"2025-12-31",
     "expenses":[
       {"type":"Expense","category":"Food","amount":250,"notes":"Lunch"}
@@ -1532,12 +1305,28 @@ curl -X POST "YOUR_DEPLOYMENT_URL" \
 # Get Expenses for Date
 curl -X POST "YOUR_DEPLOYMENT_URL" \
   -H "Content-Type: application/json" \
-  -d '{"action":"getExpenses","date":"2025-12-31"}'
+  -d '{"action":"getExpenses","userEmail":"you@example.com","date":"2025-12-31"}'
 
 # Get Expenses for Month
 curl -X POST "YOUR_DEPLOYMENT_URL" \
   -H "Content-Type: application/json" \
-  -d '{"action":"getExpensesByMonth","year":2025,"month":12}'
+  -d '{"action":"getExpensesByMonth","userEmail":"you@example.com","year":2025,"month":12}'
+
+# Get Monthly Budget
+curl -X POST "YOUR_DEPLOYMENT_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"getMonthlyBudget","userEmail":"you@example.com","year":2025,"month":12}'
+
+# Save Budget
+curl -X POST "YOUR_DEPLOYMENT_URL" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action":"saveBudget",
+    "userEmail":"you@example.com",
+    "budgets":[
+      {"category":"Food","type":"Expense","monthlyBudget":5000,"yearlyBudget":60000}
+    ]
+  }'
 ```
 
 ---
