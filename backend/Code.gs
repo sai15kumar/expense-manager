@@ -292,6 +292,9 @@ function doPost(e) {
             case 'deleteExpense':
                 response = handleDeleteExpense(data);
                 break;
+            case 'updateExpense':
+                response = handleUpdateExpense(data);
+                break;
             case 'migrateExpenseLog':
                 response = handleMigrateExpenseLog();
                 break;
@@ -564,6 +567,13 @@ function handleSaveExpenses(data) {
             });
         }
         
+        // Clear cached dashboard so next request reads the latest data
+        const savedDate = formatDateToString(data.date);
+        const [savedYear, savedMonth] = savedDate.split('-').map(Number);
+        if (savedYear && savedMonth) {
+            clearDashboardCache(savedYear, savedMonth);
+        }
+
         return {
             success: true,
             message: `Saved ${savedCount} expenses`,
@@ -870,7 +880,79 @@ function handleGetDashboardData(data) {
  * @param {number} month
  * @returns {Object}
  */
+// Cache key prefix for dashboard data
+const DASHBOARD_CACHE_PREFIX = 'dashboard_';
+
+/**
+ * Generate a cache key for a specific year/month combination.
+ * @param {number} year
+ * @param {number} month
+ * @returns {string}
+ */
+function getDashboardCacheKey(year, month) {
+    const monthStr = String(month).padStart(2, '0');
+    return `${DASHBOARD_CACHE_PREFIX}${year}_${monthStr}`;
+}
+
+/**
+ * Get cached dashboard payload for the given month/year.
+ * @param {number} year
+ * @param {number} month
+ * @returns {Object|null}
+ */
+function getDashboardCache(year, month) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const key = getDashboardCacheKey(year, month);
+        const cached = cache.get(key);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+    } catch (error) {
+        console.warn('getDashboardCache: failed to read cache', error);
+    }
+    return null;
+}
+
+/**
+ * Store dashboard payload in cache for a short duration.
+ * @param {number} year
+ * @param {number} month
+ * @param {Object} data
+ */
+function setDashboardCache(year, month, data) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const key = getDashboardCacheKey(year, month);
+        cache.put(key, JSON.stringify(data), 45); // 45 seconds
+    } catch (error) {
+        console.warn('setDashboardCache: failed to write cache', error);
+    }
+}
+
+/**
+ * Clear cached dashboard data for a given year/month.
+ * @param {number} year
+ * @param {number} month
+ */
+function clearDashboardCache(year, month) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const key = getDashboardCacheKey(year, month);
+        cache.remove(key);
+    } catch (error) {
+        console.warn('clearDashboardCache: failed to remove cache', error);
+    }
+}
+
 function getDashboardData(year, month) {
+    // Attempt to return cached dashboard data first
+    const cached = getDashboardCache(year, month);
+    if (cached) {
+        console.log(`getDashboardData: cache hit for ${year}-${String(month).padStart(2, '0')}`);
+        return cached;
+    }
+
     const ss = SpreadsheetApp.openById(SHEET_ID);
 
     // Read master sheet and expense log sheet in one go
@@ -887,9 +969,13 @@ function getDashboardData(year, month) {
         };
     }
 
-    // Read all rows once per sheet
+    // Read all rows once per sheet (only required columns for log sheet)
     const masterValues = masterSheet.getDataRange().getValues();
-    const logValues = logSheet.getDataRange().getValues();
+
+    const lastRow = logSheet.getLastRow();
+    const logValues = lastRow > 1
+        ? logSheet.getRange(2, 1, lastRow - 1, COLUMNS.expenseLog.STATUS).getValues()
+        : [];
 
     // Build categories list and budget totals
     const categories = [];
@@ -919,11 +1005,14 @@ function getDashboardData(year, month) {
 
     // Build expenses by date for requested month
     const expensesByDate = {};
-    for (let i = 1; i < logValues.length; i++) {
+    for (let i = 0; i < logValues.length; i++) {
         const row = logValues[i];
+
+        // Skip deleted rows early
         const status = (row[COLUMNS.expenseLog.STATUS - 1] || '').toString().trim().toUpperCase();
         if (status === 'DELETED') continue;
 
+        // Only parse dates for rows in the requested month/year
         const rowDate = row[COLUMNS.expenseLog.DATE - 1];
         const dateString = formatDateToString(rowDate);
         if (!dateString) continue;
@@ -945,12 +1034,17 @@ function getDashboardData(year, month) {
         expensesByDate[dateString].push(expense);
     }
 
-    return {
+    const response = {
         success: true,
         categories,
         budget,
         expensesByDate
     };
+
+    // Cache dashboard result for a short time to reduce sheet reads
+    setDashboardCache(year, month, response);
+
+    return response;
 }
 
 function handleGetMonthlyBudget(data) {
@@ -1133,7 +1227,17 @@ function handleDeleteExpense(data) {
         for (let i = 1; i < values.length; i++) {
             const rowId = (values[i][COLUMNS.expenseLog.ID - 1] || '').toString();
             if (rowId === targetId) {
+                // Determine which month/year this row belongs to, so we can clear cache
+                const rowDate = values[i][COLUMNS.expenseLog.DATE - 1];
+                const dateString = formatDateToString(rowDate);
+                const [rowYear, rowMonth] = dateString.split('-').map(Number);
+
                 logSheet.getRange(i + 1, COLUMNS.expenseLog.STATUS).setValue('DELETED');
+
+                if (rowYear && rowMonth) {
+                    clearDashboardCache(rowYear, rowMonth);
+                }
+
                 return {
                     success: true
                 };
@@ -1150,6 +1254,91 @@ function handleDeleteExpense(data) {
             success: false,
             message: error.message
         };
+    }
+}
+
+/**
+ * Handle UPDATE EXPENSE action
+ * Updates an existing expense row and clears cached dashboard data for affected month(s).
+ *
+ * @param {Object} data - Request data containing:
+ *   - id: transaction ID (required)
+ *   - date: optional new date (YYYY-MM-DD)
+ *   - type: optional new type
+ *   - category: optional new category
+ *   - amount: optional new amount
+ *   - notes: optional new notes
+ *
+ * @returns {Object}
+ */
+function handleUpdateExpense(data) {
+    try {
+        data = data || {};
+        if (!data.id) {
+            return { success: false, message: 'Missing required field: id' };
+        }
+
+        const ss = SpreadsheetApp.openById(SHEET_ID);
+        const logSheet = ss.getSheetByName(SHEET_NAMES.EXPENSE_LOG);
+
+        if (!logSheet) {
+            return {
+                success: false,
+                message: `Sheet ${SHEET_NAMES.EXPENSE_LOG} not found`
+            };
+        }
+
+        const values = logSheet.getDataRange().getValues();
+        const targetId = data.id.toString();
+
+        let clearedMonths = new Set();
+
+        for (let i = 1; i < values.length; i++) {
+            const rowId = (values[i][COLUMNS.expenseLog.ID - 1] || '').toString();
+            if (rowId !== targetId) continue;
+
+            const originalDate = formatDateToString(values[i][COLUMNS.expenseLog.DATE - 1]);
+            const [origYear, origMonth] = originalDate.split('-').map(Number);
+            if (origYear && origMonth) {
+                clearedMonths.add(`${origYear}_${origMonth}`);
+            }
+
+            // Apply updates
+            if (data.date) {
+                logSheet.getRange(i + 1, COLUMNS.expenseLog.DATE).setValue(data.date);
+            }
+            if (data.type) {
+                logSheet.getRange(i + 1, COLUMNS.expenseLog.TYPE).setValue(data.type);
+            }
+            if (data.category) {
+                logSheet.getRange(i + 1, COLUMNS.expenseLog.CATEGORY).setValue(data.category);
+            }
+            if (data.amount !== undefined && data.amount !== null) {
+                logSheet.getRange(i + 1, COLUMNS.expenseLog.AMOUNT).setValue(parseFloat(data.amount));
+            }
+            if (data.notes !== undefined) {
+                logSheet.getRange(i + 1, COLUMNS.expenseLog.NOTES).setValue(data.notes);
+            }
+
+            const newDate = formatDateToString(data.date || originalDate);
+            const [newYear, newMonth] = newDate.split('-').map(Number);
+            if (newYear && newMonth) {
+                clearedMonths.add(`${newYear}_${newMonth}`);
+            }
+
+            // Clear caches for affected months
+            clearedMonths.forEach(key => {
+                const [y, m] = key.split('_').map(Number);
+                clearDashboardCache(y, m);
+            });
+
+            return { success: true };
+        }
+
+        return { success: false, message: `Expense ID not found: ${targetId}` };
+    } catch (error) {
+        console.error(`Error updating expense: ${error.message}`);
+        return { success: false, message: error.message };
     }
 }
 
