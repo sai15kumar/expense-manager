@@ -7,7 +7,7 @@
 // ====================================================
 
 const CONFIG = {
-     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbxvNxt-x9hHNg_f2K8iO6RGMI8Y-C1paSqMaUlmsTEZnhbQe851FQnO6b9npv_dQGAjhw/exec',
+     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbypePGKSfQdZBMaO9NfpzHJnDRIYZaCNuPDfburUEtK081JGrxUxVNWad2YSD2R4KvOMA/exec',
      MONTH_NAMES: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
      EXPENSE_ROWS: 5,
@@ -785,6 +785,60 @@ function getHomeTotals() {
     }
 
     return { totalExpense, totalIncome, totalSavings, totalPayoff };
+}
+
+/**
+ * Merge newly saved expenses into in-memory state and refresh the dashboard UI.
+ * This avoids an extra backend call after saving.
+ *
+ * @param {Object} expensesByDate - { [dateString]: Array<expense> }
+ */
+function mergeSavedExpensesIntoState(expensesByDate) {
+    if (!expensesByDate || typeof expensesByDate !== 'object') return;
+
+    if (!appState.homeExpensesByDate) {
+        appState.homeExpensesByDate = {};
+    }
+
+    Object.entries(expensesByDate).forEach(([date, expenses]) => {
+        if (!Array.isArray(expenses)) return;
+        if (!isDateInCurrentView(date)) return;
+
+        if (!appState.homeExpensesByDate[date]) {
+            appState.homeExpensesByDate[date] = [];
+        }
+        appState.homeExpensesByDate[date].push(...expenses);
+    });
+
+    if (appState.homeViewPeriod === 'year') {
+        calculateAndDisplayYearlySummary(appState.homeSelectedYear);
+    } else {
+        const { year, month } = appState.homeSelectedMonth || {};
+        calculateAndDisplayMonthlySummary(year, month);
+    }
+
+    renderHomeTransactionList();
+}
+
+/**
+ * Check whether a date belongs to the currently selected month/year view.
+ *
+ * @param {string} dateString - YYYY-MM-DD
+ * @returns {boolean}
+ */
+function isDateInCurrentView(dateString) {
+    if (!dateString) return false;
+    const parts = dateString.split('-').map(n => parseInt(n, 10));
+    if (parts.length < 2) return false;
+    const [year, month] = parts;
+    if (!year || !month) return false;
+
+    if (appState.homeViewPeriod === 'year') {
+        return year === appState.homeSelectedYear;
+    }
+
+    const selected = appState.homeSelectedMonth || {};
+    return year === selected.year && month === selected.month;
 }
 
 function normalizeText(value) {
@@ -2334,11 +2388,14 @@ async function saveExpensesByDate() {
         
         if (result.success) {
             showToast(`${expenses.length} expense(s) saved successfully`, 'success');
+
+            // Update local dashboard state so the new expense appears immediately
+            if (result.savedExpenses && result.savedExpenses.length) {
+                mergeSavedExpensesIntoState({ [date]: result.savedExpenses });
+            }
+
             setTimeout(() => {
                 resetAddScreen();
-                if (appState.homeSelectedMonth) {
-                    loadHomeData();
-                }
             }, 1500);
         } else {
             showToast('Failed to save. Please try again.', 'error');
@@ -2438,6 +2495,9 @@ async function saveExpensesByCategory() {
             });
         });
         
+        // Store saved items by date so we can update state without reloading
+        const savedByDate = {};
+        
         // Send each date's expenses separately to API
         let totalSaved = 0;
         for (const [date, dateExpenses] of Object.entries(expensesByDate)) {
@@ -2459,17 +2519,25 @@ async function saveExpensesByCategory() {
             
             if (result.success) {
                 totalSaved += dateExpenses.length;
+
+                if (result.savedExpenses && Array.isArray(result.savedExpenses)) {
+                    if (!savedByDate[date]) {
+                        savedByDate[date] = [];
+                    }
+                    savedByDate[date].push(...result.savedExpenses);
+                }
             } else {
                 throw new Error(`Failed to save for date ${date}`);
             }
         }
         
         showToast(`${totalSaved} expense(s) saved successfully`, 'success');
+
+        // Update local dashboard state so the new expenses appear immediately
+        mergeSavedExpensesIntoState(savedByDate);
+
         setTimeout(() => {
             resetAddScreen();
-            if (appState.homeSelectedMonth) {
-                loadHomeData();
-            }
         }, 1500);
     } catch (error) {
         console.error('[ADD_SCREEN] Error saving expenses by category:', error);
@@ -2581,11 +2649,13 @@ async function saveMonthly() {
         
         if (result.success) {
             showToast(`${transactions.length} transaction(s) saved successfully`, 'success');
+
+            if (result.savedExpenses && result.savedExpenses.length) {
+                mergeSavedExpensesIntoState({ [date]: result.savedExpenses });
+            }
+
             setTimeout(() => {
                 resetAddScreen();
-                if (appState.homeSelectedMonth) {
-                    loadHomeData();
-                }
             }, 1500);
         } else {
             showToast('Failed to save. Please try again.', 'error');

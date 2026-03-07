@@ -529,6 +529,7 @@ function handleSaveExpenses(data) {
         }
         
         let savedCount = 0;
+        const savedExpenses = [];
         const now = new Date();
         
         // Save each expense to the sheet
@@ -551,12 +552,24 @@ function handleSaveExpenses(data) {
 
             logSheet.appendRow(row);
             savedCount++;
+
+            savedExpenses.push({
+                id: id,
+                type: expense.type || 'Expense',
+                category: expense.category,
+                amount: parseFloat(expense.amount),
+                notes: expense.notes || '',
+                timestamp: now.toISOString(),
+                status: 'ACTIVE'
+            });
         }
         
         return {
             success: true,
             message: `Saved ${savedCount} expenses`,
-            count: savedCount
+            count: savedCount,
+            date: data.date,
+            savedExpenses: savedExpenses
         };
         
     } catch (error) {
