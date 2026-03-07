@@ -1152,53 +1152,6 @@ function renderMonthlyTransactionList(year, month) {
 
     const hasFilter = selectedType !== 'all';
 
-    // Group by date (already newest-first list); grouping keeps order
-    const groupsMap = new Map();
-    filteredTransactions.forEach(txn => {
-        if (!groupsMap.has(txn.date)) {
-            groupsMap.set(txn.date, []);
-        }
-        groupsMap.get(txn.date).push(txn);
-    });
-
-    const grouped = Array.from(groupsMap.entries()).sort((a, b) => new Date(b[0]) - new Date(a[0]));
-    grouped.forEach(([, arr]) => arr.sort((a, b) => new Date(b.date) - new Date(a.date)));
-
-    // Helper: aggregate transactions by category (per date) and retain details
-    const aggregateByCategory = (items) => {
-        const map = new Map();
-        items.forEach(txn => {
-            const key = `${txn.typeKey}|||${txn.category}`;
-            if (!map.has(key)) {
-                map.set(key, {
-                    ...txn,
-                    amount: 0,
-                    _notes: [],
-                    transactions: []
-                });
-            }
-            const agg = map.get(key);
-            agg.amount += txn.amount;
-            if (txn.notes && txn.notes.trim()) {
-                agg._notes.push(txn.notes.trim());
-            }
-            agg.transactions.push({
-                id: txn.id || txn.ID || '',
-                amount: txn.amount,
-                notes: txn.notes,
-                category: txn.category,
-                date: txn.date,
-                type: txn.type,
-                typeKey: txn.typeKey
-            });
-        });
-        return Array.from(map.values()).map(agg => ({
-            ...agg,
-            id: (agg.transactions && agg.transactions.length > 0) ? agg.transactions[0].id : '',
-            notes: agg._notes.join(' • ')
-        }));
-    };
-
     // Render
     if (filteredTransactions.length === 0) {
         const emptyScope = appState.homeViewPeriod === 'year' ? 'year' : 'month';
@@ -1209,97 +1162,38 @@ function renderMonthlyTransactionList(year, month) {
             </div>
         `;
     } else {
-        listContainer.innerHTML = grouped.map(([date, items]) => {
-            const aggregatedItems = aggregateByCategory(items);
-            const today = new Date();
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const txnDate = new Date(date);
-            
-            let dateLabel;
-            if (txnDate.toDateString() === today.toDateString()) {
-                dateLabel = 'Today';
-            } else if (txnDate.toDateString() === yesterday.toDateString()) {
-                dateLabel = 'Yesterday';
-            } else {
-                dateLabel = formatDateForDisplay(date);
-            }
-            
-            const count = aggregatedItems.length;
-            const countLabel = count === 1 ? '1 Transaction' : `${count} Transactions`;
-            
-            const rows = aggregatedItems.map(txn => {
-                const icon = getCategoryIcon(txn.category, txn.type);
-                const notes = txn.notes ? txn.notes.trim() : '';
-                const hasDetails = txn.transactions && txn.transactions.length > 1;
-                const isDisabled = txn.transactions && txn.transactions.length === 1;
-                const detailRows = hasDetails ? txn.transactions.map((detail, idx) => {
-                    const detailNotes = detail.notes && detail.notes.trim() ? `<div class="txn-detail-notes">${detail.notes.trim()}</div>` : '';
-                    const entryLabel = `Entry ${idx + 1}`;
-                    return `
-                        <div class="txn-detail-row">
-                            <div class="detail-left">
-                                <span class="detail-date">${entryLabel}</span>
-                                ${detailNotes}
-                            </div>
-                            <div class="detail-meta">
-                                <span class="detail-amount">₹${detail.amount.toFixed(2)}</span>
-                                <button class="delete-btn" type="button" data-id="${detail.id}" title="Delete expense">🗑</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('') : '';
+        listContainer.innerHTML = filteredTransactions.map(txn => {
+            const icon = getCategoryIcon(txn.category, txn.type);
+            const notes = txn.notes ? txn.notes.trim() : '';
+            const dateLabel = formatDateForDisplay(txn.date);
+            const deleteBtnHtml = txn.id ? `<button class="delete-btn" type="button" data-id="${txn.id}" title="Delete expense">🗑</button>` : '';
 
-                const detailListHtml = hasDetails ? `
-                    <div class="txn-detail-list">
-                        ${detailRows}
-                    </div>
-                ` : '';
-
-                const notesHtml = notes ? `
-                            <div class="txn-details">
-                                <span class="txn-notes-display">${notes}</span>
-                            </div>` : '';
-                const expandIcon = `
-                        <div class="txn-expand-icon${isDisabled ? ' disabled' : ''}${hasDetails ? '' : ' disabled'}">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </div>
-                `;
-                const deleteBtnHtml = txn.id ? `<button class="delete-btn" type="button" data-id="${txn.id}" title="Delete expense">🗑</button>` : '';
-                return `
-                    <div class="txn-row${hasDetails ? ' expandable' : ''}" data-type="${txn.typeKey}">
-                        <div class="txn-row-header">
-                            <div class="txn-icon">${icon}</div>
-                            <div class="txn-main">
-                                <div class="txn-title">${txn.category}</div>${notesHtml}
-                            </div>
-                            <div class="txn-meta">
-                                <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
-                        <div class="transaction-actions">
-                            <span class="amount">₹${txn.amount.toFixed(2)}</span>
-                            ${deleteBtnHtml}
-                        </div>
-                        </div>
-                        ${detailListHtml}
-                    </div>
-                `;
-            }).join('');
+            const notesHtml = notes ? `
+                <div class="txn-details">
+                    <span class="txn-notes-display">${notes}</span>
+                </div>` : '';
 
             return `
-                <div class="txn-date-group">
-                    <div class="txn-date-header">
-                        <span class="txn-date-label">${dateLabel}</span>
-                        <span class="txn-count">${countLabel}</span>
+                <div class="txn-row" data-type="${txn.typeKey}">
+                    <div class="txn-row-header">
+                        <div class="txn-icon">${icon}</div>
+                        <div class="txn-main">
+                            <div class="txn-title">${txn.category}</div>
+                            <div class="txn-subtitle">${dateLabel}</div>
+                            ${notesHtml}
+                        </div>
+                        <div class="txn-meta">
+                            <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
+                            <div class="transaction-actions">
+                                <span class="amount">₹${txn.amount.toFixed(2)}</span>
+                                ${deleteBtnHtml}
+                            </div>
+                        </div>
                     </div>
-                    ${rows}
                 </div>
             `;
         }).join('');
 
-        // Enable per-category expansion within each date group
-        setupTransactionExpansion();
         setupTransactionDeleteButtons();
     }
 }
