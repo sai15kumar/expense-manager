@@ -14,13 +14,43 @@
 const SHEET_ID = '1yeXItfT47WxpcYCff-F8uBWeMIuvN52PrGl1B4AmaFc';
 
 /**
- * Allowed user emails for API access
- * Only these users can call the backend APIs
+ * Default allowed user emails for API access.
+ * These are used only if no override is set in the script properties.
  */
-const ALLOWED_USERS = [
+const DEFAULT_ALLOWED_USERS = [
   "sai15kumar@gmail.com",
   "rubijohn88@gmail.com"
 ];
+
+/**
+ * Get the configured allowlist for API access.
+ * Uses script properties so it can be updated without redeploying.
+ *
+ * Stored in Script Properties as a comma-separated string under key: ALLOWED_USERS
+ * Example: "a@x.com,b@y.com"
+ *
+ * @returns {string[]}
+ */
+function getAllowedUsers() {
+  let allowed = DEFAULT_ALLOWED_USERS;
+  try {
+    const stored = PropertiesService.getScriptProperties().getProperty('ALLOWED_USERS');
+    if (stored) {
+      const parsed = stored
+        .toString()
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (parsed.length) {
+        allowed = parsed;
+      }
+    }
+  } catch (e) {
+    // Ignore if properties service is not available or if parsing fails
+    Logger.log('getAllowedUsers: failed to read script properties: ' + e);
+  }
+  return allowed;
+}
 
 /**
  * Check if a user email is authorized
@@ -28,7 +58,8 @@ const ALLOWED_USERS = [
  * @returns {boolean} - True if authorized
  */
 function isAuthorized(email) {
-  return ALLOWED_USERS.includes(email);
+  const allowed = getAllowedUsers();
+  return allowed.includes(email);
 }
 
 /**
@@ -264,6 +295,12 @@ function doPost(e) {
             case 'migrateExpenseLog':
                 response = handleMigrateExpenseLog();
                 break;
+            case 'setAllowedUsers':
+                response = handleSetAllowedUsers(data);
+                break;
+            case 'getAllowedUsers':
+                response = handleGetAllowedUsers();
+                break;
             default:
                 response = {
                     success: false,
@@ -408,6 +445,51 @@ function handleGetCategories() {
             message: error.message
         };
     }
+}
+
+/**
+ * Handle SET ALLOWED USERS action
+ * Allows updating the allowlist saved in Script Properties.
+ * This enables adding/removing authorized emails without redeploying.
+ *
+ * @param {Object} data - Request data containing:
+ *   - emails: string or array of strings (email addresses)
+ * @returns {Object} - Response indicating success and current allowlist
+ */
+function handleSetAllowedUsers(data) {
+    try {
+        if (!data || !data.emails) {
+            return { success: false, message: 'Missing emails' };
+        }
+
+        const emails = Array.isArray(data.emails)
+            ? data.emails
+            : String(data.emails).split(',');
+
+        const normalized = emails
+            .map(e => (e || '').toString().trim())
+            .filter(Boolean);
+
+        if (!normalized.length) {
+            return { success: false, message: 'No valid email addresses provided' };
+        }
+
+        PropertiesService.getScriptProperties().setProperty('ALLOWED_USERS', normalized.join(','));
+        return { success: true, allowedUsers: normalized };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+}
+
+/**
+ * Handle GET ALLOWED USERS action
+ * Returns the current allowlist (from script properties or defaults)
+ */
+function handleGetAllowedUsers() {
+    return {
+        success: true,
+        allowedUsers: getAllowedUsers()
+    };
 }
 
 /**
