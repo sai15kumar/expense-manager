@@ -1358,7 +1358,6 @@ function initializeAppAfterAuth() {
     setupPageNavigation();
     setupFAB();
     setupLogout();
-    fetchCategories().catch(err => console.error('[APP] Failed to load categories:', err));
     hideLoading();
 
     authedAppInitialized = true;
