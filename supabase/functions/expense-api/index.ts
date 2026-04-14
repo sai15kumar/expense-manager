@@ -109,6 +109,47 @@ async function isAllowedUser(supabase: ReturnType<typeof createClient>, email: s
   return !!data;
 }
 
+function buildCategoryGroups(rows: Array<Record<string, unknown>>) {
+  const grouped: Record<string, Array<{ category: string; details: string[] }>> = {
+    Expense: [],
+    Income: [],
+    Savings: [],
+    Payoff: []
+  };
+
+  const tempMap: Record<string, Map<string, Set<string>>> = {
+    Expense: new Map(),
+    Income: new Map(),
+    Savings: new Map(),
+    Payoff: new Map()
+  };
+
+  for (const row of rows || []) {
+    const type = normalizeType((row.type || '').toString());
+    const parent = (row.category || '').toString().trim();
+    const detail = (row.detail || '').toString().trim();
+
+    if (!parent || !(type in tempMap)) continue;
+
+    if (!tempMap[type].has(parent)) {
+      tempMap[type].set(parent, new Set());
+    }
+
+    if (detail) {
+      tempMap[type].get(parent)?.add(detail);
+    }
+  }
+
+  for (const type of Object.keys(tempMap)) {
+    grouped[type] = Array.from(tempMap[type].entries()).map(([category, details]) => ({
+      category,
+      details: Array.from(details)
+    }));
+  }
+
+  return grouped;
+}
+
 async function getCategories(supabase: ReturnType<typeof createClient>) {
   const { data, error } = await supabase
     .from('category_master')
@@ -119,15 +160,18 @@ async function getCategories(supabase: ReturnType<typeof createClient>) {
 
   if (error) throw error;
 
+  const categories = (data || []).map((row) => ({
+    name: (row.detail || row.category || '').toString().trim(),
+    type: normalizeType(row.type),
+    budget: Number(row.budget_monthly || 0),
+    parentCategory: (row.category || '').toString().trim(),
+    detail: (row.detail || '').toString().trim()
+  }));
+
   return {
     success: true,
-    categories: (data || []).map((row) => ({
-      name: (row.detail || row.category || '').toString().trim(),
-      type: normalizeType(row.type),
-      budget: Number(row.budget_monthly || 0),
-      parentCategory: (row.category || '').toString().trim(),
-      detail: (row.detail || '').toString().trim()
-    }))
+    categories,
+    categoryGroups: buildCategoryGroups((data || []) as Array<Record<string, unknown>>)
   };
 }
 
@@ -235,6 +279,7 @@ async function getDashboardData(supabase: ReturnType<typeof createClient>, paylo
   return {
     success: true,
     categories: categoriesResult.categories,
+    categoryGroups: categoriesResult.categoryGroups || {},
     budget: budgetResult.budget,
     expensesByDate: expensesResult.expensesByDate || {}
   };

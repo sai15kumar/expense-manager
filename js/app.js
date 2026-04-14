@@ -43,7 +43,8 @@ const storage = window.AUTH_STORAGE || sessionStorage;
  * Stores current month/year, selected date, and expenses data
  */
 let appState = {
-    categories: [], // [{name, type}]
+    categories: [], // [{name, type, parentCategory, detail}]
+    categoryGroups: { Expense: [], Income: [], Savings: [], Payoff: [] },
     categoryBudgets: {}, // {categoryKey: amount}
     homeSelectedMonth: null,
     homeSelectedYear: null,
@@ -167,6 +168,66 @@ async function deleteExpense(id) {
 /**
  * Fetch category metadata and budgets
  */
+function buildCategoryGroupsFromCategories(categories) {
+    const grouped = {
+        Expense: [],
+        Income: [],
+        Savings: [],
+        Payoff: []
+    };
+
+    const tempMap = {
+        Expense: new Map(),
+        Income: new Map(),
+        Savings: new Map(),
+        Payoff: new Map()
+    };
+
+    (categories || []).forEach((category) => {
+        const type = (category.type || '').toString().trim();
+        const parent = (category.parentCategory || category.name || '').toString().trim();
+        const detail = (category.detail || category.name || '').toString().trim();
+
+        if (!type || !parent || !(type in tempMap)) return;
+
+        if (!tempMap[type].has(parent)) {
+            tempMap[type].set(parent, new Set());
+        }
+
+        if (detail) {
+            tempMap[type].get(parent).add(detail);
+        }
+    });
+
+    Object.keys(tempMap).forEach((type) => {
+        grouped[type] = Array.from(tempMap[type].entries()).map(([category, details]) => ({
+            category,
+            details: Array.from(details)
+        }));
+    });
+
+    return grouped;
+}
+
+function applyCategoryResponse(result) {
+    const categories = Array.isArray(result?.categories) ? result.categories : [];
+    appState.categories = categories;
+
+    const budgetMap = {};
+    categories.forEach((category) => {
+        const name = (category.name || '').toString().trim();
+        const typeKey = (category.type || '').toString().trim().toLowerCase();
+        if (!name || !typeKey) return;
+        const categoryKey = `${name}|${typeKey}`;
+        budgetMap[categoryKey] = parseFloat(category.budget) || 0;
+    });
+    appState.categoryBudgets = budgetMap;
+
+    appState.categoryGroups = result?.categoryGroups && typeof result.categoryGroups === 'object'
+        ? result.categoryGroups
+        : buildCategoryGroupsFromCategories(categories);
+}
+
 async function fetchCategories() {
     try {
         const result = await callBackend({ action: 'getCategories' });
@@ -174,18 +235,7 @@ async function fetchCategories() {
         if (!checkApiAuthorization(result)) return;
 
         if (result.success && Array.isArray(result.categories)) {
-            appState.categories = result.categories;
-
-            // Build category budget lookup for summary views
-            const budgetMap = {};
-            result.categories.forEach((category) => {
-                const name = (category.name || '').toString().trim();
-                const typeKey = (category.type || '').toString().trim().toLowerCase();
-                if (!name || !typeKey) return;
-                const categoryKey = `${name}|${typeKey}`;
-                budgetMap[categoryKey] = parseFloat(category.budget) || 0;
-            });
-            appState.categoryBudgets = budgetMap;
+            applyCategoryResponse(result);
         } else {
             console.error('Failed to load categories:', result.message);
         }
@@ -610,7 +660,7 @@ async function loadHomeData() {
             if (!checkApiAuthorization(result)) return;
 
             if (result && result.success) {
-                appState.categories = Array.isArray(result.categories) ? result.categories : [];
+                applyCategoryResponse(result);
                 appState.monthlyBudget = result.budget || {
                     expense: 0,
                     income: 0,
