@@ -1,3387 +1,1571 @@
-/* ====================================================
-    EXPENSE MANAGER - VANILLA JAVASCRIPT APP
-    ==================================================== */
+﻿/* ============================================================
+   EXPENSE MANAGER — React App  (JSX via Babel Standalone)
+   React 18 UMD + Tailwind CDN
+   All 6 phases in one file.
+   ============================================================ */
 
-// ====================================================
-// CONFIGURATION & CONSTANTS
-// ====================================================
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
-const CONFIG = {
-     SUPABASE_URL: window.EXPENSE_SUPABASE_URL || '',
-     SUPABASE_ANON_KEY: window.EXPENSE_SUPABASE_ANON_KEY || '',
-     SUPABASE_FUNCTION_NAME: window.EXPENSE_SUPABASE_FUNCTION_NAME || 'expense-api',
-     MONTH_NAMES: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-     EXPENSE_ROWS: 5,
-     DATE_FORMAT: 'YYYY-MM-DD'
+// ── CONSTANTS ─────────────────────────────────────────────────────────────
+
+const TABS = ['Expense', 'Income', 'Savings', 'Payoff'];
+
+const TAB_LABEL = {
+  Expense: 'Expenses',
+  Income:  'Income',
+  Savings: 'Savings',
+  Payoff:  'Payoffs',
 };
 
-CONFIG.BACKEND_URL = CONFIG.SUPABASE_URL
-    ? `${CONFIG.SUPABASE_URL}/functions/v1/${CONFIG.SUPABASE_FUNCTION_NAME}`
-    : '';
-
-if (!CONFIG.BACKEND_URL) {
-    console.error('[CONFIG] Supabase configuration is missing. Check js/deployment-config.js.');
-}
-
-window.CONFIG = CONFIG;
-
-// Shared auth storage configuration
-const STORAGE_KEYS = window.AUTH_STORAGE_KEYS || {
-    idToken: 'expenseManager_idToken',
-    userEmail: 'expenseManager_userEmail',
-    userName: 'expenseManager_userName'
-};
-const storage = window.AUTH_STORAGE || sessionStorage;
-
-// ====================================================
-// STATE MANAGEMENT
-// ====================================================
-
-/**
- * Application state object
- * Stores current month/year, selected date, and expenses data
- */
-let appState = {
-    categories: [], // [{name, type, parentCategory, detail}]
-    categoryGroups: { Expense: [], Income: [], Savings: [], Payoff: [] },
-    categoryBudgets: {}, // {categoryKey: amount}
-    homeSelectedMonth: null,
-    homeSelectedYear: null,
-    homeExpensesByDate: {},
-    homeSelectedType: 'all',
-    homeViewMode: 'summary', // 'transactions' or 'summary'
-    homeViewPeriod: 'month', // 'month' or 'year'
-    expandedCategories: new Set(), // Track expanded category keys in summary view
-    monthlyBudget: {} // {expense: amount, income: amount, savings: amount, payoff: amount}
+const TYPE_COLOR = {
+  Expense: { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-100',    tab: 'border-red-500 text-red-600',    badge: 'bg-red-100 text-red-700'    },
+  Income:  { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-100',  tab: 'border-green-500 text-green-600',  badge: 'bg-green-100 text-green-700'  },
+  Savings: { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-100',   tab: 'border-blue-500 text-blue-600',   badge: 'bg-blue-100 text-blue-700'   },
+  Payoff:  { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-100',  tab: 'border-amber-500 text-amber-600',  badge: 'bg-amber-100 text-amber-700'  },
 };
 
-// ====================================================
-// DOM ELEMENT REFERENCES
-// ====================================================
+const MAX_QUICK_SLOTS  = 5;
+const QUICK_SLOTS_KEY  = 'expenseManager_quickSlots';
 
-// Calendar page removed; DOM lookups are performed inline where needed.
+// Emoji map — matched by lowercase sub-category name
+const CAT_EMOJI = {
+  'coffee': '☕', 'tea': '🍵', 'chai': '🍵',
+  'auto': '🛺', 'rickshaw': '🛺', 'autorickshaw': '🛺',
+  'cab': '🚕', 'taxi': '🚕', 'uber': '🚕', 'ola': '🚕',
+  'bus': '🚌', 'train': '🚆', 'metro': '🚇', 'bike': '🏍️',
+  'groceries': '🛒', 'grocery': '🛒', 'supermarket': '🛒',
+  'vegetables': '🥦', 'fruits': '🍎',
+  'dining': '🍽️', 'dining out': '🍽️', 'restaurant': '🍽️',
+  'food': '🍔', 'lunch': '🍱', 'dinner': '🍛', 'breakfast': '🥗',
+  'swiggy': '🍜', 'zomato': '🍜', 'takeaway': '🥡',
+  'petrol': '⛽', 'fuel': '⛽', 'diesel': '⛽',
+  'electricity': '⚡', 'power bill': '⚡', 'eb': '⚡',
+  'rent': '🏠', 'house': '🏠', 'maintenance': '🔧',
+  'shopping': '🛍️', 'clothes': '👗', 'clothing': '👗', 'amazon': '📦', 'flipkart': '📦',
+  'movie': '🎬', 'movies': '🎬', 'cinema': '🎬', 'entertainment': '🎭', 'ott': '📺',
+  'medical': '💊', 'medicine': '💊', 'doctor': '🏥', 'hospital': '🏥', 'pharmacy': '💊',
+  'gym': '💪', 'fitness': '💪', 'sports': '⚽',
+  'salary': '💰', 'income': '💰', 'freelance': '💻', 'bonus': '💰',
+  'savings': '🏦', 'investment': '📈', 'mutual fund': '📈', 'sip': '📈', 'fd': '🏦',
+  'emi': '💳', 'loan': '💳', 'credit card': '💳',
+  'internet': '📶', 'wifi': '📶', 'broadband': '📶',
+  'mobile': '📱', 'phone': '📱', 'recharge': '📱',
+  'travel': '✈️', 'flight': '✈️', 'hotel': '🏨', 'trip': '🗺️',
+  'education': '📚', 'school': '📚', 'fees': '📚', 'books': '📖',
+  'gift': '🎁', 'donation': '🤝', 'insurance': '🛡️',
+  'water': '💧', 'gas': '🔥',
+};
 
-// ====================================================
-// FETCH DATA FUNCTIONS (Backend API Calls)
-// ====================================================
-
-/**
- * Get the current Google ID token for authenticated API calls.
- * @returns {string|null} - ID token or null if not signed in
- */
-function getAuthToken() {
-    return storage.getItem(STORAGE_KEYS.idToken);
+function catEmoji(name) {
+  return CAT_EMOJI[(name || '').toLowerCase().trim()] || '📌';
 }
 
-/**
- * Get the current user's email address.
- * @returns {string|null} - User email or null if not signed in
- */
-function getUserEmail() {
-    return storage.getItem(STORAGE_KEYS.userEmail);
+function loadQuickSlots() {
+  try {
+    const raw = localStorage.getItem(QUICK_SLOTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
 }
 
-/**
- * Call the Supabase backend with a JSON payload.
- * @param {Object} payload - Request payload (must include action and userEmail)
- * @returns {Promise<Object>} - Parsed JSON response from backend
- */
+function persistQuickSlots(slots) {
+  try { localStorage.setItem(QUICK_SLOTS_KEY, JSON.stringify(slots)); } catch {}
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+
+let _rowId = 0;
+function uid() { return ++_rowId; }
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function currentMonthStr() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function makeRow(prevDate) {
+  return { _id: uid(), date: prevDate || todayStr(), subCategory: '', amount: '', notes: '' };
+}
+
+function initRows() {
+  const rows = [];
+  for (let i = 0; i < 5; i++) rows.push(makeRow(rows[i - 1]?.date));
+  return rows;
+}
+
+function fmt(n) {
+  if (n === null || n === undefined) return '₹0';
+  return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function parseMoney(s) {
+  const n = parseFloat(s);
+  return isNaN(n) || n < 0 ? 0 : n;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return new Date(+y, +m - 1, +d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function prevMonth(m) {
+  const [y, mo] = m.split('-').map(Number);
+  return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
+}
+
+function nextMonth(m) {
+  const [y, mo] = m.split('-').map(Number);
+  return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
+}
+
+function buildSubCatLookup(categoryGroups) {
+  const map = {};
+  Object.entries(categoryGroups).forEach(([type, groups]) => {
+    (groups || []).forEach(({ category, details }) => {
+      (details || []).forEach(det => { map[det] = { parentCategory: category, type }; });
+    });
+  });
+  return map;
+}
+
+function flattenExpensesByDate(expensesByDate) {
+  return Object.entries(expensesByDate || {}).flatMap(([date, exps]) =>
+    (exps || []).map(e => ({
+      id: e.id || String(uid()),
+      date: e.date || date,
+      type: e.type || 'Expense',
+      subCategory: e.detail || e.name || e.category || '',
+      amount: parseMoney(e.amount),
+      notes: e.notes || '',
+    }))
+  );
+}
+
+// ── BACKEND ────────────────────────────────────────────────────────────────
+
 async function callBackend(payload) {
-    const userEmail = getUserEmail();
-    const idToken = getAuthToken();
+  const storage = window.AUTH_STORAGE || sessionStorage;
+  const keys = window.AUTH_STORAGE_KEYS || {
+    idToken:   'expenseManager_idToken',
+    userEmail: 'expenseManager_userEmail',
+  };
+  const idToken   = storage.getItem(keys.idToken);
+  const userEmail = storage.getItem(keys.userEmail);
 
-    if (!CONFIG.BACKEND_URL) {
-        throw new Error('Supabase backend URL is not configured');
-    }
+  const url = `${window.EXPENSE_SUPABASE_URL}/functions/v1/${window.EXPENSE_SUPABASE_FUNCTION_NAME}`;
+  const headers = {
+    'Content-Type':  'application/json',
+    'X-Client-Info': 'expense-manager-react-v7',
+  };
+  if (window.EXPENSE_SUPABASE_ANON_KEY) headers['apikey'] = window.EXPENSE_SUPABASE_ANON_KEY;
+  if (idToken)   headers['X-Google-Id-Token'] = idToken;
+  if (userEmail) { headers['X-User-Email'] = userEmail; payload = { ...payload, userEmail }; }
 
-    if (userEmail) {
-        payload.userEmail = userEmail;
-        console.log('[API] Sending request with userEmail:', userEmail, 'action:', payload.action, 'provider: supabase', 'url:', CONFIG.BACKEND_URL, 'build:', window.EXPENSE_BUILD_VERSION || 'unknown');
-    } else {
-        console.warn('[API] WARNING: No userEmail found in storage');
-    }
-
-    const requestOptions = {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Client-Info': 'expense-manager-web'
-        },
-        body: JSON.stringify(payload)
-    };
-
-    if (CONFIG.SUPABASE_ANON_KEY) {
-        requestOptions.headers.apikey = CONFIG.SUPABASE_ANON_KEY;
-    }
-
-    // Keep Google Identity separate from Supabase auth. The Edge Function validates
-    // the Google token itself, so we do not send the publishable key as a Bearer token.
-    if (idToken) {
-        requestOptions.headers['X-Google-Id-Token'] = idToken;
-    }
-
-    if (userEmail) {
-        requestOptions.headers['X-User-Email'] = userEmail;
-    }
-
-    const response = await fetch(CONFIG.BACKEND_URL, requestOptions);
-    return await response.json();
+  const resp = await fetch(url, {
+    method:  'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  return resp.json();
 }
 
-/**
- * Delete a transaction by ID (soft delete via backend)
- * @param {string} id - Transaction ID
- */
-async function deleteExpense(id) {
-    if (!id) {
-        console.warn('[DELETE] Missing id');
-        return false;
-    }
+// ── LOADING OVERLAY (DOM bridge for loading state) ─────────────────────────
 
-    // Confirmation dialog
-    const confirmed = window.confirm('Delete this expense?');
-    if (!confirmed) return false;
-
-    console.log('[DELETE] Attempting delete for id:', id);
-
-    try {
-        const result = await callBackend({ action: 'deleteExpense', id });
-        console.log('[DELETE] API response:', result);
-        if (!checkApiAuthorization(result)) return false;
-
-        if (result && result.success) {
-            showToast('Expense deleted', 'success');
-            await loadHomeData();
-            return true;
-        }
-
-        showToast(result.message || 'Failed to delete expense', 'error');
-        return false;
-    } catch (error) {
-        console.error('[DELETE] Error deleting expense:', error);
-        showToast('Failed to delete expense', 'error');
-        return false;
-    }
+function setLoadingOverlay(show) {
+  const el = document.getElementById('loadingOverlay');
+  if (!el) return;
+  if (show) el.classList.remove('hidden');
+  else      el.classList.add('hidden');
 }
 
-/**
- * Fetch category metadata and budgets
- */
-function buildCategoryGroupsFromCategories(categories) {
-    const grouped = {
-        Expense: [],
-        Income: [],
-        Savings: [],
-        Payoff: []
-    };
+// ── COMPONENTS ─────────────────────────────────────────────────────────────
 
-    const tempMap = {
-        Expense: new Map(),
-        Income: new Map(),
-        Savings: new Map(),
-        Payoff: new Map()
-    };
+// Toast — React-managed (separate from auth.js #toast)
+function AppToast({ toast, onClear }) {
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(onClear, 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-    (categories || []).forEach((category) => {
-        const type = (category.type || '').toString().trim();
-        const parent = (category.parentCategory || category.name || '').toString().trim();
-        const detail = (category.detail || category.name || '').toString().trim();
-
-        if (!type || !parent || !(type in tempMap)) return;
-
-        if (!tempMap[type].has(parent)) {
-            tempMap[type].set(parent, new Set());
-        }
-
-        if (detail) {
-            tempMap[type].get(parent).add(detail);
-        }
-    });
-
-    Object.keys(tempMap).forEach((type) => {
-        grouped[type] = Array.from(tempMap[type].entries()).map(([category, details]) => ({
-            category,
-            details: Array.from(details)
-        }));
-    });
-
-    return grouped;
+  if (!toast) return null;
+  const bg = toast.type === 'error' ? 'bg-red-600' : 'bg-green-600';
+  return (
+    <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2 rounded-md shadow-lg text-white text-sm font-medium ${bg} transition-opacity`}>
+      {toast.msg}
+    </div>
+  );
 }
 
-function applyCategoryResponse(result) {
-    const categories = Array.isArray(result?.categories) ? result.categories : [];
-    appState.categories = categories;
-
-    const budgetMap = {};
-    categories.forEach((category) => {
-        const name = (category.name || '').toString().trim();
-        const typeKey = (category.type || '').toString().trim().toLowerCase();
-        if (!name || !typeKey) return;
-        const categoryKey = `${name}|${typeKey}`;
-        budgetMap[categoryKey] = parseFloat(category.budget) || 0;
-    });
-    appState.categoryBudgets = budgetMap;
-
-    appState.categoryGroups = result?.categoryGroups && typeof result.categoryGroups === 'object'
-        ? result.categoryGroups
-        : buildCategoryGroupsFromCategories(categories);
-}
-
-async function fetchCategories() {
-    try {
-        const result = await callBackend({ action: 'getCategories' });
-
-        if (!checkApiAuthorization(result)) return;
-
-        if (result.success && Array.isArray(result.categories)) {
-            applyCategoryResponse(result);
-        } else {
-            console.error('Failed to load categories:', result.message);
-        }
-    } catch (error) {
-        console.error('Error fetching categories:', error);
-    }
-}
-
-// ====================================================
-// UTILITY FUNCTIONS
-// ====================================================
-
-/**
- * Show loading overlay
- */
-function showLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.classList.remove('hidden');
-    }
-}
-
-/**
- * Hide loading overlay
- */
-function hideLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.classList.add('hidden');
-    }
-}
-
-/**
- * Guard against unauthorized API responses and trigger auth flow
- * @param {Object} result - API response payload
- * @returns {boolean} - True if authorized, false if blocked
- */
-function checkApiAuthorization(result) {
-    const isUnauthorized = !result || result.error === 'UNAUTHORIZED' || result.success === false && result.error === 'UNAUTHORIZED';
-    if (!isUnauthorized) return true;
-
-    if (window.appAuth && typeof window.appAuth.handleUnauthorized === 'function') {
-        window.appAuth.handleUnauthorized('Access denied. Please sign in again.');
-    }
-    return false;
-}
-
-/**
- * Format date object to string (YYYY-MM-DD)
- * @param {Date} dateObj - Date object to format
- * @returns {string} - Formatted date string
- */
-function formatDateToString(dateObj) {
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-/**
- * Format date string for user display
- * @param {string} dateString - Date in YYYY-MM-DD format
- * @returns {string} - Formatted for display (e.g., "Tuesday, Dec 30, 2025")
- */
-function formatDateForDisplay(dateString) {
-    const [year, month, day] = dateString.split('-');
-    const dateObj = new Date(year, parseInt(month) - 1, day);
-    const options = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
-    return dateObj.toLocaleDateString('en-US', options);
-}
-
-/**
- * Get icon emoji for category
- * @param {string} category - Category name
- * @param {string} type - Transaction type
- * @returns {string} - Emoji icon
- */
-function getCategoryIcon(category, type) {
-    const icons = {
-        // Common categories
-        'Food': '🍽️',
-        'Transport': '🚗',
-        'Shopping': '🛒',
-        'Entertainment': '🎬',
-        'Bills': '📄',
-        'Health': '⚕️',
-        'Education': '📚',
-        'Groceries': '🛒',
-        'Dining': '🍽️',
-        'Travel': '✈️',
-        'Salary': '💰',
-        'Investment': '📈',
-        'Gift': '🎁',
-        'Rent': '🏠',
-        'Utilities': '💡',
-        'Insurance': '🛡️',
-        'Subscription': '📱',
-        'Savings': '🏦',
-        'Payoff': '💳'
-    };
-    
-    // Match by category first
-    for (const [key, icon] of Object.entries(icons)) {
-        if (category.toLowerCase().includes(key.toLowerCase())) {
-            return icon;
-        }
-    }
-    
-    // Fallback by type
-    const typeKey = (type || '').toLowerCase();
-    if (typeKey === 'income') return '💰';
-    if (typeKey === 'expense') return '💸';
-    if (typeKey === 'savings') return '🏦';
-    if (typeKey === 'payoff') return '💳';
-    
-    return '📊';
-}
-
-/**
- * Fetch expenses for an entire month
- * (For future feature: monthly summary)
- * @param {number} year - Year
- * @param {number} month - Month (1-12)
- */
-// REMOVED - using the new async version without parameters instead
-
-// ====================================================
-// HOME PAGE FUNCTIONS (MONTHLY OVERVIEW)
-// ====================================================
-
-/**
- * Initialize Home Page state and elements
- */
-function initializeHomePage() {
-    // Set initial month to current month
-    const now = new Date();
-    appState.homeSelectedMonth = {
-        year: now.getFullYear(),
-        month: now.getMonth() + 1 // 1-12
-    };
-    appState.homeSelectedYear = now.getFullYear();
-    
-    // Setup event listeners
-    const homePrevBtn = document.getElementById('homePrevMonth');
-    const homeNextBtn = document.getElementById('homeNextMonth');
-    const homeMonthPicker = document.getElementById('homeMonthPicker');
-    const homeYearPicker = document.getElementById('homeYearPicker');
-    const homeAddBtn = document.getElementById('homeAddBtn');
-    
-    if (homePrevBtn) homePrevBtn.addEventListener('click', () => changeHomeMonth(-1));
-    if (homeNextBtn) homeNextBtn.addEventListener('click', () => changeHomeMonth(1));
-    if (homeMonthPicker) homeMonthPicker.addEventListener('change', handleMonthPickerChange);
-    if (homeYearPicker) homeYearPicker.addEventListener('change', handleYearPickerChange);
-    if (homeAddBtn) homeAddBtn.addEventListener('click', navigateToAddExpense);
-
-    // Enable summary cards as filter toggles
-    setupHomeSummaryFilters();
-    
-    // Setup view toggle buttons
-    setupViewToggle();
-
-    // Setup period toggle buttons
-    setupHomePeriodToggle();
-    
-    // Set initial picker value
-    updateMonthPicker();
-    updateYearPicker();
-    updateHomePeriodUI();
-    
-    // Load Home data
-    loadHomeData();
-}
-
-/**
- * Setup click/keyboard handlers for summary cards to filter transactions
- */
-function setupHomeSummaryFilters() {
-    const cards = document.querySelectorAll('.home-summary-card[data-type]');
-    if (!cards.length) return;
-
-    cards.forEach(card => {
-        const type = (card.dataset.type || '').toLowerCase();
-
-        card.addEventListener('click', () => handleHomeSummarySelect(type));
-        card.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                handleHomeSummarySelect(type);
-            }
-        });
-    });
-
-    updateHomeSummarySelection(appState.homeSelectedType);
-}
-
-/**
- * Toggle the selected summary card filter and re-render list
- */
-function handleHomeSummarySelect(type) {
-    const normalizedType = type || 'all';
-    const nextType = appState.homeSelectedType === normalizedType ? 'all' : normalizedType;
-    appState.homeSelectedType = nextType;
-
-    updateHomeSummarySelection(nextType);
-
-    renderHomeTransactionList();
-}
-
-/**
- * Reflect active filter state on the summary cards
- */
-function updateHomeSummarySelection(selectedType = 'all') {
-    const activeType = (selectedType || 'all').toLowerCase();
-
-    document.querySelectorAll('.home-summary-card[data-type]').forEach(card => {
-        const cardType = (card.dataset.type || '').toLowerCase();
-        const isActive = activeType !== 'all' && activeType === cardType;
-        card.classList.toggle('selected', isActive);
-        card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    });
-}
-
-/**
- * Setup view toggle buttons between Transactions and Summary
- */
-function setupViewToggle() {
-    const toggleBtns = document.querySelectorAll('.view-toggle .toggle-btn');
-    const titleEl = document.getElementById('transactionListTitle');
-    if (!toggleBtns.length) return;
-
-    toggleBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const view = btn.dataset.view;
-            if (view === appState.homeViewMode) return;
-
-            appState.homeViewMode = view;
-            
-            // Update heading
-            if (titleEl) {
-                titleEl.textContent = view === 'summary' ? 'Summary' : 'Transactions';
-            }
-            
-            // Update active state
-            toggleBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            // Re-render
-            renderHomeTransactionList();
-        });
-    });
-}
-
-/**
- * Setup toggle buttons between Monthly and Yearly summary
- */
-function setupHomePeriodToggle() {
-    const toggleBtns = document.querySelectorAll('.home-period-toggle .period-btn');
-    if (!toggleBtns.length) return;
-
-    toggleBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const period = btn.dataset.period;
-            if (!period || period === appState.homeViewPeriod) return;
-
-            appState.homeViewPeriod = period;
-            toggleBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            updateHomePeriodUI();
-            loadHomeData();
-        });
-    });
-}
-
-/**
- * Change month on Home page
- */
-function changeHomeMonth(direction) {
-    if (appState.homeViewPeriod === 'year') {
-        const nextYear = (appState.homeSelectedYear || new Date().getFullYear()) + direction;
-        appState.homeSelectedYear = nextYear;
-        updateYearPicker();
-        loadHomeData();
-        return;
-    }
-
-    const { year, month } = appState.homeSelectedMonth;
-
-    let newMonth = month + direction;
-    let newYear = year;
-
-    if (newMonth < 1) {
-        newMonth = 12;
-        newYear--;
-    } else if (newMonth > 12) {
-        newMonth = 1;
-        newYear++;
-    }
-
-    appState.homeSelectedMonth = { year: newYear, month: newMonth };
-    updateMonthPicker();
-    loadHomeData();
-}
-
-/**
- * Handle month picker change
- */
-function handleMonthPickerChange(event) {
-    if (appState.homeViewPeriod === 'year') return;
-    const value = event.target.value; // Format: "2025-12"
-    if (!value) return;
-    
-    const [year, month] = value.split('-').map(Number);
-    appState.homeSelectedMonth = { year, month };
-    loadHomeData();
-}
-
-/**
- * Handle year picker change
- */
-function handleYearPickerChange(event) {
-    const value = parseInt(event.target.value, 10);
-    if (!value || Number.isNaN(value)) return;
-
-    appState.homeSelectedYear = value;
-    loadHomeData();
-}
-
-/**
- * Update month picker input value
- */
-function updateMonthPicker() {
-    const monthPicker = document.getElementById('homeMonthPicker');
-    const monthDisplay = document.getElementById('homeMonthYear');
-    if (monthPicker) {
-        const { year, month } = appState.homeSelectedMonth;
-        monthPicker.value = `${year}-${String(month).padStart(2, '0')}`;
-    }
-    if (monthDisplay) {
-        const { year, month } = appState.homeSelectedMonth;
-        const shortYear = String(year).slice(-2);
-        monthDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
-    }
-}
-
-/**
- * Update year picker input value
- */
-function updateYearPicker() {
-    const yearPicker = document.getElementById('homeYearPicker');
-    if (yearPicker && appState.homeSelectedYear) {
-        yearPicker.value = appState.homeSelectedYear;
-    }
-}
-
-/**
- * Update UI state for month/year period
- */
-function updateHomePeriodUI() {
-    const homeContainer = document.querySelector('.home-main-container');
-    const monthDisplay = document.getElementById('homeMonthYear');
-    const summaryTitle = document.getElementById('homeSummaryTitle');
-
-    if (homeContainer) {
-        homeContainer.classList.toggle('yearly-view', appState.homeViewPeriod === 'year');
-    }
-
-    if (summaryTitle) {
-        summaryTitle.textContent = appState.homeViewPeriod === 'year' ? 'Yearly Summary' : 'Monthly Summary';
-    }
-
-    if (appState.homeViewPeriod === 'year') {
-        if (monthDisplay && appState.homeSelectedYear) {
-            monthDisplay.textContent = `${appState.homeSelectedYear}`;
-        }
-    } else {
-        updateMonthPicker();
-    }
-}
-
-/**
- * Navigate to Add screen
- */
-function navigateToAddExpense() {
-    openAddScreen();
-}
-
-/**
- * Load all Home page data (summary, transactions)
- */
-async function loadHomeData() {
-    showLoading();
-
-    try {
-        if (appState.homeViewPeriod === 'year') {
-            const year = appState.homeSelectedYear || new Date().getFullYear();
-            appState.homeSelectedYear = year;
-            updateYearPicker();
-            updateHomePeriodUI();
-
-            // Yearly view still uses the existing per-year API
-            await fetchHomeExpensesForYear(year);
-            calculateAndDisplayYearlySummary(year);
-            renderHomeTransactionList();
-        } else {
-            const { year, month } = appState.homeSelectedMonth;
-
-            // Update month/year display
-            const monthYearDisplay = document.getElementById('homeMonthYear');
-            if (monthYearDisplay) {
-                const shortYear = String(year).slice(-2);
-                monthYearDisplay.textContent = `${CONFIG.MONTH_NAMES[month - 1]} ${shortYear}`;
-            }
-
-            // Fetch dashboard data (single API call)
-            const result = await callBackend({
-                action: 'getDashboardData',
-                year: year,
-                month: month
-            });
-
-            if (!checkApiAuthorization(result)) return;
-
-            if (result && result.success) {
-                applyCategoryResponse(result);
-                appState.monthlyBudget = result.budget || {
-                    expense: 0,
-                    income: 0,
-                    savings: 0,
-                    payoff: 0
-                };
-                appState.homeExpensesByDate = result.expensesByDate || {};
-
-                calculateAndDisplayMonthlySummary(year, month);
-                renderHomeTransactionList();
-            } else {
-                console.error('[HOME] Failed to load dashboard data:', result && result.message);
-            }
-        }
-    } finally {
-        hideLoading();
-    }
-}
-
-/**
- * Fetch monthly budget for the selected month
- */
-async function fetchMonthlyBudget(year, month) {
-    try {
-        console.log('[BUDGET] Fetching budget for', year, month);
-        const result = await callBackend({
-            action: 'getMonthlyBudget',
-            year: year,
-            month: month
-        });
-
-        console.log('[BUDGET] Result:', result);
-
-        if (!checkApiAuthorization(result)) return;
-
-        if (result.success && result.budget) {
-            appState.monthlyBudget = result.budget;
-            console.log('[BUDGET] Stored budget:', appState.monthlyBudget);
-        } else {
-            console.warn('[BUDGET] No budget data in result, using mock data for local testing');
-            // Mock data for local testing
-            appState.monthlyBudget = {
-                expense: 50000,
-                income: 200000,
-                savings: 70000,
-                payoff: 50000
-            };
-        }
-    } catch (error) {
-        console.error('[HOME] Error fetching budget:', error);
-        // Use mock data on error for local testing
-        appState.monthlyBudget = {
-            expense: 50000,
-            income: 200000,
-            savings: 70000,
-            payoff: 50000
-        };
-    }
-}
-
-/**
- * Fetch expenses for a specific month for Home page
- */
-async function fetchHomeExpensesForMonth(year, month) {
-    try {
-        console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
-        
-        const result = await callBackend({
-            action: 'getExpensesByMonth',
-            year: year,
-            month: month
-        });
-        
-        console.log('[HOME] Fetch result:', result);
-        
-        if (!checkApiAuthorization(result)) return;
-        
-        if (result.success && result.expensesByDate) {
-            appState.homeExpensesByDate = result.expensesByDate;
-        } else if (result.success && result.expenses) {
-            // Group by date if backend returns flat array
-            appState.homeExpensesByDate = {};
-            result.expenses.forEach(expense => {
-                const date = expense.date || expense.Date;
-                if (!appState.homeExpensesByDate[date]) {
-                    appState.homeExpensesByDate[date] = [];
-                }
-                appState.homeExpensesByDate[date].push(expense);
-            });
-        } else {
-            appState.homeExpensesByDate = {};
-        }
-        
-    } catch (error) {
-        console.error('[HOME] Error fetching expenses:', error);
-        appState.homeExpensesByDate = {};
-    }
-}
-
-/**
- * Fetch expenses for an entire year (aggregated by date)
- */
-async function fetchHomeExpensesForYear(year) {
-    appState.homeExpensesByDate = {};
-
-    try {
-        for (let month = 1; month <= 12; month += 1) {
-            console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
-
-            const result = await callBackend({
-                action: 'getExpensesByMonth',
-                year: year,
-                month: month
-            });
-
-            if (!checkApiAuthorization(result)) return;
-
-            if (result.success && result.expensesByDate) {
-                Object.entries(result.expensesByDate).forEach(([date, expenses]) => {
-                    if (!appState.homeExpensesByDate[date]) {
-                        appState.homeExpensesByDate[date] = [];
-                    }
-                    appState.homeExpensesByDate[date].push(...expenses);
-                });
-            } else if (result.success && result.expenses) {
-                result.expenses.forEach(expense => {
-                    const date = expense.date || expense.Date;
-                    if (!appState.homeExpensesByDate[date]) {
-                        appState.homeExpensesByDate[date] = [];
-                    }
-                    appState.homeExpensesByDate[date].push(expense);
-                });
-            }
-        }
-    } catch (error) {
-        console.error('[HOME] Error fetching yearly expenses:', error);
-        appState.homeExpensesByDate = {};
-    }
-}
-
-/**
- * Calculate and display monthly summary totals with budget percentages
- */
-function calculateAndDisplayMonthlySummary(year, month) {
-    const { totalExpense, totalIncome, totalSavings, totalPayoff } = getHomeTotals();
-    
-    // Update DOM
-    const expenseEl = document.getElementById('homeTotalExpenses');
-    const incomeEl = document.getElementById('homeTotalIncome');
-    const savingsEl = document.getElementById('homeTotalSavings');
-    const payoffEl = document.getElementById('homeTotalPayoffs');
-    
-    if (expenseEl) expenseEl.textContent = `₹${totalExpense.toFixed(2)}`;
-    if (incomeEl) incomeEl.textContent = `₹${totalIncome.toFixed(2)}`;
-    if (savingsEl) savingsEl.textContent = `₹${totalSavings.toFixed(2)}`;
-    if (payoffEl) payoffEl.textContent = `₹${totalPayoff.toFixed(2)}`;
-    
-    // Update percentage hints
-    updateBudgetHints(totalExpense, totalIncome, totalSavings, totalPayoff);
-}
-
-/**
- * Calculate and display yearly summary totals
- */
-function calculateAndDisplayYearlySummary(year) {
-    const { totalExpense, totalIncome, totalSavings, totalPayoff } = getHomeTotals();
-
-    const expenseEl = document.getElementById('homeTotalExpenses');
-    const incomeEl = document.getElementById('homeTotalIncome');
-    const savingsEl = document.getElementById('homeTotalSavings');
-    const payoffEl = document.getElementById('homeTotalPayoffs');
-
-    if (expenseEl) expenseEl.textContent = `₹${totalExpense.toFixed(2)}`;
-    if (incomeEl) incomeEl.textContent = `₹${totalIncome.toFixed(2)}`;
-    if (savingsEl) savingsEl.textContent = `₹${totalSavings.toFixed(2)}`;
-    if (payoffEl) payoffEl.textContent = `₹${totalPayoff.toFixed(2)}`;
-
-    clearBudgetHints();
-}
-
-/**
- * Compute totals from currently loaded home expenses
- */
-function getHomeTotals() {
-    let totalExpense = 0;
-    let totalIncome = 0;
-    let totalSavings = 0;
-    let totalPayoff = 0;
-
-    if (appState.homeExpensesByDate) {
-        Object.values(appState.homeExpensesByDate).forEach(expenses => {
-            expenses.forEach(expense => {
-                const amount = parseFloat(expense.amount || expense.Amount || 0);
-                const type = (expense.type || expense.Type || '').toLowerCase();
-
-                if (type === 'expense') {
-                    totalExpense += amount;
-                } else if (type === 'income') {
-                    totalIncome += amount;
-                } else if (type === 'savings') {
-                    totalSavings += amount;
-                } else if (type === 'payoff') {
-                    if (!isCreditCardPayoff(expense)) {
-                        totalPayoff += amount;
-                    }
-                }
-            });
-        });
-    }
-
-    return { totalExpense, totalIncome, totalSavings, totalPayoff };
-}
-
-/**
- * Merge newly saved expenses into in-memory state and refresh the dashboard UI.
- * This avoids an extra backend call after saving.
- *
- * @param {Object} expensesByDate - { [dateString]: Array<expense> }
- */
-function mergeSavedExpensesIntoState(expensesByDate) {
-    if (!expensesByDate || typeof expensesByDate !== 'object') return;
-
-    if (!appState.homeExpensesByDate) {
-        appState.homeExpensesByDate = {};
-    }
-
-    Object.entries(expensesByDate).forEach(([date, expenses]) => {
-        if (!Array.isArray(expenses)) return;
-        if (!isDateInCurrentView(date)) return;
-
-        if (!appState.homeExpensesByDate[date]) {
-            appState.homeExpensesByDate[date] = [];
-        }
-        appState.homeExpensesByDate[date].push(...expenses);
-    });
-
-    if (appState.homeViewPeriod === 'year') {
-        calculateAndDisplayYearlySummary(appState.homeSelectedYear);
-    } else {
-        const { year, month } = appState.homeSelectedMonth || {};
-        calculateAndDisplayMonthlySummary(year, month);
-    }
-
-    renderHomeTransactionList();
-}
-
-/**
- * Check whether a date belongs to the currently selected month/year view.
- *
- * @param {string} dateString - YYYY-MM-DD
- * @returns {boolean}
- */
-function isDateInCurrentView(dateString) {
-    if (!dateString) return false;
-    const parts = dateString.split('-').map(n => parseInt(n, 10));
-    if (parts.length < 2) return false;
-    const [year, month] = parts;
-    if (!year || !month) return false;
-
-    if (appState.homeViewPeriod === 'year') {
-        return year === appState.homeSelectedYear;
-    }
-
-    const selected = appState.homeSelectedMonth || {};
-    return year === selected.year && month === selected.month;
-}
-
-function normalizeText(value) {
-    return value
-        .toString()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '');
-}
-
-function isCreditCardPayoff(expense) {
-    const category = normalizeText(expense.category || expense.Category || '');
-    const notes = normalizeText(expense.notes || expense.Notes || '');
-    const combined = `${category} ${notes}`;
-
-    return combined.includes('creditcard')
-        || combined.includes('cardpayment')
-        || /\bcc\b/.test(combined);
-}
-
-/**
- * Update budget percentage hints on cards
- */
-function updateBudgetHints(expense, income, savings, payoff) {
-    if (appState.homeViewPeriod === 'year') {
-        clearBudgetHints();
-        return;
-    }
-    console.log('[HINTS] Called with:', { expense, income, savings, payoff });
-    console.log('[HINTS] Monthly budget:', appState.monthlyBudget);
-    
-    const budgetData = [
-        { type: 'expense', actual: expense, hintId: 'hintExpenses' },
-        { type: 'income', actual: income, hintId: 'hintIncome' },
-        { type: 'savings', actual: savings, hintId: 'hintSavings' },
-        { type: 'payoff', actual: payoff, hintId: 'hintPayoffs' }
-    ];
-    
-    budgetData.forEach(item => {
-        const hintEl = document.getElementById(item.hintId);
-        if (!hintEl) {
-            console.warn('[HINTS] Element not found:', item.hintId);
-            return;
-        }
-        
-        const budget = appState.monthlyBudget[item.type] || 0;
-        console.log(`[HINTS] ${item.type}: actual=${item.actual}, budget=${budget}`);
-        
-        if (budget <= 0) {
-            hintEl.textContent = '';
-            hintEl.style.display = 'none';
-            return;
-        }
-        
-        const percentage = Math.round((item.actual / budget) * 100);
-        hintEl.textContent = `${percentage}%`;
-        hintEl.style.display = 'block';
-        console.log(`[HINTS] ${item.type}: ${percentage}% displayed`);
-        
-        // Color logic:
-        // - Expense & Payoff: >100% is bad (red), ≤100% is good (green)
-        // - Income & Savings: <100% is bad (red), ≥100% is good (green)
-        const isBad = (item.type === 'expense' || item.type === 'payoff') 
-            ? percentage > 100 
-            : percentage < 100;
-        
-        if (isBad) {
-            hintEl.classList.add('over-budget');
-        } else {
-            hintEl.classList.remove('over-budget');
-        }
-    });
-}
-
-function clearBudgetHints() {
-    ['hintExpenses', 'hintIncome', 'hintSavings', 'hintPayoffs'].forEach(id => {
-        const hintEl = document.getElementById(id);
-        if (!hintEl) return;
-        hintEl.textContent = '';
-        hintEl.style.display = 'none';
-        hintEl.classList.remove('over-budget');
-    });
-}
-
-/**
- * Render category-wise summary view
- */
-function renderCategorySummary(year, month) {
-    const listContainer = document.getElementById('homeTransactionList');
-    if (!listContainer) return;
-
-    // Collect all transactions
-    const allTransactions = [];
-    if (appState.homeExpensesByDate) {
-        Object.entries(appState.homeExpensesByDate).forEach(([date, expenses]) => {
-            expenses.forEach(expense => {
-                const status = (expense.status || expense.Status || '').toString().trim().toUpperCase();
-                if (status === 'DELETED') return; // Skip deleted rows
-
-                const type = expense.type || expense.Type || 'Expense';
-                const normalizedType = (type || '').toLowerCase();
-                allTransactions.push({
-                    id: expense.id || expense.ID || '',
-                    status: status || 'ACTIVE',
-                    date: date,
-                    type: type,
-                    typeKey: normalizedType,
-                    category: expense.category || expense.Category || 'Uncategorized',
-                    amount: parseFloat(expense.amount || expense.Amount || 0),
-                    notes: expense.notes || expense.Notes || ''
-                });
-            });
-        });
-    }
-
-    const selectedType = (appState.homeSelectedType || 'all').toLowerCase();
-    const filteredTransactions = allTransactions.filter(txn => {
-        return selectedType === 'all' ? true : txn.typeKey === selectedType;
-    });
-
-    // Group by category and collect transactions
-    const categoryMap = new Map();
-    filteredTransactions.forEach(txn => {
-        const key = `${txn.category}|${txn.typeKey}`;
-        if (!categoryMap.has(key)) {
-            categoryMap.set(key, {
-                category: txn.category,
-                type: txn.type,
-                typeKey: txn.typeKey,
-                total: 0,
-                count: 0,
-                transactions: []
-            });
-        }
-        const entry = categoryMap.get(key);
-        entry.total += txn.amount;
-        entry.count += 1;
-        entry.transactions.push(txn);
-    });
-
-    const summaryItems = Array.from(categoryMap.values()).sort((a, b) => b.total - a.total);
-
-    const hasFilter = selectedType !== 'all';
-
-    // Render
-    if (summaryItems.length === 0) {
-        listContainer.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">📭</div>
-                <p>${hasFilter ? 'No transactions for this filter' : 'No transactions for this month'}</p>
-            </div>
-        `;
-    } else {
-        // Group by type for sectioned layout
-        const typeGroups = {
-            expense: [],
-            income: [],
-            savings: [],
-            payoff: []
-        };
-        
-        summaryItems.forEach(item => {
-            if (typeGroups[item.typeKey]) {
-                typeGroups[item.typeKey].push(item);
-            }
-        });
-
-        const renderCategoryCard = (item) => {
-            const icon = getCategoryIcon(item.category, item.type);
-            const countLabel = item.count === 1 ? '1 transaction' : `${item.count} transactions`;
-            const categoryKey = `${item.category}|${item.typeKey}`;
-            const isExpanded = appState.expandedCategories.has(categoryKey);
-            
-            // Get budget for this category from appState.categoryBudgets
-            const categoryBudgetAmount = appState.categoryBudgets[categoryKey] || 0;
-            let budgetPercentage = 0;
-            let percentageColor = '#9aa5b5'; // neutral
-            
-            if (categoryBudgetAmount > 0) {
-                budgetPercentage = Math.round((item.total / categoryBudgetAmount) * 100);
-                
-                // Color logic: green if good, red if over/under budget
-                const isExpenseType = item.typeKey === 'expense' || item.typeKey === 'payoff';
-                const isBad = isExpenseType ? budgetPercentage > 100 : budgetPercentage < 100;
-                percentageColor = isBad ? '#e74c3c' : '#27ae60';
-            }
-            
-            // Sort transactions by date (newest first)
-            item.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            const detailsHtml = isExpanded ? `
-                <div class="summary-details">
-                    ${item.transactions.map(txn => {
-                        const notes = txn.notes ? txn.notes.trim() : '';
-                        const detailsLine = notes ? `<div class="txn-detail-notes">${notes}</div>` : '';
-                        return `
-                            <div class="summary-detail-row">
-                                <div class="detail-left">
-                                    <span class="detail-date">${formatDateForDisplay(txn.date)}</span>
-                                    ${detailsLine}
-                                </div>
-                                <span class="detail-amount">₹${txn.amount.toFixed(2)}</span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            ` : '';
-            
-            const budgetIndicator = categoryBudgetAmount > 0 ? `
-                <div class="summary-card-budget" style="color: ${percentageColor};">
-                    ${budgetPercentage}%
-                </div>
-            ` : '';
-            
-            return `
-                <div class="summary-card ${isExpanded ? 'expanded' : ''}" data-category-key="${categoryKey}">
-                    <div class="summary-card-header" data-type="${item.typeKey}">
-                        <div class="summary-card-main">
-                            <div class="summary-card-title">${item.category}</div>
-                            <div class="summary-card-count">${countLabel}</div>
-                        </div>
-                        <div class="summary-card-bottom">
-                            <div class="summary-card-amount">₹${item.total.toFixed(2)}</div>
-                            ${budgetIndicator}
-                        </div>
-                        <div class="expand-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </div>
-                    </div>
-                    ${detailsHtml}
-                </div>
-            `;
-        };
-
-        const sections = [];
-        
-        if (typeGroups.expense.length > 0) {
-            sections.push(`
-                <div class="summary-section">
-                    <div class="summary-section-header">
-                        <span class="summary-section-title">Expenses</span>
-                        <span class="summary-section-badge expense">${typeGroups.expense.length}</span>
-                    </div>
-                    <div class="summary-grid">
-                        ${typeGroups.expense.map(renderCategoryCard).join('')}
-                    </div>
-                </div>
-            `);
-        }
-        
-        if (typeGroups.income.length > 0) {
-            sections.push(`
-                <div class="summary-section">
-                    <div class="summary-section-header">
-                        <span class="summary-section-title">Income</span>
-                        <span class="summary-section-badge income">${typeGroups.income.length}</span>
-                    </div>
-                    <div class="summary-grid">
-                        ${typeGroups.income.map(renderCategoryCard).join('')}
-                    </div>
-                </div>
-            `);
-        }
-        
-        if (typeGroups.savings.length > 0) {
-            sections.push(`
-                <div class="summary-section">
-                    <div class="summary-section-header">
-                        <span class="summary-section-title">Savings</span>
-                        <span class="summary-section-badge savings">${typeGroups.savings.length}</span>
-                    </div>
-                    <div class="summary-grid">
-                        ${typeGroups.savings.map(renderCategoryCard).join('')}
-                    </div>
-                </div>
-            `);
-        }
-        
-        if (typeGroups.payoff.length > 0) {
-            sections.push(`
-                <div class="summary-section">
-                    <div class="summary-section-header">
-                        <span class="summary-section-title">Payoffs</span>
-                        <span class="summary-section-badge payoff">${typeGroups.payoff.length}</span>
-                    </div>
-                    <div class="summary-grid">
-                        ${typeGroups.payoff.map(renderCategoryCard).join('')}
-                    </div>
-                </div>
-            `);
-        }
-        
-        listContainer.innerHTML = sections.join('');
-        
-        // Add click handlers for expansion
-        setupSummaryExpansion();
-    }
-}
-
-/**
- * Setup click handlers for expanding/collapsing summary categories
- */
-function setupSummaryExpansion() {
-    const summaryCards = document.querySelectorAll('.summary-card');
-    summaryCards.forEach(card => {
-        const header = card.querySelector('.summary-card-header');
-        if (!header) return;
-        
-        header.addEventListener('click', () => {
-            const categoryKey = card.dataset.categoryKey;
-            if (!categoryKey) return;
-            
-            if (appState.expandedCategories.has(categoryKey)) {
-                appState.expandedCategories.delete(categoryKey);
-            } else {
-                appState.expandedCategories.add(categoryKey);
-            }
-            
-            // Re-render
-            renderHomeTransactionList();
-        });
-    });
-}
-
-/**
- * Render monthly transaction list
- */
-function renderHomeTransactionList() {
-    const { year, month } = appState.homeSelectedMonth || {};
-    renderMonthlyTransactionList(year, month);
-}
-
-/**
- * Render monthly transaction list
- */
-function renderMonthlyTransactionList(year, month) {
-    // Check view mode and delegate to appropriate renderer
-    if (appState.homeViewMode === 'summary') {
-        renderCategorySummary(year, month);
-        return;
-    }
-
-    const listContainer = document.getElementById('homeTransactionList');
-    
-    if (!listContainer) return;
-    
-    // Collect all transactions
-    const allTransactions = [];
-    if (appState.homeExpensesByDate) {
-        Object.entries(appState.homeExpensesByDate).forEach(([date, expenses]) => {
-            expenses.forEach(expense => {
-                const status = (expense.status || expense.Status || '').toString().trim().toUpperCase();
-                if (status === 'DELETED') return; // Skip deleted rows
-
-                const type = expense.type || expense.Type || 'Expense';
-                const normalizedType = (type || '').toLowerCase();
-                allTransactions.push({
-                    id: expense.id || expense.ID || '',
-                    status: status || 'ACTIVE',
-                    date: date,
-                    type: type,
-                    typeKey: normalizedType,
-                    category: expense.category || expense.Category || 'Uncategorized',
-                    amount: parseFloat(expense.amount || expense.Amount || 0),
-                    notes: expense.notes || expense.Notes || ''
-                });
-            });
-        });
-    }
-    
-    const selectedType = (appState.homeSelectedType || 'all').toLowerCase();
-    const filteredTransactions = allTransactions.filter(txn => {
-        return selectedType === 'all' ? true : txn.typeKey === selectedType;
-    });
-
-    // Sort by date (newest first)
-    filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    const hasFilter = selectedType !== 'all';
-
-    // Render
-    if (filteredTransactions.length === 0) {
-        const emptyScope = appState.homeViewPeriod === 'year' ? 'year' : 'month';
-        listContainer.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">📭</div>
-                <p>${hasFilter ? 'No transactions for this filter' : `No transactions for this ${emptyScope}`}</p>
-            </div>
-        `;
-    } else {
-        listContainer.innerHTML = filteredTransactions.map(txn => {
-            const icon = getCategoryIcon(txn.category, txn.type);
-            const notes = txn.notes ? txn.notes.trim() : '';
-            const dateLabel = formatDateForDisplay(txn.date);
-            const deleteBtnHtml = txn.id ? `<button class="delete-btn" type="button" data-id="${txn.id}" title="Delete expense">🗑</button>` : '';
-
-            const notesHtml = notes ? `
-                <div class="txn-details">
-                    <span class="txn-notes-display">${notes}</span>
-                </div>` : '';
-
-            return `
-                <div class="txn-row" data-type="${txn.typeKey}">
-                    <div class="txn-row-header">
-                        <div class="txn-icon">${icon}</div>
-                        <div class="txn-main">
-                            <div class="txn-title">${txn.category}</div>
-                            <div class="txn-subtitle">${dateLabel}</div>
-                            ${notesHtml}
-                        </div>
-                        <div class="txn-meta">
-                            <span class="transaction-type-badge ${txn.typeKey}">${txn.type}</span>
-                            <div class="transaction-actions">
-                                <span class="amount">₹${txn.amount.toFixed(2)}</span>
-                                ${deleteBtnHtml}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        setupTransactionDeleteButtons();
-    }
-}
-
-/**
- * Enable expand/collapse for aggregated transaction rows to reveal individual entries
- */
-function setupTransactionExpansion() {
-    const rows = document.querySelectorAll('.txn-row.expandable');
-    rows.forEach(row => {
-        const detailList = row.querySelector('.txn-detail-list');
-        const expandIcon = row.querySelector('.txn-expand-icon');
-        const header = row.querySelector('.txn-row-header');
-        if (!detailList || !detailList.children.length || !header) return;
-
-        header.addEventListener('click', (event) => {
-            event.stopPropagation();
-            const expanded = row.classList.toggle('expanded');
-            if (expandIcon) {
-                expandIcon.classList.toggle('expanded', expanded);
-            }
-        });
-    });
-}
-
-/**
- * Attach delete handlers to rendered transaction rows
- */
-function setupTransactionDeleteButtons() {
-    const deleteButtons = document.querySelectorAll('.delete-btn');
-    deleteButtons.forEach(btn => {
-        btn.addEventListener('click', async (event) => {
-            event.stopPropagation();
-            const id = btn.dataset.id;
-            if (!id) return;
-            await deleteExpense(id);
-        });
-    });
-}
-
-// ====================================================
-// PAGE NAVIGATION HANDLER
-// ====================================================
-
-function setupPageNavigation() {
-    const pageNavBtns = document.querySelectorAll('.nav-rail-item');
-    const pages = document.querySelectorAll('.page');
-    
-    console.log('[PAGE_NAV] Found buttons:', pageNavBtns.length);
-    console.log('[PAGE_NAV] Found pages:', pages.length);
-
-    // Hide all pages initially
-    pages.forEach(page => {
-        page.style.display = 'none';
-    });
-
-    pageNavBtns.forEach(btn => {
-        const targetPage = btn.getAttribute('data-page');
-        if (!targetPage) {
-            return; // skip buttons like logout without a target page
-        }
-
-        // Remove any existing listeners by cloning and replacing the button
-        const newBtn = btn.cloneNode(true);
-        btn.parentNode.replaceChild(newBtn, btn);
-
-        newBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log('[PAGE_NAV] Button clicked, target page:', targetPage);
-
-            // Use Add flow helper so rows and defaults are initialized every time
-            if (targetPage === 'add') {
-                openAddScreen();
-                document.querySelectorAll('.nav-rail-item').forEach(b => b.classList.remove('active'));
-                newBtn.classList.add('active');
-                return;
-            }
-
-            // Hide all pages
-            pages.forEach(page => {
-                page.style.display = 'none';
-            });
-
-            // Show target page
-            const targetPageEl = document.getElementById(`${targetPage}-page`);
-            console.log('[PAGE_NAV] Looking for element:', `${targetPage}-page`, 'Found:', !!targetPageEl);
-            
-            if (targetPageEl) {
-                targetPageEl.style.display = 'block';
-                console.log('[PAGE_NAV] Showed page:', targetPage);
-                
-                // Initialize budget page when navigating to it
-                if (targetPage === 'budget') {
-                    console.log('[BUDGET] Initializing budget page...');
-                    initBudgetPage();
-                }
-            } else {
-                console.error('[PAGE_NAV] Page not found:', `${targetPage}-page`);
-            }
-
-            // Update active button
-            document.querySelectorAll('.nav-rail-item').forEach(b => b.classList.remove('active'));
-            newBtn.classList.add('active');
-
-            console.log(`[PAGE_NAV] Switched to page: ${targetPage}`);
-        });
-    });
-
-    // Show dashboard by default on initial load
-    const dashboardPage = document.getElementById('dashboard-page');
-    const dashboardBtn = document.querySelector('.nav-rail-item[data-page="dashboard"]');
-    
-    if (dashboardPage) {
-        dashboardPage.style.display = 'block';
-        console.log('[PAGE_NAV] Dashboard set as initial page');
-    }
-    
-    if (dashboardBtn) {
-        dashboardBtn.classList.add('active');
-        console.log('[PAGE_NAV] Dashboard button marked as active');
-    }
-
-    console.log('[PAGE_NAV] Page navigation initialized with', pageNavBtns.length, 'buttons and', pages.length, 'pages');
-}
-
-// ====================================================
-// APP START
-// ====================================================
-
-let authedAppInitialized = false;
-
-function resetAppInitialization() {
-    authedAppInitialized = false;
-}
-
-function initializeAppAfterAuth() {
-    if (authedAppInitialized) return true;
-
-    const token = getAuthToken();
-    if (!token) {
-        console.log('[APP] No idToken in session; skipping app initialization');
-        return false;
-    }
-
-    console.log('[APP] Initializing app after auth');
-    initializeHomePage();
-    initializeAddScreen();
-    setupPageNavigation();
-    setupFAB();
-    setupLogout();
-    hideLoading();
-
-    authedAppInitialized = true;
-    return true;
-}
-
-// Start-up: only attempt auth-gated init if a token already exists
-document.addEventListener('DOMContentLoaded', () => {
-    if (!initializeAppAfterAuth()) {
-        console.log('[APP] Awaiting authentication before initializing app');
-    }
-});
-
-// Expose hooks for auth module
-window.initializeAppAfterAuth = initializeAppAfterAuth;
-window.resetAppInitialization = resetAppInitialization;
-
-// Log app initialization for debugging
-console.log('Expense Manager app script loaded');
-
-// ====================================================
-// FLOATING ACTION BUTTON (FAB) HANDLER
-// ====================================================
-
-/**
- * Setup FAB to open Add page
- */
-function setupFAB() {
-    const fabBtn = document.getElementById('fabAddExpense');
-    if (fabBtn) {
-        fabBtn.addEventListener('click', () => {
-            console.log('[FAB] Opening add page...');
-            // Use same flow as nav to reset rows/defaults
-            openAddScreen();
-            // Remove active class from all nav items to reflect floating entry
-            const navItems = document.querySelectorAll('.nav-rail-item');
-            navItems.forEach(item => item.classList.remove('active'));
-        });
-        console.log('[FAB] FAB button initialized');
-    } else {
-        console.warn('[FAB] FAB button not found in DOM');
-    }
-}
-
-// ====================================================
-// AUTH HANDLERS
-// ====================================================
-
-function setupLogout() {
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (!logoutBtn) return;
-
-    logoutBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        console.log('[APP] Logout requested');
-        
-        if (window.appAuth && typeof window.appAuth.logout === 'function') {
-            window.appAuth.logout();
-        } else {
-            // Fallback: clear storage and reload
-            storage.removeItem(STORAGE_KEYS.idToken);
-            storage.removeItem(STORAGE_KEYS.userEmail);
-            storage.removeItem(STORAGE_KEYS.userName);
-            window.location.reload();
-        }
-    });
-}
-
-// ====================================================
-// ADD SCREEN FUNCTIONS (REFACTORED)
-// ====================================================
-
-let addScreenState = {
-    currentTab: 'expenses',
-    expenseMode: 'byDate', // 'byDate' or 'byCategory'
-    expenseRows: [],
-    expenseRowsByCategory: [],
-    monthlyRows: {
-        income: [],
-        savings: [],
-        payoff: []
-    },
-    rowCounter: 0,
-    rowCounterByCategory: 0,
-    quickType: 'Expense',
-    quickParent: '',
-    quickDetail: '',
-    recentAdds: []
-};
-
-const RECENT_ADD_STORAGE_KEY = 'expenseManager_recentAdds';
-
-function getRecentAdds() {
-    try {
-        const raw = localStorage.getItem(RECENT_ADD_STORAGE_KEY);
-        const items = raw ? JSON.parse(raw) : [];
-        return Array.isArray(items) ? items : [];
-    } catch (error) {
-        console.warn('[QUICK_ADD] Failed to read recent adds:', error);
-        return [];
-    }
-}
-
-function rememberRecentAdd(entry) {
-    try {
-        const current = getRecentAdds();
-        const key = `${entry.type}|${entry.parentCategory}|${entry.detail}`;
-        const filtered = current.filter(item => `${item.type}|${item.parentCategory}|${item.detail}` !== key);
-        filtered.unshift({
-            type: entry.type,
-            parentCategory: entry.parentCategory,
-            detail: entry.detail,
-            amount: Number(entry.amount) || 0,
-            notes: entry.notes || ''
-        });
-        localStorage.setItem(RECENT_ADD_STORAGE_KEY, JSON.stringify(filtered.slice(0, 6)));
-    } catch (error) {
-        console.warn('[QUICK_ADD] Failed to store recent add:', error);
-    }
-}
-
-function renderRecentAdds() {
-    const container = document.getElementById('recentQuickAdds');
-    if (!container) return;
-
-    const recentAdds = getRecentAdds();
-    addScreenState.recentAdds = recentAdds;
-
-    if (!recentAdds.length) {
-        container.innerHTML = '<span class="recent-empty">Your recent adds will show here.</span>';
-        return;
-    }
-
-    container.innerHTML = recentAdds.map((item, index) => `
-        <button type="button" class="recent-add-chip" data-index="${index}">
-            <span class="recent-add-title">${item.detail}</span>
-            <span class="recent-add-meta">${item.type} · ${item.parentCategory}</span>
+// Top nav
+function TopNav({ currentPage, setCurrentPage, onLogout }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function navigate(page) {
+    setCurrentPage(page);
+    setMenuOpen(false);
+  }
+
+  function handleLogout() {
+    setMenuOpen(false);
+    onLogout();
+  }
+
+  return (
+    <header className="shrink-0 bg-slate-800 border-b border-slate-700 relative z-50">
+      <div className="h-11 flex items-center justify-between px-4">
+        <span className="font-bold text-sm text-white tracking-tight">Expense Manager</span>
+
+        {/* Desktop nav — visible on lg+ */}
+        <nav className="hidden lg:flex items-center gap-4 text-sm">
+          <button
+            onClick={() => setCurrentPage('dashboard')}
+            className={`font-medium transition-colors ${currentPage === 'dashboard' ? 'text-sky-300' : 'text-slate-400 hover:text-white'}`}
+          >Dashboard</button>
+          <button
+            onClick={() => setCurrentPage('transactions')}
+            className={`font-medium transition-colors ${currentPage === 'transactions' ? 'text-sky-300' : 'text-slate-400 hover:text-white'}`}
+          >Transactions</button>
+          <button
+            onClick={onLogout}
+            className="text-slate-400 hover:text-red-400 font-medium transition-colors"
+          >Logout</button>
+        </nav>
+
+        {/* Hamburger — visible below lg */}
+        <button
+          onClick={() => setMenuOpen(o => !o)}
+          className="lg:hidden flex flex-col justify-center items-center w-8 h-8 gap-1.5"
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+        >
+          <span className={`block w-5 h-0.5 bg-slate-300 transition-transform origin-center ${menuOpen ? 'translate-y-2 rotate-45' : ''}`} />
+          <span className={`block w-5 h-0.5 bg-slate-300 transition-opacity ${menuOpen ? 'opacity-0' : ''}`} />
+          <span className={`block w-5 h-0.5 bg-slate-300 transition-transform origin-center ${menuOpen ? '-translate-y-2 -rotate-45' : ''}`} />
         </button>
-    `).join('');
+      </div>
 
-    container.querySelectorAll('.recent-add-chip').forEach(btn => {
-        btn.addEventListener('click', () => applyRecentAdd(Number(btn.dataset.index)));
+      {/* Dropdown menu */}
+      {menuOpen && (
+        <div className="lg:hidden absolute top-full right-0 left-0 bg-slate-800 border-b border-slate-700 shadow-lg">
+          <nav className="flex flex-col py-1">
+            <button
+              onClick={() => navigate('dashboard')}
+              className={`text-left px-5 py-3 text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-sky-300 bg-slate-700' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+            >Dashboard</button>
+            <button
+              onClick={() => navigate('transactions')}
+              className={`text-left px-5 py-3 text-sm font-medium transition-colors ${currentPage === 'transactions' ? 'text-sky-300 bg-slate-700' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+            >Transactions</button>
+            <button
+              onClick={handleLogout}
+              className="text-left px-5 py-3 text-sm font-medium text-red-400 hover:bg-slate-700 transition-colors"
+            >Logout</button>
+          </nav>
+        </div>
+      )}
+    </header>
+  );
+}
+
+// Month selector
+function MonthSelector({ selectedMonth, onChange }) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => onChange(prevMonth(selectedMonth))}
+        className="px-2 py-1 text-gray-400 hover:text-gray-700 text-lg leading-none"
+        aria-label="Previous month"
+      >&#8249;</button>
+      <input
+        type="month"
+        value={selectedMonth}
+        onChange={e => onChange(e.target.value)}
+        className="border border-gray-200 rounded px-2 py-1 text-sm text-gray-700 bg-white"
+      />
+      <button
+        onClick={() => onChange(nextMonth(selectedMonth))}
+        className="px-2 py-1 text-gray-400 hover:text-gray-700 text-lg leading-none"
+        aria-label="Next month"
+      >&#8250;</button>
+    </div>
+  );
+}
+
+// Summary cards
+function SummaryCards({ transactions, selectedMonth }) {
+  const totals = useMemo(() => {
+    const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
+    transactions
+      .filter(tx => tx.date.startsWith(selectedMonth))
+      .forEach(tx => { t[tx.type] = (t[tx.type] || 0) + tx.amount; });
+    return t;
+  }, [transactions, selectedMonth]);
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {TABS.map(type => {
+        const c = TYPE_COLOR[type];
+        return (
+          <div key={type} className={`${c.bg} ${c.border} border rounded-lg p-3`}>
+            <div className="text-xs text-gray-500 mb-1">{TAB_LABEL[type]}</div>
+            <div className={`text-xl font-bold text-right ${c.text}`}>{'₹' + Math.round(totals[type]).toLocaleString('en-IN')}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── BULK ENTRY (desktop only, hidden on mobile) ────────────────────────────
+
+function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMonth, onSave }) {
+  // Groups: [{ category, details:[] }]
+  const catGroups = useMemo(
+    () => categoryGroups[activeTab] || [],
+    [categoryGroups, activeTab]
+  );
+  // Flat list of all sub-cats (for total calculations)
+  const subCats = useMemo(
+    () => catGroups.flatMap(g => g.details || []),
+    [catGroups]
+  );
+  // Accordion: track which single category is open
+  const [openGroup, setOpenGroup] = useState(() => catGroups[0]?.category ?? null);
+  function toggleGroup(cat) {
+    setOpenGroup(prev => prev === cat ? null : cat);
+  }
+
+  const { days, dayLabels, weekendSet } = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const count = new Date(y, m, 0).getDate();
+    const days = Array.from({ length: count }, (_, i) => i + 1);
+    const weekendSet = new Set();
+    const dayLabels = days.map(d => {
+      const date = new Date(y, m - 1, d);
+      const dow = date.getDay();
+      if (dow === 0 || dow === 6) weekendSet.add(d);
+      return { d, label: date.toLocaleDateString('en-IN', { weekday: 'short' }).slice(0, 2) };
     });
-}
+    return { days, dayLabels, weekendSet };
+  }, [selectedMonth]);
 
-function applyRecentAdd(index) {
-    const item = addScreenState.recentAdds[index];
-    if (!item) return;
+  // grid[sc][d] = amount string,  notesGrid[sc][d] = note string
+  const [grid, setGrid]           = useState({});
+  const [notesGrid, setNotesGrid] = useState({});
+  // activeNote: { sc, d, top, left } | null
+  const [activeNote, setActiveNote] = useState(null);
+  const noteRef = useRef(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null); // Date | null
 
-    selectQuickType(item.type || 'Expense');
-    populateQuickParentOptions(item.parentCategory || '');
-    populateQuickDetailOptions(item.parentCategory || '', item.detail || '');
+  // Draft localStorage key — scoped to month + type
+  const draftKey = `expenseManager_draft_${selectedMonth}_${activeTab}`;
 
-    const amountInput = document.getElementById('quickEntryAmount');
-    const notesInput = document.getElementById('quickEntryNotes');
-    if (amountInput) amountInput.value = item.amount || '';
-    if (notesInput) notesInput.value = item.notes || '';
+  // Day-range filter (1-based day numbers within the month)
+  const [fromDay, setFromDay] = useState(1);
+  const [toDay,   setToDay]   = useState(() => {
+    const today = new Date();
+    const cur   = currentMonthStr();
+    if (selectedMonth === cur) return today.getDate();
+    const [y, m] = selectedMonth.split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+  });
 
-    updateQuickAddState();
-}
+  function defaultToDay(monthStr) {
+    const today = new Date();
+    const [y, m] = monthStr.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    if (monthStr === currentMonthStr()) return Math.min(today.getDate(), lastDay);
+    return lastDay;
+  }
 
-function selectQuickType(type) {
-    addScreenState.quickType = type || 'Expense';
-
-    document.querySelectorAll('.type-chip').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.type === addScreenState.quickType);
-    });
-
-    addScreenState.quickParent = '';
-    addScreenState.quickDetail = '';
-    populateQuickParentOptions('');
-    updateQuickAddState();
-}
-
-function populateQuickParentOptions(selectedParent = '') {
-    const select = document.getElementById('quickParentCategory');
-    if (!select) return;
-
-    const groups = appState.categoryGroups?.[addScreenState.quickType] || [];
-    select.innerHTML = '<option value="">Select category</option>';
-
-    groups.forEach(group => {
-        const option = document.createElement('option');
-        option.value = group.category;
-        option.textContent = group.category;
-        select.appendChild(option);
-    });
-
-    if (selectedParent && groups.some(group => group.category === selectedParent)) {
-        select.value = selectedParent;
-    } else if (groups.length === 1) {
-        select.value = groups[0].category;
-    }
-
-    addScreenState.quickParent = select.value;
-    populateQuickDetailOptions(select.value, addScreenState.quickDetail);
-}
-
-function populateQuickDetailOptions(parentCategory, selectedDetail = '') {
-    const select = document.getElementById('quickDetailCategory');
-    if (!select) return;
-
-    const groups = appState.categoryGroups?.[addScreenState.quickType] || [];
-    const match = groups.find(group => group.category === parentCategory);
-    const details = Array.isArray(match?.details) ? match.details : [];
-
-    select.innerHTML = '<option value="">Select sub-category</option>';
-
-    details.forEach(detail => {
-        const option = document.createElement('option');
-        option.value = detail;
-        option.textContent = detail;
-        select.appendChild(option);
-    });
-
-    if (selectedDetail && details.includes(selectedDetail)) {
-        select.value = selectedDetail;
-    } else if (details.length === 1) {
-        select.value = details[0];
-    }
-
-    addScreenState.quickDetail = select.value;
-}
-
-function updateQuickAddState() {
-    const dateInput = document.getElementById('quickEntryDate');
-    const amountInput = document.getElementById('quickEntryAmount');
-    const notesInput = document.getElementById('quickEntryNotes');
-    const saveBtn = document.getElementById('quickSaveBtn');
-
-    const amount = parseFloat(amountInput?.value || '');
-    addScreenState.quickParent = document.getElementById('quickParentCategory')?.value || '';
-    addScreenState.quickDetail = document.getElementById('quickDetailCategory')?.value || '';
-
-    const isValid = !!(dateInput?.value && addScreenState.quickType && addScreenState.quickParent && addScreenState.quickDetail && !isNaN(amount) && amount > 0);
-    if (saveBtn) saveBtn.disabled = !isValid;
-
-    if (notesInput) {
-        notesInput.dataset.activeType = addScreenState.quickType;
-    }
-}
-
-function resetQuickAddForm(preserveSelection = false) {
-    const dateInput = document.getElementById('quickEntryDate');
-    const amountInput = document.getElementById('quickEntryAmount');
-    const notesInput = document.getElementById('quickEntryNotes');
-
-    if (dateInput) {
-        dateInput.value = new Date().toISOString().split('T')[0];
-    }
-    if (amountInput) amountInput.value = '';
-    if (notesInput) notesInput.value = '';
-
-    if (!preserveSelection) {
-        selectQuickType('Expense');
-    } else {
-        populateQuickParentOptions(addScreenState.quickParent);
-        populateQuickDetailOptions(addScreenState.quickParent, addScreenState.quickDetail);
-        updateQuickAddState();
-    }
-
-    renderRecentAdds();
-}
-
-async function saveQuickEntry() {
-    const dateInput = document.getElementById('quickEntryDate');
-    const amountInput = document.getElementById('quickEntryAmount');
-    const notesInput = document.getElementById('quickEntryNotes');
-    const saveBtn = document.getElementById('quickSaveBtn');
-
-    const date = dateInput?.value || '';
-    const amount = parseFloat(amountInput?.value || '');
-    const notes = notesInput?.value || '';
-    const parentCategory = document.getElementById('quickParentCategory')?.value || '';
-    const detail = document.getElementById('quickDetailCategory')?.value || '';
-
-    if (!date || !parentCategory || !detail || isNaN(amount) || amount <= 0) {
-        showToast('Please complete all quick add fields', 'error');
-        return;
-    }
-
+  // Reset range + grid when month or tab changes; restore draft if available
+  useEffect(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    setFromDay(1);
+    setToDay(defaultToDay(selectedMonth));
+    setActiveNote(null);
+    setDraftSavedAt(null);
+    setOpenGroup(catGroups[0]?.category ?? null);
     try {
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
-        }
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const { grid: g, notesGrid: ng, savedAt } = JSON.parse(raw);
+        setGrid(g || {});
+        setNotesGrid(ng || {});
+        setDraftSavedAt(savedAt ? new Date(savedAt) : null);
+        return;
+      }
+    } catch (_) {}
+    setGrid({});
+    setNotesGrid({});
+  }, [activeTab, selectedMonth]);
 
-        const payload = {
-            action: 'saveExpenses',
-            date,
-            expenses: [{
-                type: addScreenState.quickType,
-                category: parentCategory,
-                detail,
-                amount,
-                notes
-            }]
-        };
+  function saveDraft() {
+    const now = new Date();
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ grid, notesGrid, savedAt: now.toISOString() }));
+    } catch (_) {}
+    setDraftSavedAt(now);
+  }
 
-        const result = await callBackend(payload);
-        if (!checkApiAuthorization(result)) {
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Entry';
-            }
-            return;
+  function clearDraft() {
+    try { localStorage.removeItem(draftKey); } catch (_) {}
+    setDraftSavedAt(null);
+  }
+
+  const visibleDayLabels = useMemo(
+    () => dayLabels.filter(({ d }) => d >= fromDay && d <= toDay),
+    [dayLabels, fromDay, toDay]
+  );
+  const visibleDays = useMemo(() => visibleDayLabels.map(({ d }) => d), [visibleDayLabels]);
+
+  // Close note popover on outside click
+  useEffect(() => {
+    if (!activeNote) return;
+    function onDown(e) {
+      if (noteRef.current && !noteRef.current.contains(e.target)) setActiveNote(null);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [activeNote]);
+
+  function setCell(sc, d, val) {
+    // allow only digits and a single decimal point
+    if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
+    setGrid(prev => ({ ...prev, [sc]: { ...(prev[sc] || {}), [d]: val } }));
+  }
+
+  function setNote(sc, d, val) {
+    setNotesGrid(prev => ({ ...prev, [sc]: { ...(prev[sc] || {}), [d]: val } }));
+  }
+
+  function openNote(sc, d, e) {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const top  = rect.bottom + 6;
+    const left = Math.min(rect.left, window.innerWidth - 232);
+    setActiveNote({ sc, d, top, left });
+  }
+
+  const rowTotals = useMemo(() => {
+    const t = {};
+    subCats.forEach(sc => {
+      t[sc] = visibleDays.reduce((s, d) => s + parseMoney((grid[sc] || {})[d] || ''), 0);
+    });
+    return t;
+  }, [grid, subCats, visibleDays]);
+
+  const colTotals = useMemo(() => {
+    const t = {};
+    visibleDays.forEach(d => {
+      t[d] = subCats.reduce((s, sc) => s + parseMoney((grid[sc] || {})[d] || ''), 0);
+    });
+    return t;
+  }, [grid, subCats, visibleDays]);
+
+  const grandTotal = useMemo(
+    () => Object.values(rowTotals).reduce((s, v) => s + v, 0),
+    [rowTotals]
+  );
+
+  const filledCount = useMemo(() => {
+    let n = 0;
+    subCats.forEach(sc => visibleDays.forEach(d => { if (parseMoney((grid[sc] || {})[d] || '') > 0) n++; }));
+    return n;
+  }, [grid, subCats, visibleDays]);
+
+  function handleSave() {
+    const rows = [];
+    subCats.forEach(sc => {
+      // save ALL filled days, not just visible, so nothing is lost if range was narrowed
+      days.forEach(d => {
+        const amt = parseMoney((grid[sc] || {})[d] || '');
+        if (amt > 0) {
+          rows.push({
+            _id: String(uid()),
+            date: `${selectedMonth}-${String(d).padStart(2, '0')}`,
+            subCategory: sc,
+            amount: String(amt),
+            notes: (notesGrid[sc] || {})[d] || '',
+          });
         }
+      });
+    });
+    onSave(activeTab, rows);
+    setGrid({});
+    setNotesGrid({});
+    clearDraft();
+  }
+
+  const LABEL_W = 170;
+  const TOTAL_W  = 82;
+  const MIN_CELL = 52;
+
+  const containerRef = useRef(null);
+  const [containerW, setContainerW] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(es => setContainerW(es[0].contentRect.width));
+    ro.observe(el);
+    setContainerW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  const CELL_W = useMemo(() => {
+    if (!containerW || visibleDays.length === 0) return MIN_CELL;
+    const available = containerW - LABEL_W - TOTAL_W - 2;
+    return Math.max(MIN_CELL, Math.floor(available / visibleDays.length));
+  }, [containerW, visibleDays.length]);
+
+  return (
+    <div className="mt-4 bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* Type tabs */}
+      <div className="flex border-b border-gray-200">
+        {TABS.map(tab => {
+          const c = TYPE_COLOR[tab];
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === tab ? `${c.tab} bg-white` : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}>{TAB_LABEL[tab]}</button>
+          );
+        })}
+      </div>
+
+      {/* Day-range filter bar */}
+      {subCats.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 bg-gray-50/60">
+          <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">Show days</span>
+          <div className="flex items-center gap-2">
+            <input type="number" min={1} max={toDay} value={fromDay}
+              onChange={e => setFromDay(Math.max(1, Math.min(Number(e.target.value), toDay)))}
+              className="w-14 border border-gray-200 rounded px-2 py-1 text-[11px] text-center text-gray-700 [appearance:textfield]"
+            />
+            <span className="text-[11px] text-gray-300">–</span>
+            <input type="number" min={fromDay} max={days.length} value={toDay}
+              onChange={e => setToDay(Math.min(days.length, Math.max(Number(e.target.value), fromDay)))}
+              className="w-14 border border-gray-200 rounded px-2 py-1 text-[11px] text-center text-gray-700 [appearance:textfield]"
+            />
+          </div>
+          {(fromDay !== 1 || toDay !== days.length) && (
+            <button onClick={() => { setFromDay(1); setToDay(days.length); }}
+              className="text-[11px] text-gray-400 hover:text-gray-700 underline underline-offset-2">
+              Reset
+            </button>
+          )}
+          <span className="ml-auto text-[11px] text-gray-300">{visibleDays.length} day{visibleDays.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+
+      {subCats.length === 0 ? (
+        <div className="py-12 text-center text-sm text-gray-400">No sub-categories loaded for this head.</div>
+      ) : (
+        <div ref={containerRef} className="overflow-auto" style={{ maxHeight: '62vh' }}>
+          <table className="border-collapse w-full" style={{ tableLayout: 'fixed', minWidth: LABEL_W + visibleDays.length * MIN_CELL + TOTAL_W }}>
+            <thead>
+              <tr>
+                <th className="sticky top-0 left-0 z-20 bg-gray-50 border-b border-r border-gray-200 px-3 py-2 text-left text-[11px] text-gray-400 font-medium"
+                  style={{ minWidth: LABEL_W, width: LABEL_W }}>Sub-category</th>
+                {visibleDayLabels.map(({ d, label }) => (
+                  <th key={d}
+                    className={`sticky top-0 z-10 border-b border-gray-200 py-1.5 text-center text-[11px] font-medium ${
+                      weekendSet.has(d) ? 'bg-slate-100 text-slate-400' : 'bg-gray-50 text-gray-400'
+                    }`}
+                    style={{ minWidth: CELL_W, width: CELL_W }}>
+                    <div className="leading-tight">{d}</div>
+                    <div className="text-[9px] opacity-60 leading-tight">{label}</div>
+                  </th>
+                ))}
+                <th className="sticky top-0 right-0 z-20 bg-gray-50 border-b border-l border-gray-200 px-2 py-2 text-right text-[11px] text-gray-400 font-medium"
+                  style={{ minWidth: TOTAL_W, width: TOTAL_W }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {catGroups.map(({ category, details }) => {
+                const isCollapsed = openGroup !== category;
+                const groupSubCats = details || [];
+                const groupTotal = visibleDays.reduce((s, d) =>
+                  s + groupSubCats.reduce((ss, sc) => ss + parseMoney((grid[sc] || {})[d] || ''), 0), 0);
+                const colCount = visibleDays.length + 2; // label + days + total
+                return (
+                  <React.Fragment key={category}>
+                    {/* Group header row */}
+                    <tr className="bg-slate-50 border-y border-slate-200">
+                      <td
+                        className="sticky left-0 z-10 border-r border-slate-200 px-3 text-[11px] font-semibold text-slate-600 whitespace-nowrap bg-slate-50 cursor-pointer select-none"
+                        style={{ minWidth: LABEL_W, height: 30 }}
+                        onClick={() => toggleGroup(category)}
+                      >
+                        <span className="mr-1.5 text-slate-400">{isCollapsed ? '▶' : '▼'}</span>
+                        {category}
+                        {isCollapsed && groupTotal > 0 && (
+                          <span className="ml-2 text-slate-400 font-normal">{Math.round(groupTotal).toLocaleString('en-IN')}</span>
+                        )}
+                      </td>
+                      {isCollapsed
+                        ? <td colSpan={visibleDays.length + 1} className="bg-slate-50" />
+                        : visibleDays.map(d => (
+                            <td key={d} className={`border-r border-slate-100 bg-slate-50 ${weekendSet.has(d) ? 'bg-slate-100' : ''}`}
+                              style={{ width: CELL_W, height: 30 }} />
+                          ))
+                      }
+                      {!isCollapsed && (
+                        <td className="sticky right-0 z-10 border-l border-slate-200 bg-slate-50"
+                          style={{ minWidth: TOTAL_W, height: 30 }} />
+                      )}
+                    </tr>
+
+                    {/* Sub-category rows */}
+                    {!isCollapsed && groupSubCats.map((sc, si) => {
+                      const rowBg = si % 2 === 0 ? 'bg-white' : 'bg-gray-50/40';
+                      return (
+                        <tr key={sc}>
+                          <td className={`sticky left-0 z-10 border-r border-gray-100 pl-7 pr-3 text-[11px] text-gray-700 font-medium whitespace-nowrap ${rowBg}`}
+                            style={{ minWidth: LABEL_W, height: 36 }}>{sc}</td>
+                          {visibleDays.map(d => {
+                            const val      = (grid[sc] || {})[d] || '';
+                            const note     = (notesGrid[sc] || {})[d] || '';
+                            const filled   = parseMoney(val) > 0;
+                            const hasNote  = note.trim().length > 0;
+                            const isActive = activeNote && activeNote.sc === sc && activeNote.d === d;
+                            const cellBg   = weekendSet.has(d)
+                              ? 'bg-slate-50' : si % 2 === 0 ? 'bg-white' : 'bg-gray-50/40';
+                            return (
+                              <td key={d}
+                                className={`p-0 border border-gray-100 ${cellBg}`}
+                                style={{ width: CELL_W, height: 36 }}>
+                                <div className="relative group w-full h-full">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={val}
+                                    onChange={e => setCell(sc, d, e.target.value)}
+                                    className={`block w-full h-full px-1.5 text-right text-[11px] bg-transparent outline-none
+                                      focus:bg-sky-50 focus:ring-inset focus:ring-1 focus:ring-sky-300
+                                      ${filled ? 'text-gray-800 font-semibold' : 'text-gray-200 placeholder-gray-200'}`}
+                                    placeholder="·"
+                                    style={{ width: CELL_W, height: 36, paddingBottom: hasNote ? 10 : undefined }}
+                                  />
+                                  {hasNote && (
+                                    <span className="absolute bottom-1 left-1 w-1.5 h-1.5 rounded-full bg-amber-400 pointer-events-none" />
+                                  )}
+                                  <button
+                                    onMouseDown={e => openNote(sc, d, e)}
+                                    className={`absolute bottom-0.5 right-0.5 text-[9px] leading-none px-0.5 rounded transition-opacity
+                                      ${isActive ? 'opacity-100 text-sky-500' : 'opacity-0 group-hover:opacity-100 text-gray-300 hover:text-gray-500'}`}
+                                    tabIndex={-1}
+                                    title="Add note"
+                                  >✎</button>
+                                </div>
+                              </td>
+                            );
+                          })}
+                          <td className={`sticky right-0 z-10 border-l border-gray-100 px-2 text-right text-[11px] font-semibold ${rowBg}`}
+                            style={{ minWidth: TOTAL_W, height: 36 }}>
+                            {rowTotals[sc] > 0
+                              ? <span className="text-gray-700">{Math.round(rowTotals[sc]).toLocaleString('en-IN')}</span>
+                              : <span className="text-gray-200">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-gray-300">
+                <td className="sticky left-0 z-10 border-r border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-500 bg-gray-100">
+                  Day total</td>
+                {visibleDays.map(d => {
+                  const t = colTotals[d];
+                  return (
+                    <td key={d} className={`border border-gray-100 px-1 py-1.5 text-right text-[11px] font-medium ${
+                      weekendSet.has(d) ? 'bg-slate-100' : 'bg-gray-100'
+                    } ${t > 0 ? 'text-gray-700' : 'text-gray-300'}`}>
+                      {t > 0 ? Math.round(t).toLocaleString('en-IN') : '—'}
+                    </td>
+                  );
+                })}
+                <td className="sticky right-0 z-10 border-l border-gray-200 px-2 py-1.5 text-right text-xs font-bold text-gray-800 bg-gray-100">
+                  {grandTotal > 0 ? '₹' + Math.round(grandTotal).toLocaleString('en-IN') : '—'}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100">
+        <span className="text-xs text-gray-400">{filledCount} cell{filledCount !== 1 ? 's' : ''} filled</span>
+        {draftSavedAt && (
+          <span className="text-[11px] text-amber-500">
+            Draft saved {draftSavedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={saveDraft} disabled={filledCount === 0}
+            className="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+            Save draft
+          </button>
+          <button onClick={handleSave} disabled={filledCount === 0}
+            className="px-4 py-1.5 bg-gray-800 text-white text-sm rounded hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">
+            Save{filledCount > 0 ? ` (${filledCount})` : ''}
+          </button>
+        </div>
+      </div>
+
+      {/* Note popover — fixed so it's never clipped by overflow:auto */}
+      {activeNote && (
+        <div ref={noteRef}
+          className="fixed z-[300] bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-56"
+          style={{ top: activeNote.top, left: activeNote.left }}
+          onMouseDown={e => e.stopPropagation()}>
+          <div className="text-[10px] text-gray-400 mb-2 font-medium">
+            {activeNote.sc} · Day {activeNote.d}
+          </div>
+          <textarea
+            autoFocus
+            rows={3}
+            value={(notesGrid[activeNote.sc] || {})[activeNote.d] || ''}
+            onChange={e => setNote(activeNote.sc, activeNote.d, e.target.value)}
+            placeholder="Add a note…"
+            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-sky-300"
+          />
+          <button onClick={() => setActiveNote(null)}
+            className="mt-2 w-full py-1.5 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-700">
+            Done
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── QUICK SLOTS CONFIG MODAL ──────────────────────────────────────────────
+
+function QuickSlotsConfig({ categoryGroups, quickSlots, onToggle, onClose }) {
+  // Build flat list of all sub-categories across all types
+  const allItems = useMemo(() => {
+    const result = [];
+    Object.entries(categoryGroups).forEach(([type, groups]) => {
+      (groups || []).forEach(({ category, details }) => {
+        (details || []).forEach(det => {
+          result.push({ subCategory: det, parentCategory: category, type });
+        });
+      });
+    });
+    return result;
+  }, [categoryGroups]);
+
+  const selectedKeys = new Set(quickSlots.map(s => s.subCategory));
+  const canAddMore = quickSlots.length < MAX_QUICK_SLOTS;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex flex-col" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      {/* Sheet — slides up from bottom */}
+      <div
+        className="relative mt-auto bg-white rounded-t-2xl max-h-[80vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800">Configure shortcuts</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{quickSlots.length}/{MAX_QUICK_SLOTS} selected</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+        </div>
+
+        {/* Scrollable list */}
+        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4">
+          {allItems.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-8">No categories loaded yet.</p>
+          )}
+          {TABS.map(type => {
+            const items = allItems.filter(i => i.type === type);
+            if (items.length === 0) return null;
+            return (
+              <div key={type}>
+                <p className={`text-xs font-semibold mb-2 ${TYPE_COLOR[type].text}`}>{TAB_LABEL[type]}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {items.map(item => {
+                    const selected = selectedKeys.has(item.subCategory);
+                    return (
+                      <button
+                        key={item.subCategory}
+                        onClick={() => onToggle(item)}
+                        disabled={!selected && !canAddMore}
+                        className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors
+                          ${ selected
+                              ? `${TYPE_COLOR[type].bg} ${TYPE_COLOR[type].border} ${TYPE_COLOR[type].text}`
+                              : canAddMore
+                                ? 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
+                                : 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
+                          }`}
+                      >
+                        <span className="text-xl">{catEmoji(item.subCategory)}</span>
+                        <span className="truncate w-full text-center px-1 leading-tight">{item.subCategory}</span>
+                        {selected && <span className="text-[10px] opacity-60">✓ selected</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="w-full py-2 bg-gray-800 text-white text-sm rounded font-medium hover:bg-gray-700"
+          >Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MOBILE QUICK ENTRY (redesigned) ───────────────────────────────────────
+
+function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
+  const today = todayStr();
+  const [date, setDate]           = useState(today);
+  const [txnType, setTxnType]     = useState('Expense');
+  const [parentCat, setParentCat] = useState('');
+  const [subCat, setSubCat]       = useState('');
+  const [amount, setAmount]       = useState('');
+  const [notes, setNotes]         = useState('');
+  const [pending, setPending]     = useState([]);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [quickSlots, setQuickSlots] = useState(loadQuickSlots);
+  const amountRef = useRef(null);
+
+  // Pad slots to always show MAX_QUICK_SLOTS tiles
+  const slotTiles = useMemo(() => {
+    const tiles = [...quickSlots];
+    while (tiles.length < MAX_QUICK_SLOTS) tiles.push(null);
+    return tiles;
+  }, [quickSlots]);
+
+  function toggleSlot(item) {
+    setQuickSlots(prev => {
+      const exists = prev.find(s => s.subCategory === item.subCategory);
+      const next = exists
+        ? prev.filter(s => s.subCategory !== item.subCategory)
+        : prev.length < MAX_QUICK_SLOTS ? [...prev, item] : prev;
+      persistQuickSlots(next);
+      return next;
+    });
+  }
+
+  // Parent categories for the selected type
+  const parentCats = useMemo(
+    () => (categoryGroups[txnType] || []).map(g => g.category),
+    [categoryGroups, txnType]
+  );
+
+  // Sub-categories for the selected parent
+  const subCats = useMemo(
+    () => (categoryGroups[txnType] || []).find(g => g.category === parentCat)?.details || [],
+    [categoryGroups, txnType, parentCat]
+  );
+
+  function handleTypeChange(t) { setTxnType(t); setParentCat(''); setSubCat(''); }
+  function handleParentChange(p) { setParentCat(p); setSubCat(''); }
+
+  function tapSlot(slot) {
+    setTxnType(slot.type || 'Expense');
+    setParentCat(slot.parentCategory || '');
+    setSubCat(slot.subCategory || '');
+    setAmount('');
+    setTimeout(() => amountRef.current?.focus(), 80);
+  }
+
+  const canAdd = parseMoney(amount) > 0;
+
+  function addToPending() {
+    const amt = parseMoney(amount);
+    if (!amt) return;
+    setPending(prev => [...prev, { _id: uid(), type: txnType, parentCat, subCategory: subCat, amount: amt, notes }]);
+    setSubCat('');
+    setAmount('');
+    setNotes('');
+    setTimeout(() => amountRef.current?.focus(), 80);
+  }
+
+  function removePending(id) { setPending(prev => prev.filter(e => e._id !== id)); }
+
+  function saveAll() {
+    if (pending.length === 0) return;
+    const snapshot = [...pending];
+    setPending([]);
+    snapshot.forEach(entry => onAdd({
+      id: String(uid()), date,
+      type: entry.type, subCategory: entry.subCategory,
+      amount: entry.amount, notes: entry.notes,
+    }));
+  }
+
+  const todayTxns = useMemo(() => transactions.filter(t => t.date === today), [transactions]);
+  const todayTotal = todayTxns.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
+  const pendingTotal = pending.reduce((s, e) => s + e.amount, 0);
+
+  return (
+    <div className="space-y-3">
+
+      {/* Config modal */}
+      {configOpen && (
+        <QuickSlotsConfig
+          categoryGroups={categoryGroups}
+          quickSlots={quickSlots}
+          onToggle={toggleSlot}
+          onClose={() => setConfigOpen(false)}
+        />
+      )}
+
+      {/* Quick shortcut tiles */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-gray-400">Quick fill</p>
+          <button
+            onClick={() => setConfigOpen(true)}
+            className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1"
+            aria-label="Configure shortcuts"
+          >
+            <span>✎</span><span>Edit</span>
+          </button>
+        </div>
+
+        {/* 5 equal icon tiles */}
+        <div className="grid gap-2" style={{gridTemplateColumns: 'repeat(5, 1fr)'}}>
+          {slotTiles.map((slot, i) => slot ? (
+            <button
+              key={slot.subCategory}
+              onClick={() => tapSlot(slot)}
+              className="flex flex-col items-center gap-1 py-3 bg-white border border-gray-200 rounded-xl active:bg-gray-50 transition-colors min-w-0"
+            >
+              <span className="text-2xl leading-none">{catEmoji(slot.subCategory)}</span>
+              <span className="text-[10px] text-gray-600 truncate w-full text-center px-0.5 leading-tight">{slot.subCategory}</span>
+            </button>
+          ) : (
+            <button
+              key={`empty-${i}`}
+              onClick={() => setConfigOpen(true)}
+              className="flex flex-col items-center justify-center py-3 border border-dashed border-gray-200 rounded-xl text-gray-300 hover:border-gray-400 hover:text-gray-400 transition-colors"
+              aria-label="Add shortcut"
+            >
+              <span className="text-xl leading-none">+</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Today mini-summary */}
+      <div className="text-xs text-gray-400">
+        Today: {todayTxns.length} {todayTxns.length === 1 ? 'entry' : 'entries'}
+        {todayTotal > 0 ? ` · ${fmt(todayTotal)} spent` : ''}
+      </div>
+
+      {/* Add Entry card */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700">Add Entry</h3>
+        </div>
+
+        <div className="px-4 py-3 space-y-3">
+
+          {/* 1. Date */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
+          </div>
+
+          {/* 2. Type */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Type</label>
+            <div className="grid grid-cols-4 gap-1">
+              {TABS.map(t => (
+                <button key={t} onClick={() => handleTypeChange(t)}
+                  className={`py-1.5 text-xs rounded font-medium transition-colors ${
+                    txnType === t ? TYPE_COLOR[t].badge : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Category */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Category</label>
+            <select value={parentCat} onChange={e => handleParentChange(e.target.value)}
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm">
+              <option value="">-- select category --</option>
+              {parentCats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* 4. Sub-category */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Sub-category</label>
+            {subCats.length > 0 ? (
+              <select value={subCat} onChange={e => setSubCat(e.target.value)}
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm">
+                <option value="">-- select sub-category --</option>
+                {subCats.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            ) : (
+              <input type="text" value={subCat} onChange={e => setSubCat(e.target.value)}
+                placeholder={parentCat ? 'Enter sub-category' : 'Select category first'}
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
+            )}
+          </div>
+
+          {/* 5. Amount */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Amount (₹)</label>
+            <input ref={amountRef} type="number" value={amount}
+              onChange={e => setAmount(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && canAdd) addToPending(); }}
+              placeholder="0" min="0" step="0.01" inputMode="decimal"
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
+          </div>
+
+          {/* 6. Notes */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Notes</label>
+            <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && canAdd) addToPending(); }}
+              placeholder="Optional"
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
+          </div>
+
+          <button onClick={addToPending} disabled={!canAdd}
+            className="w-full py-2 border border-gray-300 text-gray-700 text-sm rounded font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            + Add to list
+          </button>
+        </div>
+
+        {/* Pending entries */}
+        {pending.length > 0 && (
+          <div className="border-t border-gray-100">
+            <div className="px-4 py-2 bg-gray-50 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500">
+                {pending.length} pending · {fmtDate(date)}
+              </span>
+              <span className="text-xs font-semibold text-gray-700">{fmt(pendingTotal)}</span>
+            </div>
+            <ul className="divide-y divide-gray-50">
+              {pending.map(e => (
+                <li key={e._id} className="flex items-center justify-between px-4 py-2.5">
+                  <div className="min-w-0">
+                    <span className="text-sm text-gray-800 truncate block">{e.subCategory || e.parentCat || e.type}</span>
+                    {e.notes && <span className="text-xs text-gray-400">{e.notes}</span>}
+                  </div>
+                  <div className="flex items-center gap-3 ml-3 shrink-0">
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${TYPE_COLOR[e.type]?.badge || ''}`}>{e.type}</span>
+                    <span className="text-sm font-medium text-gray-700">{fmt(e.amount)}</span>
+                    <button onClick={() => removePending(e._id)}
+                      className="text-gray-300 hover:text-red-400 text-xs leading-none" aria-label="Remove">✕</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="px-4 py-3 border-t border-gray-100">
+              <button onClick={saveAll}
+                className="w-full py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700 font-medium">
+                Save {pending.length} {pending.length === 1 ? 'entry' : 'entries'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── TRANSACTIONS PAGE ──────────────────────────────────────────────────────
+
+function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth }) {
+  // ── Period filter state ─────────────────────────────────────────────────
+  const [periodMode, setPeriodMode] = useState('month');  // 'month' | 'range'
+  const [filterMonth, setFilterMonth] = useState(() => initialMonth || currentMonthStr());
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate]     = useState('');
+  const [loading, setLoading]   = useState(false);
+
+  // ── Head (type) filter state — independent of period ───────────────────
+  const [headFilter, setHeadFilter] = useState('All'); // 'All' | 'Expense' | 'Income' | 'Savings' | 'Payoff'
+
+  // Load month whenever month mode + filterMonth changes
+  useEffect(() => {
+    if (periodMode !== 'month') return;
+    setLoading(true);
+    onLoadMonth(filterMonth).finally(() => setLoading(false));
+  }, [filterMonth, periodMode]);
+
+  // Load range on demand
+  async function loadRange() {
+    if (!fromDate || !toDate || fromDate > toDate) return;
+    setLoading(true);
+    const [fy, fm] = fromDate.split('-').map(Number);
+    const [ty, tm] = toDate.split('-').map(Number);
+    const months = [];
+    let y = fy, m = fm;
+    while (y < ty || (y === ty && m <= tm)) {
+      months.push(`${y}-${String(m).padStart(2, '0')}`);
+      if (m === 12) { y++; m = 1; } else m++;
+    }
+    try { for (const mo of months) await onLoadMonth(mo); }
+    finally { setLoading(false); }
+  }
+
+  // ── Apply both filters independently ───────────────────────────────────
+  const periodFiltered = useMemo(() => {
+    if (periodMode === 'month') {
+      return transactions.filter(t => t.date.startsWith(filterMonth));
+    }
+    if (periodMode === 'range' && fromDate && toDate) {
+      return transactions.filter(t => t.date >= fromDate && t.date <= toDate);
+    }
+    return transactions;
+  }, [transactions, periodMode, filterMonth, fromDate, toDate]);
+
+  const filtered = useMemo(() => {
+    const list = headFilter === 'All'
+      ? periodFiltered
+      : periodFiltered.filter(t => t.type === headFilter);
+    return [...list].sort((a, b) => b.date.localeCompare(a.date));
+  }, [periodFiltered, headFilter]);
+
+  // Totals across the period (all heads), so head pills show useful numbers
+  const periodTotals = useMemo(() => {
+    const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
+    periodFiltered.forEach(tx => { t[tx.type] = (t[tx.type] || 0) + tx.amount; });
+    return t;
+  }, [periodFiltered]);
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-4xl mx-auto p-4 space-y-4">
+
+        {/* ── Header ── */}
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-gray-400 hover:text-gray-700 text-sm font-medium">&#8592; Back</button>
+          <h2 className="text-base font-semibold text-gray-800">Transactions</h2>
+          {loading && <span className="text-xs text-gray-400 animate-pulse ml-1">Loading…</span>}
+          <span className="ml-auto text-xs text-gray-400">{filtered.length} entries</span>
+        </div>
+
+        {/* ── Filter card ── */}
+        <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+
+          {/* Period row */}
+          <div className="px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Period</span>
+              <div className="flex gap-1">
+                {['month', 'range'].map(m => (
+                  <button key={m} onClick={() => setPeriodMode(m)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                      periodMode === m ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}>{m === 'month' ? 'Month' : 'Range'}</button>
+                ))}
+              </div>
+            </div>
+
+            {periodMode === 'month' && (
+              <div className="flex justify-center pt-1">
+                <MonthSelector selectedMonth={filterMonth} onChange={setFilterMonth} />
+              </div>
+            )}
+
+            {periodMode === 'range' && (
+              <div className="flex flex-wrap items-end gap-3 pt-1">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">From</label>
+                  <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                    className="border border-gray-200 rounded px-3 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">To</label>
+                  <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                    className="border border-gray-200 rounded px-3 py-1.5 text-sm" />
+                </div>
+                <button onClick={loadRange}
+                  disabled={!fromDate || !toDate || fromDate > toDate || loading}
+                  className="px-4 py-1.5 bg-slate-700 text-white text-sm rounded hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                >{loading ? 'Loading…' : 'Load'}</button>
+              </div>
+            )}
+          </div>
+
+          {/* Head row */}
+          <div className="px-4 py-3 space-y-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Head</span>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button onClick={() => setHeadFilter('All')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  headFilter === 'All' ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>All</button>
+              {TABS.map(type => {
+                const c = TYPE_COLOR[type];
+                const amt = periodTotals[type];
+                return (
+                  <button key={type} onClick={() => setHeadFilter(type)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1.5 ${
+                      headFilter === type ? c.badge : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}>
+                    <span>{type}</span>
+                    {amt > 0 && <span className="opacity-70">{fmt(amt)}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Table ── */}
+        {filtered.length === 0 ? (
+          <div className="text-center py-20 text-gray-400 text-sm">
+            {loading ? 'Loading…' : 'No transactions for this period.'}
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs text-gray-500">
+                  <th className="px-4 py-2 font-medium">Date</th>
+                  <th className="px-4 py-2 font-medium">Sub-category</th>
+                  <th className="px-4 py-2 text-right font-medium">Amount</th>
+                  <th className="px-4 py-2 font-medium">Head</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(t => {
+                  const c = TYPE_COLOR[t.type] || TYPE_COLOR.Expense;
+                  return (
+                    <tr key={t.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.date)}</td>
+                      <td className="px-4 py-2.5 text-gray-800">{t.subCategory || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${c.badge}`}>{t.type}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── DASHBOARD PAGE ─────────────────────────────────────────────────────────
+
+function DashboardPage({
+  transactions, selectedMonth, setSelectedMonth,
+  bulkRows, setBulkRows, activeTab, setActiveTab,
+  categoryGroups, onBulkSave, onQuickAdd,
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-5xl mx-auto p-4 space-y-4">
+        {/* Month selector */}
+        <div className="flex items-center justify-center">
+          <MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+        </div>
+
+        {/* Summary cards */}
+        <SummaryCards transactions={transactions} selectedMonth={selectedMonth} />
+
+        {/* Desktop: spreadsheet grid (md and above) */}
+        <div className="hidden md:block">
+          <SpreadsheetGrid
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            categoryGroups={categoryGroups}
+            selectedMonth={selectedMonth}
+            onSave={onBulkSave}
+          />
+        </div>
+
+        {/* Mobile: quick entry (below md) */}
+        <div className="md:hidden">
+          <QuickEntrySection
+            categoryGroups={categoryGroups}
+            onAdd={onQuickAdd}
+            transactions={transactions}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ROOT APP ───────────────────────────────────────────────────────────────
+
+function App() {
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [currentPage,   setCurrentPage]   = useState('dashboard');
+  const [transactions,  setTransactions]  = useState([]);
+  const [categoryGroups, setCategoryGroups] = useState({ Expense: [], Income: [], Savings: [], Payoff: [] });
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  const [toast, setToast]   = useState(null);
+  const [activeTab, setActiveTab] = useState('Expense');
+  const [bulkRows, setBulkRows]   = useState({
+    Expense: initRows(),
+    Income:  initRows(),
+    Savings: initRows(),
+    Payoff:  initRows(),
+  });
+
+  const showToast = useCallback((msg, type = 'success') => setToast({ msg, type }), []);
+
+  // ── Backend: load dashboard data for a month
+  const loadDashboardData = useCallback(async (monthStr) => {
+    const [y, m] = monthStr.split('-').map(Number);
+    setLoadingOverlay(true);
+    try {
+      const result = await callBackend({ action: 'getDashboardData', year: y, month: m });
+      if (result?.error === 'UNAUTHORIZED') { window.appAuth?.handleUnauthorized?.(); return; }
+      if (result?.success) {
+        // Update category groups if returned
+        if (result.categoryGroups && typeof result.categoryGroups === 'object') {
+          setCategoryGroups(result.categoryGroups);
+        }
+        // Flatten and merge this month's transactions
+        const flat = flattenExpensesByDate(result.expensesByDate || {});
+        setTransactions(prev => {
+          const others = prev.filter(t => !t.date.startsWith(monthStr));
+          return [...others, ...flat];
+        });
+      }
+    } catch (e) {
+      console.warn('[APP] loadDashboardData failed', e);
+      showToast('Failed to load data', 'error');
+    } finally {
+      setLoadingOverlay(false);
+    }
+  }, [showToast]);
+
+  // Keep a ref so window callbacks always invoke the latest version
+  const loadDashRef = useRef(loadDashboardData);
+  useEffect(() => { loadDashRef.current = loadDashboardData; }, [loadDashboardData]);
+
+  const selectedMonthRef = useRef(selectedMonth);
+  useEffect(() => { selectedMonthRef.current = selectedMonth; }, [selectedMonth]);
+
+  // ── Wire window callbacks that auth.js calls
+  useEffect(() => {
+    // auth.js calls these after successful sign-in / session restore
+    window.initializeAppAfterAuth = () => {
+      setIsInitialized(true);
+      return true; // signal "ready" back to auth.js
+    };
+    window.loadHomeData = () => {
+      // No-op: the isInitialized effect handles the initial load after auth.
+      // auth.js calls this right after initializeAppAfterAuth(); the effect
+      // already fires from the isInitialized state change, so we skip here
+      // to avoid a double API call.
+    };
+    window.resetAppInitialization = () => {
+      setIsInitialized(false);
+      setTransactions([]);
+      setCategoryGroups({ Expense: [], Income: [], Savings: [], Payoff: [] });
+      setCurrentPage('dashboard');
+    };
+
+    // Hide the loading overlay now that React has mounted
+    setLoadingOverlay(false);
+
+    // If auth.js already ran restoreSession before React mounted, self-initialize
+    if (window.appAuth?.isSignedIn()) {
+      setIsInitialized(true);
+    }
+
+    return () => {
+      delete window.initializeAppAfterAuth;
+      delete window.loadHomeData;
+      delete window.resetAppInitialization;
+    };
+  }, []); // run once on mount only
+
+  // ── Load data when initialized (first time)
+  useEffect(() => {
+    if (!isInitialized) return;
+    loadDashboardData(selectedMonth);
+  }, [isInitialized]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Reload when selected month changes (after initialization)
+  useEffect(() => {
+    if (!isInitialized) return;
+    loadDashboardData(selectedMonth);
+  }, [selectedMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Bulk save (Phases 3 + 6)
+  const handleBulkSave = useCallback(async (type, rows) => {
+    const filled = rows.filter(r => r.subCategory && parseMoney(r.amount) > 0);
+    if (filled.length === 0) { showToast('No filled rows to save', 'error'); return; }
+
+    const lookup = buildSubCatLookup(categoryGroups);
+
+    // Group by date for API calls
+    const byDate = {};
+    filled.forEach(r => {
+      if (!byDate[r.date]) byDate[r.date] = [];
+      byDate[r.date].push(r);
+    });
+
+    setLoadingOverlay(true);
+    try {
+      const allSaved = [];
+
+      for (const [date, dateRows] of Object.entries(byDate)) {
+        const result = await callBackend({
+          action:   'saveExpenses',
+          date,
+          expenses: dateRows.map(r => {
+            const meta = lookup[r.subCategory] || {};
+            return {
+              type:     meta.type || type,
+              category: meta.parentCategory || r.subCategory || type,
+              detail:   r.subCategory,
+              amount:   parseMoney(r.amount),
+              notes:    r.notes,
+            };
+          }),
+        });
+
+        if (result?.error === 'UNAUTHORIZED') { window.appAuth?.handleUnauthorized?.(); return; }
 
         if (result?.success) {
-            showToast('Entry saved successfully', 'success');
-            if (result.savedExpenses && result.savedExpenses.length) {
-                mergeSavedExpensesIntoState({ [date]: result.savedExpenses });
-            }
-            rememberRecentAdd({
-                type: addScreenState.quickType,
-                parentCategory,
-                detail,
-                amount,
-                notes
-            });
-            resetQuickAddForm(true);
-        } else {
-            showToast(result?.message || 'Failed to save entry', 'error');
+          const savedItems = result.savedExpenses || dateRows.map(r => ({
+            id: String(uid()), date, type,
+            subCategory: r.subCategory,
+            amount: parseMoney(r.amount),
+            notes: r.notes,
+          }));
+          savedItems.forEach(e => allSaved.push({
+            id: e.id || String(uid()),
+            date: e.date || date,
+            type: e.type || type,
+            subCategory: e.detail || e.subCategory || '',
+            amount: parseMoney(e.amount),
+            notes: e.notes || '',
+          }));
         }
-    } catch (error) {
-        console.error('[QUICK_ADD] Error saving quick entry:', error);
-        showToast('Failed to save entry. Please try again.', 'error');
+      }
+
+      if (allSaved.length > 0) {
+        setTransactions(prev => [...prev, ...allSaved]);
+        setBulkRows(prev => ({ ...prev, [type]: initRows() }));
+        showToast(`Saved ${allSaved.length} ${allSaved.length === 1 ? 'entry' : 'entries'}`);
+      }
+    } catch (e) {
+      console.error('[APP] Bulk save error', e);
+      showToast('Save failed', 'error');
     } finally {
-        if (saveBtn) {
-            saveBtn.textContent = 'Save Entry';
-            updateQuickAddState();
-        }
+      setLoadingOverlay(false);
     }
-}
+  }, [categoryGroups, showToast]);
 
-/**
- * Initialize Add Screen
- */
-function initializeAddScreen() {
-    console.log('[ADD_SCREEN] Initializing...');
-    
-    // Tab switching
-    const tabButtons = document.querySelectorAll('.add-tab');
-    tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => switchAddTab(btn.dataset.tab));
-    });
-    
-    // Back button
-    const addBackBtn = document.getElementById('addBackBtn');
-    if (addBackBtn) {
-        addBackBtn.addEventListener('click', closeAddScreen);
-    }
-    
-    const quickTypeButtons = document.querySelectorAll('.type-chip');
-    quickTypeButtons.forEach(btn => {
-        btn.addEventListener('click', () => selectQuickType(btn.dataset.type));
-    });
+  // ── Quick add (Phase 4 + 6)
+  const handleQuickAdd = useCallback(async (transaction) => {
+    // Optimistic local add
+    setTransactions(prev => [...prev, transaction]);
 
-    const quickParentCategory = document.getElementById('quickParentCategory');
-    if (quickParentCategory) {
-        quickParentCategory.addEventListener('change', () => {
-            addScreenState.quickParent = quickParentCategory.value;
-            addScreenState.quickDetail = '';
-            populateQuickDetailOptions(quickParentCategory.value);
-            updateQuickAddState();
-        });
-    }
+    const lookup = buildSubCatLookup(categoryGroups);
+    const meta   = lookup[transaction.subCategory] || {};
 
-    const quickDetailCategory = document.getElementById('quickDetailCategory');
-    if (quickDetailCategory) {
-        quickDetailCategory.addEventListener('change', () => {
-            addScreenState.quickDetail = quickDetailCategory.value;
-            updateQuickAddState();
-        });
-    }
-
-    ['quickEntryDate', 'quickEntryAmount', 'quickEntryNotes'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', updateQuickAddState);
-            el.addEventListener('change', updateQuickAddState);
-        }
-    });
-
-    const quickSaveBtn = document.getElementById('quickSaveBtn');
-    if (quickSaveBtn) {
-        quickSaveBtn.addEventListener('click', saveQuickEntry);
-    }
-
-    // Expense mode switching (By Date / By Category)
-    const modeRadios = document.querySelectorAll('input[name="expenseMode"]');
-    modeRadios.forEach(radio => {
-        radio.addEventListener('change', () => switchExpenseMode(radio.value));
-    });
-    
-    // Expenses tab buttons
-    const addExpenseRowBtn = document.getElementById('addExpenseRowBtn');
-    if (addExpenseRowBtn) {
-        addExpenseRowBtn.addEventListener('click', addExpenseRow);
-    }
-    
-    const addExpenseRowByCategoryBtn = document.getElementById('addExpenseRowByCategoryBtn');
-    if (addExpenseRowByCategoryBtn) {
-        addExpenseRowByCategoryBtn.addEventListener('click', addExpenseRowByCategory);
-    }
-    
-    const expensesSaveBtn = document.getElementById('expensesSaveBtn');
-    if (expensesSaveBtn) {
-        expensesSaveBtn.addEventListener('click', saveExpenses);
-    }
-    
-    // Category dropdown change listener
-    const expensesCategorySelect = document.getElementById('expensesCategorySelect');
-    if (expensesCategorySelect) {
-        expensesCategorySelect.addEventListener('change', updateSaveButtonState);
-    }
-    
-    // Monthly tab buttons
-    const monthlySaveBtn = document.getElementById('monthlySaveBtn');
-    if (monthlySaveBtn) {
-        monthlySaveBtn.addEventListener('click', saveMonthly);
-    }
-
-    // Monthly add-row buttons
-    const addIncomeMonthlyRowBtn = document.getElementById('addIncomeMonthlyRowBtn');
-    if (addIncomeMonthlyRowBtn) {
-        addIncomeMonthlyRowBtn.addEventListener('click', () => addMonthlyRow('income'));
-    }
-
-    const addSavingsMonthlyRowBtn = document.getElementById('addSavingsMonthlyRowBtn');
-    if (addSavingsMonthlyRowBtn) {
-        addSavingsMonthlyRowBtn.addEventListener('click', () => addMonthlyRow('savings'));
-    }
-
-    const addPayoffMonthlyRowBtn = document.getElementById('addPayoffMonthlyRowBtn');
-    if (addPayoffMonthlyRowBtn) {
-        addPayoffMonthlyRowBtn.addEventListener('click', () => addMonthlyRow('payoff'));
-    }
-    
-    // Collapsible sections
-    const sectionHeaders = document.querySelectorAll('.section-header-collapsible');
-    sectionHeaders.forEach(header => {
-        header.addEventListener('click', () => toggleSection(header.dataset.section));
-    });
-    
-    console.log('[ADD_SCREEN] Initialized successfully');
-}
-
-/**
- * Open Add Screen
- */
-function openAddScreen() {
-    console.log('[ADD_SCREEN] Opening...');
-    console.log('[ADD_SCREEN] appState.categories available:', appState.categories ? appState.categories.length : 'undefined');
-    
-    // Ensure categories are loaded
-    if (!appState.categories || appState.categories.length === 0) {
-        console.log('[ADD_SCREEN] Categories not loaded, fetching now...');
-        fetchCategories().then(() => {
-            openAddScreenAfterCategories();
-        });
-    } else {
-        openAddScreenAfterCategories();
-    }
-}
-
-/**
- * Open Add Screen after categories are loaded
- */
-function openAddScreenAfterCategories() {
-    // Switch to add page
-    const addPage = document.getElementById('add-page');
-    if (addPage) {
-        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-        addPage.style.display = 'block';
-        
-        // Reset to expenses tab
-        resetAddScreen();
-        switchAddTab('expenses');
-    }
-}
-
-/**
- * Close Add Screen
- */
-function closeAddScreen() {
-    console.log('[ADD_SCREEN] Closing...');
-    
-    // Navigate to home
-    const homeNavBtn = document.querySelector('.nav-rail-item[data-page="dashboard"]');
-    if (homeNavBtn) {
-        homeNavBtn.click();
-    }
-}
-
-/**
- * Reset Add Screen
- */
-function resetAddScreen() {
-    console.log('[ADD_SCREEN] Resetting...');
-    addScreenState.currentTab = 'expenses';
-    addScreenState.expenseMode = 'byDate';
-    addScreenState.expenseRows = [];
-    addScreenState.expenseRowsByCategory = [];
-    addScreenState.monthlyRows = { income: [], savings: [], payoff: [] };
-    addScreenState.rowCounter = 0;
-    addScreenState.rowCounterByCategory = 0;
-    addScreenState.quickType = 'Expense';
-    addScreenState.quickParent = '';
-    addScreenState.quickDetail = '';
-
-    const expenseContainer = document.getElementById('expenseRowsContainer');
-    if (expenseContainer) expenseContainer.innerHTML = '';
-    
-    const expenseByCategoryContainer = document.getElementById('expenseRowsByCategoryContainer');
-    if (expenseByCategoryContainer) expenseByCategoryContainer.innerHTML = '';
-
-    ['income', 'savings', 'payoff'].forEach(type => {
-        const container = document.getElementById(`${type}MonthlyRows`);
-        if (container) container.innerHTML = '';
-    });
-    
-    // Set main date field to today
-    const dateInput = document.getElementById('expensesDate');
-    if (dateInput) {
-        const today = new Date();
-        dateInput.valueAsDate = today;
-    }
-    
-    // Set category selector to default
-    const categorySelect = document.getElementById('expensesCategorySelect');
-    if (categorySelect) {
-        categorySelect.value = '';
-        if (!appState.categories || appState.categories.length === 0) {
-            console.log('[ADD_SCREEN] Categories not loaded yet, fetching...');
-            fetchCategories().then(() => {
-                populateCategoriesByType(categorySelect, 'Expense');
-            });
-        } else {
-            populateCategoriesByType(categorySelect, 'Expense');
-        }
-    }
-    
-    // Set monthly selector to current month for both tabs
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const monthValue = `${year}-${month}`;
-    
-    const monthlyMonthPicker = document.getElementById('monthlyMonthPicker');
-    if (monthlyMonthPicker) {
-        monthlyMonthPicker.value = monthValue;
-    }
-
-    // Reset expense mode selector to byDate
-    const modeRadios = document.querySelectorAll('input[name="expenseMode"]');
-    modeRadios.forEach(radio => {
-        radio.checked = radio.value === 'byDate';
-    });
-    switchExpenseMode('byDate');
-
-    resetQuickAddForm();
-
-    // Reset save buttons text
-    const expensesSaveBtn = document.getElementById('expensesSaveBtn');
-    if (expensesSaveBtn) {
-        expensesSaveBtn.textContent = 'Save';
-    }
-    
-    const monthlySaveBtn = document.getElementById('monthlySaveBtn');
-    if (monthlySaveBtn) {
-        monthlySaveBtn.textContent = 'Save';
-    }
-
-    // Ensure at least one empty expense row is present
-    addExpenseRow();
-
-    // Reset tab visuals and save button
-    switchAddTab('expenses');
-    updateSaveButtonState();
-}
-
-/**
- * Switch between add screen tabs
- */
-function switchAddTab(tabName) {
-    addScreenState.currentTab = tabName;
-
-    document.querySelectorAll('.add-tab').forEach(btn => {
-        const isActive = btn.dataset.tab === tabName;
-        btn.classList.toggle('active', isActive);
-        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    });
-
-    document.querySelectorAll('.add-tab-content').forEach(content => {
-        content.classList.toggle('active', content.id === `${tabName}TabContent`);
-    });
-
-    if (tabName === 'monthly') {
-        ['income', 'savings', 'payoff'].forEach(type => {
-            const container = document.getElementById(`${type}MonthlyRows`);
-            if (container && container.children.length === 0) {
-                addMonthlyRow(type);
-            }
-        });
-    } else {
-        // Ensure at least one expense row is present when returning to expenses tab
-        const expenseContainer = document.getElementById('expenseRowsContainer');
-        if (expenseContainer && expenseContainer.children.length === 0) {
-            addExpenseRow();
-        }
-    }
-
-    updateSaveButtonState();
-}
-
-/**
- * Switch expense mode (By Date or By Category)
- */
-function switchExpenseMode(mode) {
-    console.log('[ADD_SCREEN] Switching expense mode to:', mode);
-    addScreenState.expenseMode = mode;
-    
-    const byDateMode = document.getElementById('expenseByDateMode');
-    const byCategoryMode = document.getElementById('expenseByCategoryMode');
-    
-    if (mode === 'byDate') {
-        byDateMode.classList.remove('hidden');
-        byCategoryMode.classList.add('hidden');
-        
-        // Reset by-category container and rows
-        const container = document.getElementById('expenseRowsByCategoryContainer');
-        if (container) container.innerHTML = '';
-        addScreenState.expenseRowsByCategory = [];
-        addScreenState.rowCounterByCategory = 0;
-        
-        // Ensure at least one row in by-date mode
-        const dateContainer = document.getElementById('expenseRowsContainer');
-        if (dateContainer && dateContainer.children.length === 0) {
-            addExpenseRow();
-        }
-    } else {
-        byDateMode.classList.add('hidden');
-        byCategoryMode.classList.remove('hidden');
-        
-        // Ensure categories are loaded before populating dropdown
-        if (!appState.categories || appState.categories.length === 0) {
-            console.log('[ADD_SCREEN] Categories not loaded, fetching...');
-            fetchCategories().then(() => {
-                const categorySelect = document.getElementById('expensesCategorySelect');
-                if (categorySelect) {
-                    categorySelect.innerHTML = '<option value="">Select category</option>';
-                    populateCategoriesByType(categorySelect, 'Expense');
-                }
-            });
-        } else {
-            // Categories already loaded
-            const categorySelect = document.getElementById('expensesCategorySelect');
-            if (categorySelect) {
-                categorySelect.innerHTML = '<option value="">Select category</option>';
-                populateCategoriesByType(categorySelect, 'Expense');
-            }
-        }
-        
-        // Reset by-date container and rows
-        const container = document.getElementById('expenseRowsContainer');
-        if (container) container.innerHTML = '';
-        addScreenState.expenseRows = [];
-        addScreenState.rowCounter = 0;
-        
-        // Ensure at least one row in by-category mode
-        const categoryContainer = document.getElementById('expenseRowsByCategoryContainer');
-        if (categoryContainer && categoryContainer.children.length === 0) {
-            addExpenseRowByCategory();
-        }
-    }
-    
-    updateSaveButtonState();
-}
-
-/**
- * Toggle collapsible section
- */
-function toggleSection(sectionName) {
-    const content = document.getElementById(sectionName + 'SectionContent');
-    const arrow = document.querySelector(`[data-section="${sectionName}"] .collapse-arrow`);
-    
-    if (content.classList.contains('collapsed')) {
-        content.classList.remove('collapsed');
-        arrow.textContent = '▼';
-    } else {
-        content.classList.add('collapsed');
-        arrow.textContent = '▶';
-    }
-}
-
-/**
- * Expand section
- */
-function expandSection(sectionName) {
-    const content = document.getElementById(sectionName + 'SectionContent');
-    const arrow = document.querySelector(`[data-section="${sectionName}"] .collapse-arrow`);
-    
-    if (content) {
-        content.classList.remove('collapsed');
-        if (arrow) arrow.textContent = '▼';
-    }
-}
-
-/**
- * Add expense row
- */
-function addExpenseRow() {
-    const container = document.getElementById('expenseRowsContainer');
-    const rowId = addScreenState.rowCounter++;
-    const isFirstRow = addScreenState.expenseRows.length === 0;
-    
-    const row = document.createElement('tr');
-    row.className = 'expense-row';
-    row.dataset.rowId = rowId;
-    row.dataset.type = 'expense';
-    
-    row.innerHTML = `
-        <td data-label="Category">
-            <select class="row-category" data-row-id="${rowId}">
-                <option value="">Select category</option>
-            </select>
-        </td>
-        <td data-label="Amount">
-            <input type="number" class="row-amount" data-row-id="${rowId}" placeholder="0.00" step="0.01" min="0">
-        </td>
-        <td data-label="Notes">
-            <input type="text" class="row-notes" data-row-id="${rowId}" placeholder="Optional">
-        </td>
-        <td data-label="Action">
-            <button type="button" class="remove-btn" ${isFirstRow ? 'disabled' : ''} onclick="removeExpenseRow(${rowId})">✕</button>
-        </td>
-    `;
-    
-    container.appendChild(row);
-    
-    // Populate categories
-    const categorySelect = row.querySelector('.row-category');
-    console.log('[ADD_SCREEN] addExpenseRow: Populating categories for expense row');
-    
-    // Try to find expense categories - database uses 'Expenses' (plural)
-    const typesToTry = ['Expenses', 'Expense', 'expense'];
-    
-    for (let typeVariation of typesToTry) {
-        populateCategoriesByType(categorySelect, typeVariation);
-        if (categorySelect.options.length > 1) { // More than just the "Select category" option
-            console.log(`[ADD_SCREEN] ✓ Found categories with type: "${typeVariation}"`);
-            break;
-        }
-    }
-    
-    // Add to state
-    addScreenState.expenseRows.push(rowId);
-    
-    // Add input listeners for enable logic
-    const inputs = row.querySelectorAll('input, select');
-    console.log(`[ADD_SCREEN] Row ${rowId}: Found ${inputs.length} input/select elements`);
-    
-    inputs.forEach((input, index) => {
-        console.log(`[ADD_SCREEN] Row ${rowId}: Attaching listeners to input ${index}:`, input.className);
-        
-        input.addEventListener('input', () => {
-            console.log(`[ADD_SCREEN] Row ${rowId}: input event triggered`);
-            checkExpenseRowInput();
-            updateSaveButtonState();
-        });
-        
-        input.addEventListener('change', () => {
-            console.log(`[ADD_SCREEN] Row ${rowId}: change event triggered`);
-            checkExpenseRowInput();
-            updateSaveButtonState();
-        });
-    });
-    
-    console.log('[ADD_SCREEN] Added expense row:', rowId);
-}
-
-/**
- * Remove expense row
- */
-function removeExpenseRow(rowId) {
-    const row = document.querySelector(`.expense-row[data-row-id="${rowId}"]`);
-    if (row) {
-        row.remove();
-        addScreenState.expenseRows = addScreenState.expenseRows.filter(id => id !== rowId);
-        checkExpenseRowInput();
-        updateSaveButtonState();
-        console.log('[ADD_SCREEN] Removed expense row:', rowId);
-    }
-}
-
-/**
- * Add expense row by category (Date input instead of Category)
- */
-function addExpenseRowByCategory() {
-    const container = document.getElementById('expenseRowsByCategoryContainer');
-    const rowId = addScreenState.rowCounterByCategory++;
-    const isFirstRow = addScreenState.expenseRowsByCategory.length === 0;
-    
-    const row = document.createElement('tr');
-    row.className = 'expense-row-by-category';
-    row.dataset.rowId = rowId;
-    row.dataset.type = 'expenseByCategory';
-    
-    const today = new Date().toISOString().split('T')[0];
-    
-    row.innerHTML = `
-        <td data-label="Date">
-            <input type="date" class="row-date" data-row-id="${rowId}" value="${today}">
-        </td>
-        <td data-label="Amount">
-            <input type="number" class="row-amount" data-row-id="${rowId}" placeholder="0.00" step="0.01" min="0">
-        </td>
-        <td data-label="Notes">
-            <input type="text" class="row-notes" data-row-id="${rowId}" placeholder="Optional">
-        </td>
-        <td data-label="Action">
-            <button type="button" class="remove-btn" ${isFirstRow ? 'disabled' : ''} onclick="removeExpenseRowByCategory(${rowId})">✕</button>
-        </td>
-    `;
-    
-    container.appendChild(row);
-    
-    // Add to state
-    addScreenState.expenseRowsByCategory.push(rowId);
-    
-    // Add input listeners for enable logic
-    const inputs = row.querySelectorAll('input, select');
-    console.log(`[ADD_SCREEN] Category row ${rowId}: Found ${inputs.length} input/select elements`);
-    
-    inputs.forEach((input, index) => {
-        console.log(`[ADD_SCREEN] Category row ${rowId}: Attaching listeners to input ${index}:`, input.className);
-        
-        input.addEventListener('input', () => {
-            console.log(`[ADD_SCREEN] Category row ${rowId}: input event triggered`);
-            checkExpenseRowByCategoryInput();
-            updateSaveButtonState();
-        });
-        
-        input.addEventListener('change', () => {
-            console.log(`[ADD_SCREEN] Category row ${rowId}: change event triggered`);
-            checkExpenseRowByCategoryInput();
-            updateSaveButtonState();
-        });
-    });
-    
-    console.log('[ADD_SCREEN] Added expense row by category:', rowId);
-}
-
-/**
- * Remove expense row by category
- */
-function removeExpenseRowByCategory(rowId) {
-    const row = document.querySelector(`.expense-row-by-category[data-row-id="${rowId}"]`);
-    if (row) {
-        row.remove();
-        addScreenState.expenseRowsByCategory = addScreenState.expenseRowsByCategory.filter(id => id !== rowId);
-        checkExpenseRowByCategoryInput();
-        updateSaveButtonState();
-        console.log('[ADD_SCREEN] Removed expense row by category:', rowId);
-    }
-}
-
-/**
- * Check if any expense row by category has input (to enable + button)
- */
-function checkExpenseRowByCategoryInput() {
-    const rows = document.querySelectorAll('.expense-row-by-category');
-    const addBtn = document.getElementById('addExpenseRowByCategoryBtn');
-    
-    console.log('[ADD_SCREEN] checkExpenseRowByCategoryInput: Checking', rows.length, 'expense rows by category');
-    
-    let hasInput = false;
-    rows.forEach(row => {
-        const dateInput = row.querySelector('.row-date');
-        const amountInput = row.querySelector('.row-amount');
-        
-        if ((dateInput && dateInput.value) || (amountInput && amountInput.value)) {
-            hasInput = true;
-        }
-    });
-    
-    if (addBtn) {
-        addBtn.disabled = !hasInput;
-    }
-    
-    // Update save button state
-    updateSaveButtonState();
-}
-
-/**
- * Check if any expense row has input (to enable + button)
- */
-function checkExpenseRowInput() {
-    const rows = document.querySelectorAll('.expense-row');
-    let hasInput = false;
-    
-    console.log('[ADD_SCREEN] checkExpenseRowInput: Checking', rows.length, 'expense rows');
-    
-    rows.forEach((row, index) => {
-        const categorySelect = row.querySelector('.row-category');
-        const amountInput = row.querySelector('.row-amount');
-        const notesInput = row.querySelector('.row-notes');
-        
-        const category = categorySelect ? categorySelect.value : '';
-        const amount = amountInput ? amountInput.value : '';
-        const notes = notesInput ? notesInput.value : '';
-        
-        console.log(`[ADD_SCREEN] Row ${index}: category="${category}", amount="${amount}", notes="${notes}"`);
-        
-        if (category || amount || notes) {
-            hasInput = true;
-        }
-    });
-    
-    const addBtn = document.getElementById('addExpenseRowBtn');
-    if (addBtn) {
-        addBtn.disabled = !hasInput;
-        console.log(`[ADD_SCREEN] Add button state: disabled=${!hasInput}`);
-    }
-}
-
-
-/**
- * Add monthly row
- */
-function addMonthlyRow(sectionType) {
-    const container = document.getElementById(sectionType + 'MonthlyRows');
-    if (!container) return;
-    const rowId = addScreenState.rowCounter++;
-    
-    const row = document.createElement('tr');
-    row.className = 'monthly-row';
-    row.dataset.rowId = rowId;
-    row.dataset.type = sectionType;
-    
-    const isFirstRow = addScreenState.monthlyRows[sectionType].length === 0;
-    
-    row.innerHTML = `
-        <td data-label="Category">
-            <select class="row-category" data-row-id="${rowId}">
-                <option value="">Select category</option>
-            </select>
-        </td>
-        <td data-label="Amount">
-            <input type="number" class="row-amount" data-row-id="${rowId}" placeholder="0.00" step="0.01" min="0">
-        </td>
-        <td data-label="Notes">
-            <input type="text" class="row-notes" data-row-id="${rowId}" placeholder="Optional">
-        </td>
-    `;
-    
-    container.appendChild(row);
-    
-    // Populate categories
-    const categorySelect = row.querySelector('.row-category');
-    populateCategoriesByType(categorySelect, sectionType);
-    
-    // Add to state
-    addScreenState.monthlyRows[sectionType].push(rowId);
-    
-    // Add input listeners
-    const inputs = row.querySelectorAll('input, select');
-    inputs.forEach(input => {
-        input.addEventListener('input', updateSaveButtonState);
-        input.addEventListener('change', updateSaveButtonState);
-    });
-    updateSaveButtonState();
-    
-    console.log('[ADD_SCREEN] Added monthly row:', sectionType, rowId);
-}
-
-/**
- * Remove monthly row
- */
-function removeMonthlyRow(rowId, sectionType) {
-    const row = document.querySelector(`.monthly-row[data-row-id="${rowId}"]`);
-    if (row) {
-        row.remove();
-        addScreenState.monthlyRows[sectionType] = addScreenState.monthlyRows[sectionType].filter(id => id !== rowId);
-        updateSaveButtonState();
-        console.log('[ADD_SCREEN] Removed monthly row:', sectionType, rowId);
-    }
-}
-
-/**
- * Populate categories by type
- */
-function populateCategoriesByType(selectElement, type) {
-    if (!selectElement) {
-        console.warn('[ADD_SCREEN] selectElement is null');
-        return;
-    }
-    
-    if (!appState.categories || appState.categories.length === 0) {
-        console.warn('[ADD_SCREEN] appState.categories is empty or undefined', appState.categories);
-        selectElement.innerHTML = '<option value="">Loading categories...</option>';
-        return;
-    }
-    
-    selectElement.innerHTML = '<option value="">Select category</option>';
-    
-    // Log all available types
-    const availableTypes = [...new Set(appState.categories.map(cat => cat.type))];
-    console.log(`[ADD_SCREEN] Available category types in appState:`, availableTypes);
-    console.log(`[ADD_SCREEN] Looking for type: "${type}"`);
-    console.log(`[ADD_SCREEN] All categories:`, appState.categories);
-    
-    const filtered = appState.categories.filter(cat => {
-        const catType = cat.type ? cat.type.toLowerCase() : '';
-        const typeMatch = catType === type.toLowerCase();
-        console.log(`[ADD_SCREEN] Category "${cat.name}" has type "${cat.type}" (lowercase: "${catType}") - Match? ${typeMatch}`);
-        return typeMatch;
-    });
-    
-    console.log(`[ADD_SCREEN] RESULT: Found ${filtered.length} categories for type "${type}"`, filtered);
-    
-    filtered.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.name;
-        option.textContent = cat.name;
-        selectElement.appendChild(option);
-    });
-    
-    if (filtered.length === 0) {
-        console.warn(`[ADD_SCREEN] ⚠️  NO categories found for type: ${type}`);
-    }
-}
-
-/**
- * Update save button state
- */
-/**
- * Update save button state
- */
-function updateSaveButtonState() {
-    console.log('[ADD_SCREEN] updateSaveButtonState called, currentTab:', addScreenState.currentTab);
-    
-    if (addScreenState.currentTab === 'expenses') {
-        const saveBtn = document.getElementById('expensesSaveBtn');
-        
-        // Check based on current expense mode
-        let hasValidRow = false;
-        if (addScreenState.expenseMode === 'byCategory') {
-            hasValidRow = hasValidExpenseRowByCategory();
-        } else {
-            hasValidRow = hasValidExpenseRow();
-        }
-        
-        console.log('[ADD_SCREEN] Expenses tab (mode=' + addScreenState.expenseMode + '): hasValidRow =', hasValidRow);
-        if (saveBtn) {
-            saveBtn.disabled = !hasValidRow;
-            console.log('[ADD_SCREEN] expensesSaveBtn disabled =', saveBtn.disabled);
-        }
-    } else {
-        const saveBtn = document.getElementById('monthlySaveBtn');
-        const hasValidRow = hasValidMonthlyRow();
-        console.log('[ADD_SCREEN] Monthly tab: hasValidRow =', hasValidRow);
-        if (saveBtn) {
-            saveBtn.disabled = !hasValidRow;
-            console.log('[ADD_SCREEN] monthlySaveBtn disabled =', saveBtn.disabled);
-        }
-    }
-}
-
-/**
- * Check if there's at least one valid expense row by category
- */
-function hasValidExpenseRowByCategory() {
-    const rows = document.querySelectorAll('.expense-row-by-category');
-    console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: Checking', rows.length, 'category rows');
-    
-    // Also need to check if category is selected
-    const categorySelect = document.getElementById('expensesCategorySelect');
-    const category = categorySelect ? categorySelect.value : '';
-    
-    if (!category) {
-        console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: No category selected');
-        return false;
-    }
-    
-    for (let row of rows) {
-        const dateInput = row.querySelector('.row-date');
-        const amountInput = row.querySelector('.row-amount');
-        
-        if (!dateInput || !amountInput) {
-            console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: Missing elements');
-            continue;
-        }
-        
-        const date = dateInput.value;
-        const amount = parseFloat(amountInput.value);
-        
-        console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: date="' + date + '", amount=' + amount + ', valid=' + (date && !isNaN(amount) && amount >= 0));
-        
-        if (date && !isNaN(amount) && amount >= 0) {
-            console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: Found valid row! Returning true');
-            return true;
-        }
-    }
-    
-    console.log('[ADD_SCREEN] hasValidExpenseRowByCategory: No valid rows found');
-    return false;
-}
-function hasValidExpenseRow() {
-    const rows = document.querySelectorAll('.expense-row');
-    console.log('[ADD_SCREEN] hasValidExpenseRow: Checking', rows.length, 'expense rows');
-    
-    for (let row of rows) {
-        const categorySelect = row.querySelector('.row-category');
-        const amountInput = row.querySelector('.row-amount');
-        
-        if (!categorySelect || !amountInput) {
-            console.log('[ADD_SCREEN] hasValidExpenseRow: Missing elements');
-            continue;
-        }
-        
-        const category = categorySelect.value;
-        const amount = parseFloat(amountInput.value);
-        
-        console.log('[ADD_SCREEN] hasValidExpenseRow: category="' + category + '", amount=' + amount + ', valid=' + (category && !isNaN(amount) && amount >= 0));
-        
-        if (category && !isNaN(amount) && amount >= 0) {
-            console.log('[ADD_SCREEN] hasValidExpenseRow: Found valid row! Returning true');
-            return true;
-        }
-    }
-    
-    console.log('[ADD_SCREEN] hasValidExpenseRow: No valid rows found');
-    return false;
-}
-
-/**
- * Check if there's at least one valid monthly row
- */
-function hasValidMonthlyRow() {
-    const rows = document.querySelectorAll('.monthly-row');
-    
-    for (let row of rows) {
-        const categorySelect = row.querySelector('.row-category');
-        const amountInput = row.querySelector('.row-amount');
-        
-        if (!categorySelect || !amountInput) continue;
-        
-        const category = categorySelect.value;
-        const amount = parseFloat(amountInput.value);
-        
-        if (category && !isNaN(amount) && amount >= 0) {
-            return true;
-        }
-    }
-    
-    return false;
-}
-
-/**
- * Save expenses
- */
-async function saveExpenses() {
-    console.log('[ADD_SCREEN] saveExpenses called with mode:', addScreenState.expenseMode);
-    
-    if (addScreenState.expenseMode === 'byDate') {
-        await saveExpensesByDate();
-    } else {
-        await saveExpensesByCategory();
-    }
-}
-
-/**
- * Save expenses with By Date mode
- */
-async function saveExpensesByDate() {
-    console.log('[ADD_SCREEN] saveExpensesByDate called');
-    
-    const dateInput = document.getElementById('expensesDate');
-    const date = dateInput.value;
-    
-    console.log('[ADD_SCREEN] Date:', date);
-    
-    if (!date) {
-        showToast('Please select a date', 'error');
-        return;
-    }
-    
-    // Collect all valid rows
-    const rows = document.querySelectorAll('.expense-row');
-    const expenses = [];
-    
-    console.log('[ADD_SCREEN] Found expense rows:', rows.length);
-    
-    rows.forEach((row, index) => {
-        const categorySelect = row.querySelector('.row-category');
-        const amountInput = row.querySelector('.row-amount');
-        const notesInput = row.querySelector('.row-notes');
-        
-        console.log(`[ADD_SCREEN] Row ${index}:`, {
-            categorySelect: !!categorySelect,
-            amountInput: !!amountInput,
-            notesInput: !!notesInput
-        });
-        
-        if (!categorySelect || !amountInput || !notesInput) {
-            console.warn(`[ADD_SCREEN] Row ${index} missing elements`);
-            return;
-        }
-        
-        const category = categorySelect.value;
-        const amount = parseFloat(amountInput.value);
-        const notes = notesInput.value;
-        
-        console.log(`[ADD_SCREEN] Row ${index} data:`, { category, amount, notes });
-        
-        if (category && !isNaN(amount) && amount >= 0) {
-            expenses.push({
-                type: 'Expense',
-                category: category,
-                amount: amount,
-                notes: notes || ''
-            });
-        }
-    });
-    
-    console.log('[ADD_SCREEN] Collected expenses:', expenses);
-    
-    if (expenses.length === 0) {
-        showToast('Please add at least one valid expense', 'error');
-        return;
-    }
-    
-    console.log('[ADD_SCREEN] Saving expenses:', expenses);
-    
-    // Save using existing API
     try {
-        const saveBtn = document.getElementById('expensesSaveBtn');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving...';
-        
-        const payload = {
-            action: 'saveExpenses',
-            date: date,
-            expenses: expenses
-        };
-        
-        console.log('[ADD_SCREEN] Sending payload:', JSON.stringify(payload, null, 2));
-        
-        const result = await callBackend(payload);
-        
-        console.log('[ADD_SCREEN] Save response status: API call completed');
-        
-        if (!checkApiAuthorization(result)) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save';
-            return;
-        }
-        
-        console.log('[ADD_SCREEN] Result success?', result.success);
-        console.log('[ADD_SCREEN] Result message:', result.message);
-        console.log('[ADD_SCREEN] Full result object:', JSON.stringify(result, null, 2));
-        
-        if (result.success) {
-            showToast(`${expenses.length} expense(s) saved successfully`, 'success');
+      const result = await callBackend({
+        action: 'saveExpenses',
+        date:   transaction.date,
+        expenses: [{
+          type:     meta.type || transaction.type,
+          category: meta.parentCategory || transaction.subCategory || transaction.type,
+          detail:   transaction.subCategory,
+          amount:   transaction.amount,
+          notes:    transaction.notes || '',
+        }],
+      });
 
-            // Update local dashboard state so the new expense appears immediately
-            if (result.savedExpenses && result.savedExpenses.length) {
-                mergeSavedExpensesIntoState({ [date]: result.savedExpenses });
-            }
+      if (result?.error === 'UNAUTHORIZED') { window.appAuth?.handleUnauthorized?.(); return; }
 
-            setTimeout(() => {
-                resetAddScreen();
-            }, 1500);
-        } else {
-            showToast('Failed to save. Please try again.', 'error');
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save';
+      if (result?.success) {
+        // Patch ID from backend if returned
+        const backendId = result.savedExpenses?.[0]?.id;
+        if (backendId) {
+          setTransactions(prev =>
+            prev.map(t => t.id === transaction.id ? { ...t, id: backendId } : t)
+          );
         }
-    } catch (error) {
-        console.error('[ADD_SCREEN] Error saving expenses:', error);
-        showToast('Failed to save. Please try again.', 'error');
-        const saveBtn = document.getElementById('expensesSaveBtn');
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
+        showToast('Saved');
+      } else {
+        // Roll back
+        setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+        showToast('Save failed', 'error');
+      }
+    } catch (e) {
+      setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+      showToast('Save failed', 'error');
     }
+  }, [categoryGroups, showToast]);
+
+  // Don't render until auth is complete (auth.js controls #app-root visibility)
+  if (!isInitialized) return null;
+
+  return (
+    <div className="flex flex-col min-h-screen w-full bg-gray-50">
+      <TopNav
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        onLogout={() => window.appAuth?.logout?.()}
+      />
+
+      {currentPage === 'dashboard' && (
+        <DashboardPage
+          transactions={transactions}
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          bulkRows={bulkRows}
+          setBulkRows={setBulkRows}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          categoryGroups={categoryGroups}
+          onBulkSave={handleBulkSave}
+          onQuickAdd={handleQuickAdd}
+        />
+      )}
+
+      {currentPage === 'transactions' && (
+        <TransactionsPage
+          transactions={transactions}
+          onBack={() => setCurrentPage('dashboard')}
+          onLoadMonth={loadDashboardData}
+          initialMonth={selectedMonth}
+        />
+      )}
+
+      <AppToast toast={toast} onClear={() => setToast(null)} />
+    </div>
+  );
 }
 
-/**
- * Save expenses with By Category mode
- */
-async function saveExpensesByCategory() {
-    console.log('[ADD_SCREEN] saveExpensesByCategory called');
-    
-    const categorySelect = document.getElementById('expensesCategorySelect');
-    const category = categorySelect.value;
-    
-    console.log('[ADD_SCREEN] Category:', category);
-    
-    if (!category) {
-        showToast('Please select a category', 'error');
-        return;
-    }
-    
-    // Collect all valid rows
-    const rows = document.querySelectorAll('.expense-row-by-category');
-    const expenses = [];
-    
-    console.log('[ADD_SCREEN] Found expense rows by category:', rows.length);
-    
-    rows.forEach((row, index) => {
-        const dateInput = row.querySelector('.row-date');
-        const amountInput = row.querySelector('.row-amount');
-        const notesInput = row.querySelector('.row-notes');
-        
-        console.log(`[ADD_SCREEN] Category row ${index}:`, {
-            dateInput: !!dateInput,
-            amountInput: !!amountInput,
-            notesInput: !!notesInput
-        });
-        
-        if (!dateInput || !amountInput || !notesInput) {
-            console.warn(`[ADD_SCREEN] Category row ${index} missing elements`);
-            return;
-        }
-        
-        const date = dateInput.value;
-        const amount = parseFloat(amountInput.value);
-        const notes = notesInput.value;
-        
-        console.log(`[ADD_SCREEN] Category row ${index} data:`, { date, amount, notes });
-        
-        if (date && !isNaN(amount) && amount >= 0) {
-            expenses.push({
-                type: 'Expense',
-                category: category,
-                amount: amount,
-                notes: notes || '',
-                date: date
-            });
-        }
-    });
-    
-    console.log('[ADD_SCREEN] Collected expenses by category:', expenses);
-    
-    if (expenses.length === 0) {
-        showToast('Please add at least one valid entry', 'error');
-        return;
-    }
-    
-    console.log('[ADD_SCREEN] Saving expenses by category:', expenses);
-    
-    // Save using existing API with multiple dates
-    try {
-        const saveBtn = document.getElementById('expensesSaveBtn');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving...';
-        
-        // Group expenses by date and save
-        const expensesByDate = {};
-        expenses.forEach(exp => {
-            if (!expensesByDate[exp.date]) {
-                expensesByDate[exp.date] = [];
-            }
-            expensesByDate[exp.date].push({
-                type: 'Expense',
-                category: exp.category,
-                amount: exp.amount,
-                notes: exp.notes
-            });
-        });
-        
-        // Store saved items by date so we can update state without reloading
-        const savedByDate = {};
-        
-        // Send each date's expenses separately to API
-        let totalSaved = 0;
-        for (const [date, dateExpenses] of Object.entries(expensesByDate)) {
-            const payload = {
-                action: 'saveExpenses',
-                date: date,
-                expenses: dateExpenses
-            };
-            
-            console.log('[ADD_SCREEN] Sending payload for date', date, ':', JSON.stringify(payload, null, 2));
-            
-            const result = await callBackend(payload);
-            
-            if (!checkApiAuthorization(result)) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save';
-                return;
-            }
-            
-            if (result.success) {
-                totalSaved += dateExpenses.length;
-
-                if (result.savedExpenses && Array.isArray(result.savedExpenses)) {
-                    if (!savedByDate[date]) {
-                        savedByDate[date] = [];
-                    }
-                    savedByDate[date].push(...result.savedExpenses);
-                }
-            } else {
-                throw new Error(`Failed to save for date ${date}`);
-            }
-        }
-        
-        showToast(`${totalSaved} expense(s) saved successfully`, 'success');
-
-        // Update local dashboard state so the new expenses appear immediately
-        mergeSavedExpensesIntoState(savedByDate);
-
-        setTimeout(() => {
-            resetAddScreen();
-        }, 1500);
-    } catch (error) {
-        console.error('[ADD_SCREEN] Error saving expenses by category:', error);
-        showToast('Failed to save. Please try again.', 'error');
-        const saveBtn = document.getElementById('expensesSaveBtn');
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
-    }
-}
-
-/**
- * Save monthly transactions
- */
-async function saveMonthly() {
-    console.log('[ADD_SCREEN] saveMonthly called');
-    
-    const monthPicker = document.getElementById('monthlyMonthPicker');
-    const monthValue = monthPicker.value;
-    
-    console.log('[ADD_SCREEN] Month:', monthValue);
-    
-    if (!monthValue) {
-        showToast('Please select a month', 'error');
-        return;
-    }
-    
-    const [year, month] = monthValue.split('-');
-    const date = `${year}-${month}-01`;
-    
-    // Collect all valid rows
-    const rows = document.querySelectorAll('.monthly-row');
-    const transactions = [];
-    
-    console.log('[ADD_SCREEN] Found monthly rows:', rows.length);
-    
-    rows.forEach((row, index) => {
-        const categorySelect = row.querySelector('.row-category');
-        const amountInput = row.querySelector('.row-amount');
-        const notesInput = row.querySelector('.row-notes');
-        const type = row.dataset.type;
-        
-        console.log(`[ADD_SCREEN] Monthly row ${index}:`, {
-            categorySelect: !!categorySelect,
-            amountInput: !!amountInput,
-            notesInput: !!notesInput,
-            type: type
-        });
-        
-        if (!categorySelect || !amountInput || !notesInput) {
-            console.warn(`[ADD_SCREEN] Monthly row ${index} missing elements`);
-            return;
-        }
-        
-        const category = categorySelect.value;
-        const amount = parseFloat(amountInput.value);
-        const notes = notesInput.value;
-        
-        console.log(`[ADD_SCREEN] Monthly row ${index} data:`, { category, amount, notes, type });
-        
-        if (category && !isNaN(amount) && amount >= 0) {
-            // Capitalize first letter of type
-            const typeCapitalized = type.charAt(0).toUpperCase() + type.slice(1);
-            
-            transactions.push({
-                type: typeCapitalized,
-                category: category,
-                amount: amount,
-                notes: notes || ''
-            });
-        }
-    });
-    
-    console.log('[ADD_SCREEN] Collected transactions:', transactions);
-    
-    if (transactions.length === 0) {
-        showToast('Please add at least one valid transaction', 'error');
-        return;
-    }
-    
-    console.log('[ADD_SCREEN] Saving monthly transactions:', transactions);
-    
-    // Save using existing API
-    try {
-        const saveBtn = document.getElementById('monthlySaveBtn');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving...';
-        
-        const payload = {
-            action: 'saveExpenses',
-            date: date,
-            expenses: transactions
-        };
-        
-        console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
-        
-        const result = await callBackend(payload);
-        
-        console.log('[ADD_SCREEN] Monthly save response status: API call completed');
-        
-        if (!checkApiAuthorization(result)) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save';
-            return;
-        }
-        
-        console.log('[ADD_SCREEN] Result success?', result.success);
-        console.log('[ADD_SCREEN] Result message:', result.message);
-        console.log('[ADD_SCREEN] Full result object:', JSON.stringify(result, null, 2));
-        
-        if (result.success) {
-            showToast(`${transactions.length} transaction(s) saved successfully`, 'success');
-
-            if (result.savedExpenses && result.savedExpenses.length) {
-                mergeSavedExpensesIntoState({ [date]: result.savedExpenses });
-            }
-
-            setTimeout(() => {
-                resetAddScreen();
-            }, 1500);
-        } else {
-            showToast('Failed to save. Please try again.', 'error');
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save';
-        }
-    } catch (error) {
-        console.error('[ADD_SCREEN] Error saving transactions:', error);
-        showToast('Failed to save. Please try again.', 'error');
-        const saveBtn = document.getElementById('monthlySaveBtn');
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
-    }
-}
-
-/**
- * Show toast notification
- */
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-    
-    toast.textContent = message;
-    toast.className = `toast ${type}`;
-    toast.classList.remove('hidden');
-    toast.classList.add('show');
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => {
-            toast.classList.add('hidden');
-        }, 300);
-    }, 3000);
-}
-
-// ====================================================
-// BUDGET PAGE FUNCTIONALITY
-// ====================================================
-
-/**
- * Initialize Budget Page
- */
-function initBudgetPage() {
-    console.log('[BUDGET] Initializing budget page...');
-    console.log('[BUDGET] Categories available:', appState.categories);
-    
-    // Check if categories are loaded, if not fetch them first
-    if (!appState.categories || appState.categories.length === 0) {
-        console.log('[BUDGET] Categories not loaded, fetching...');
-        fetchCategories().then(() => {
-            populateBudgetTable();
-            loadBudgetData();
-        });
-    } else {
-        // Populate budget table from categories
-        populateBudgetTable();
-        loadBudgetData();
-    }
-    
-    // Setup form submission
-    const budgetForm = document.getElementById('budgetForm');
-    if (budgetForm) {
-        budgetForm.addEventListener('submit', handleBudgetSubmit);
-    }
-}
-
-/**
- * Populate budget tables by type
- */
-function populateBudgetTable() {
-    const incomeTableBody = document.getElementById('incomeTableBody');
-    const expenseTableBody = document.getElementById('expenseTableBody');
-    const payoffTableBody = document.getElementById('payoffTableBody');
-    const savingsTableBody = document.getElementById('savingsTableBody');
-    
-    // Clear existing
-    if (incomeTableBody) incomeTableBody.innerHTML = '';
-    if (expenseTableBody) expenseTableBody.innerHTML = '';
-    if (payoffTableBody) payoffTableBody.innerHTML = '';
-    if (savingsTableBody) savingsTableBody.innerHTML = '';
-    
-    console.log('[BUDGET] All categories:', appState.categories);
-    
-    // Debug: Show unique type values
-    const uniqueTypes = [...new Set(appState.categories.map(c => c.type))];
-    console.log('[BUDGET] Unique type values found:', uniqueTypes);
-    console.log('[BUDGET] Sample categories:', appState.categories.slice(0, 3));
-    
-    // Group categories by type
-    const incomeCategories = appState.categories.filter(c => c.type === 'Income').sort((a, b) => a.name.localeCompare(b.name));
-    const expenseCategories = appState.categories.filter(c => c.type === 'Expense').sort((a, b) => a.name.localeCompare(b.name));
-    const payoffCategories = appState.categories.filter(c => c.type === 'Payoff').sort((a, b) => a.name.localeCompare(b.name));
-    const savingsCategories = appState.categories.filter(c => c.type === 'Savings').sort((a, b) => a.name.localeCompare(b.name));
-    
-    console.log('[BUDGET] Income:', incomeCategories.length, 'Expense:', expenseCategories.length, 'Payoff:', payoffCategories.length, 'Savings:', savingsCategories.length);
-    
-    // Populate each table
-    incomeCategories.forEach(cat => {
-        if (incomeTableBody) {
-            const row = createBudgetTableRow(cat.name, cat.type);
-            incomeTableBody.appendChild(row);
-        }
-    });
-    
-    expenseCategories.forEach(cat => {
-        if (expenseTableBody) {
-            const row = createBudgetTableRow(cat.name, cat.type);
-            expenseTableBody.appendChild(row);
-        }
-    });
-    
-    payoffCategories.forEach(cat => {
-        if (payoffTableBody) {
-            const row = createBudgetTableRow(cat.name, cat.type);
-            payoffTableBody.appendChild(row);
-        }
-    });
-    
-    savingsCategories.forEach(cat => {
-        if (savingsTableBody) {
-            const row = createBudgetTableRow(cat.name, cat.type);
-            savingsTableBody.appendChild(row);
-        }
-    });
-    
-    // Setup collapsible sections
-    setupBudgetSectionToggle();
-}
-
-/**
- * Setup collapsible sections for budget tables
- */
-function setupBudgetSectionToggle() {
-    const sectionHeaders = document.querySelectorAll('.budget-type-header');
-    
-    sectionHeaders.forEach(header => {
-        // Remove existing listeners
-        const newHeader = header.cloneNode(true);
-        header.parentNode.replaceChild(newHeader, header);
-        
-        newHeader.addEventListener('click', (e) => {
-            e.preventDefault();
-            const section = newHeader.closest('.budget-type-section');
-            
-            // Get all budget sections
-            const allSections = document.querySelectorAll('.budget-type-section');
-            
-            // Close all sections except the clicked one
-            allSections.forEach(s => {
-                if (s !== section) {
-                    s.classList.add('collapsed');
-                }
-            });
-            
-            // Toggle the clicked section
-            section.classList.toggle('collapsed');
-        });
-    });
-}
-
-/**
- * Create budget table row for a category
- */
-function createBudgetTableRow(categoryName, type) {
-    const tr = document.createElement('tr');
-    tr.dataset.category = categoryName;
-    tr.dataset.type = type;
-    
-    // Category column
-    const categoryCell = document.createElement('td');
-    categoryCell.textContent = categoryName;
-    tr.appendChild(categoryCell);
-    
-    // Monthly budget input column
-    const monthlyCell = document.createElement('td');
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.id = `budget-${type}-${categoryName}`;
-    input.name = `budget-${type}-${categoryName}`;
-    input.step = '0.01';
-    input.min = '0';
-    input.placeholder = '0.00';
-    input.dataset.category = categoryName;
-    input.dataset.type = type;
-    input.addEventListener('input', (e) => updateYearlyAmount(e.target));
-    monthlyCell.appendChild(input);
-    tr.appendChild(monthlyCell);
-    
-    // Yearly budget column (auto-calculated)
-    const yearlyCell = document.createElement('td');
-    yearlyCell.className = 'yearly-amount';
-    yearlyCell.id = `yearly-${type}-${categoryName}`;
-    yearlyCell.textContent = '0.00';
-    tr.appendChild(yearlyCell);
-    
-    return tr;
-}
-
-/**
- * Update yearly amount when monthly budget changes
- */
-function updateYearlyAmount(input) {
-    const monthlyAmount = parseFloat(input.value) || 0;
-    const yearlyAmount = monthlyAmount * 12;
-    const type = input.dataset.type;
-    const category = input.dataset.category;
-    const yearlyCell = document.getElementById(`yearly-${type}-${category}`);
-    if (yearlyCell) {
-        yearlyCell.textContent = yearlyAmount.toFixed(2);
-    }
-    
-    // Update summary cards
-    updateBudgetSummary();
-}
-
-/**
- * Update budget summary cards with totals for each type
- */
-function updateBudgetSummary() {
-    const incomeHeaderSummary = document.getElementById('incomeHeaderSummary');
-    const savingsHeaderSummary = document.getElementById('savingsHeaderSummary');
-    const payoffHeaderSummary = document.getElementById('payoffHeaderSummary');
-    const expenseHeaderSummary = document.getElementById('expenseHeaderSummary');
-    
-    let incomeTotal = 0;
-    let savingsTotal = 0;
-    let payoffTotal = 0;
-    let expenseTotal = 0;
-    
-    // Sum up all input values by type
-    const inputs = document.querySelectorAll('#budgetForm input[type="number"]');
-    inputs.forEach(input => {
-        const amount = parseFloat(input.value) || 0;
-        const type = input.dataset.type;
-        
-        if (type === 'Income') {
-            incomeTotal += amount;
-        } else if (type === 'Savings') {
-            savingsTotal += amount;
-        } else if (type === 'Payoff') {
-            payoffTotal += amount;
-        } else if (type === 'Expense') {
-            expenseTotal += amount;
-        }
-    });
-    
-    // Update header displays
-    if (incomeHeaderSummary) incomeHeaderSummary.textContent = `₹${incomeTotal.toFixed(2)}`;
-    if (savingsHeaderSummary) savingsHeaderSummary.textContent = `₹${savingsTotal.toFixed(2)}`;
-    if (payoffHeaderSummary) payoffHeaderSummary.textContent = `₹${payoffTotal.toFixed(2)}`;
-    if (expenseHeaderSummary) expenseHeaderSummary.textContent = `₹${expenseTotal.toFixed(2)}`;
-}
-
-/**
- * Load saved budget data from localStorage
- */
-/**
- * Load budget data from categories
- */
-function loadBudgetData() {
-    console.log('[BUDGET] Loading budget data from categories...');
-    
-    // Populate inputs with budget values from categories
-    if (appState.categories && appState.categories.length > 0) {
-        appState.categories.forEach(cat => {
-            if (cat.budget && cat.budget > 0) {
-                const inputId = `budget-${cat.type}-${cat.name}`;
-                const input = document.getElementById(inputId);
-                if (input) {
-                    input.value = cat.budget;
-                    // Update yearly amount
-                    updateYearlyAmount(input);
-                }
-            }
-        });
-    }
-    
-    // Update summary cards
-    updateBudgetSummary();
-}
-
-/**
- * Handle budget form submission
- */
-async function handleBudgetSubmit(event) {
-    event.preventDefault();
-    
-    const budgets = [];
-    const form = document.getElementById('budgetForm');
-    const inputs = form.querySelectorAll('input[type="number"]');
-    
-    inputs.forEach(input => {
-        const monthlyBudget = parseFloat(input.value) || 0;
-        if (monthlyBudget > 0) {
-            const category = input.dataset.category;
-            const type = input.dataset.type;
-            const yearlyBudget = monthlyBudget * 12;
-            
-            budgets.push({
-                category: category,
-                type: type,
-                monthlyBudget: monthlyBudget,
-                yearlyBudget: yearlyBudget
-            });
-        }
-    });
-    
-    console.log('[BUDGET] Saving budget data:', budgets);
-    
-    // Save to Supabase backend
-    try {
-        const saveBtn = form.querySelector('button[type="submit"]');
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
-        }
-        
-        const result = await callBackend({
-            action: 'saveBudget',
-            budgets: budgets
-        });
-        
-        if (!checkApiAuthorization(result)) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = '💾 Save Budget';
-            return;
-        }
-        
-        if (result.success) {
-            showToast('Budget saved successfully!', 'success');
-            // Update categories to reflect new budget values
-            fetchCategories().then(() => {
-                loadBudgetData();
-            });
-        } else {
-            showToast(`Failed to save budget: ${result.message}`, 'error');
-        }
-        
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = '💾 Save Budget';
-        }
-    } catch (error) {
-        console.error('[BUDGET] Error saving budget:', error);
-        showToast('Error saving budget. Please try again.', 'error');
-        const saveBtn = form.querySelector('button[type="submit"]');
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = '💾 Save Budget';
-        }
-    }
-}
+// ── MOUNT ──────────────────────────────────────────────────────────────────
+const _root = ReactDOM.createRoot(document.getElementById('app-root'));
+_root.render(<App />);
