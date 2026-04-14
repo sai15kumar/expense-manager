@@ -328,14 +328,16 @@ async function saveBudget(supabase: ReturnType<typeof createClient>, payload: Pa
 
     const monthlyBudget = Number(budget.monthlyBudget || 0);
     const yearlyBudget = Number(budget.yearlyBudget || monthlyBudget * 12);
+    const budgetType = (budget.type || '').toString().trim();
 
-    const { data: existing, error: lookupError } = await supabase
+    // Look up the row by detail name, scoped by type
+    let query = supabase
       .from('category_master')
-      .select('id, category, detail')
-      .or(`category.ilike.${incomingCategory},detail.ilike.${incomingCategory}`)
-      .limit(1)
-      .maybeSingle();
-
+      .select('id')
+      .eq('active', true)
+      .ilike('detail', incomingCategory);
+    if (budgetType) query = query.ilike('type', budgetType);
+    const { data: existing, error: lookupError } = await query.limit(1).maybeSingle();
     if (lookupError) throw lookupError;
 
     if (existing?.id) {

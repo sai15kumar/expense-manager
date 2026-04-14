@@ -230,6 +230,10 @@ function TopNav({ currentPage, setCurrentPage, onLogout }) {
             className={`font-medium transition-colors ${currentPage === 'transactions' ? 'text-sky-300' : 'text-slate-400 hover:text-white'}`}
           >Transactions</button>
           <button
+            onClick={() => setCurrentPage('budget')}
+            className={`font-medium transition-colors ${currentPage === 'budget' ? 'text-sky-300' : 'text-slate-400 hover:text-white'}`}
+          >Budget</button>
+          <button
             onClick={onLogout}
             className="text-slate-400 hover:text-red-400 font-medium transition-colors"
           >Logout</button>
@@ -260,6 +264,10 @@ function TopNav({ currentPage, setCurrentPage, onLogout }) {
               onClick={() => navigate('transactions')}
               className={`text-left px-5 py-3 text-sm font-medium transition-colors ${currentPage === 'transactions' ? 'text-sky-300 bg-slate-700' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
             >Transactions</button>
+            <button
+              onClick={() => navigate('budget')}
+              className={`text-left px-5 py-3 text-sm font-medium transition-colors ${currentPage === 'budget' ? 'text-sky-300 bg-slate-700' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+            >Budget</button>
             <button
               onClick={handleLogout}
               className="text-left px-5 py-3 text-sm font-medium text-red-400 hover:bg-slate-700 transition-colors"
@@ -296,7 +304,7 @@ function MonthSelector({ selectedMonth, onChange }) {
 }
 
 // Summary cards
-function SummaryCards({ transactions, selectedMonth }) {
+function SummaryCards({ transactions, selectedMonth, budgets }) {
   const totals = useMemo(() => {
     const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
     transactions
@@ -305,17 +313,211 @@ function SummaryCards({ transactions, selectedMonth }) {
     return t;
   }, [transactions, selectedMonth]);
 
+  // Total monthly budget per type
+  const budgetTotals = useMemo(() => {
+    const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
+    (budgets || []).forEach(b => {
+      if (b.type in t) t[b.type] += b.monthlyBudget || 0;
+    });
+    return t;
+  }, [budgets]);
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {TABS.map(type => {
-        const c = TYPE_COLOR[type];
+        const c       = TYPE_COLOR[type];
+        const spent   = totals[type];
+        const budget  = budgetTotals[type];
+        const hasBudget = budget > 0;
+        const pct     = hasBudget ? Math.min((spent / budget) * 100, 100) : 0;
+        const over    = hasBudget && spent > budget;
+        const barColor = over
+          ? 'bg-red-500'
+          : pct >= 80 ? 'bg-amber-400' : 'bg-green-400';
         return (
           <div key={type} className={`${c.bg} ${c.border} border rounded-lg p-3`}>
             <div className="text-xs text-gray-500 mb-1">{TAB_LABEL[type]}</div>
-            <div className={`text-xl font-bold text-right ${c.text}`}>{'₹' + Math.round(totals[type]).toLocaleString('en-IN')}</div>
+            <div className={`text-xl font-bold text-right ${c.text}`}>{'₹' + Math.round(spent).toLocaleString('en-IN')}</div>
+            {hasBudget && (
+              <div className="mt-2">
+                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                  <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className={`text-[10px] mt-1 text-right ${over ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
+                  {over
+                    ? `Over by ₹${Math.round(spent - budget).toLocaleString('en-IN')}`
+                    : `${Math.round(pct)}% of ₹${Math.round(budget).toLocaleString('en-IN')}`}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── BUDGET PAGE ───────────────────────────────────────────────────────────
+
+function BudgetPage({ categoryGroups, onBack, showToast }) {
+  const [activeTab, setActiveTab] = useState('Expense');
+  const [budgetMap, setBudgetMap] = useState({}); // key: subCat name → monthly amount string
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [dirty, setDirty]         = useState(false);
+
+  // Load budgets from Supabase on mount
+  useEffect(() => {
+    setLoading(true);
+    callBackend({ action: 'getBudgets' })
+      .then(res => {
+        if (res?.success) {
+          const map = {};
+          (res.budgets || []).forEach(b => {
+            // Key by type::subCat to avoid collisions across types
+            map[`${b.type}::${b.category}`] = b.monthlyBudget > 0 ? String(b.monthlyBudget) : '';
+          });
+          setBudgetMap(map);
+        } else {
+          showToast('Failed to load budgets', 'error');
+        }
+      })
+      .catch(() => showToast('Failed to load budgets', 'error'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function handleChange(type, subCat, val) {
+    if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
+    setBudgetMap(prev => ({ ...prev, [`${type}::${subCat}`]: val }));
+    setDirty(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    // Build payload: all sub-cats across all tabs
+    const budgets = [];
+    TABS.forEach(type => {
+      (categoryGroups[type] || []).forEach(({ details }) => {
+        (details || []).forEach(sc => {
+          const key = `${type}::${sc}`;
+          budgets.push({
+            type,
+            category:      sc,
+            monthlyBudget: parseMoney(budgetMap[key] || '0'),
+            yearlyBudget:  parseMoney(budgetMap[key] || '0') * 12,
+          });
+        });
+      });
+    });
+    try {
+      const res = await callBackend({ action: 'saveBudget', budgets });
+      if (res?.success) {
+        showToast('Budgets saved');
+        setDirty(false);
+      } else {
+        showToast('Save failed', 'error');
+      }
+    } catch {
+      showToast('Save failed', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const groups = categoryGroups[activeTab] || [];
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button onClick={onBack}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-lg font-bold text-gray-800">Budget Settings</h1>
+          <span className="ml-auto text-xs text-gray-400">Monthly limits per sub-category</span>
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex border-b border-gray-200">
+          {TABS.map(type => {
+            const c = TYPE_COLOR[type];
+            return (
+              <button key={type}
+                onClick={() => setActiveTab(type)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === type
+                    ? `${c.tab} border-b-2`
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                }`}>
+                {TAB_LABEL[type]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="text-center py-16 text-gray-400 text-sm">Loading budgets…</div>
+        ) : (
+          <div className="space-y-4">
+            {groups.length === 0 && (
+              <div className="text-center py-12 text-gray-400 text-sm">No categories found.</div>
+            )}
+            {groups.map(({ category, details }) => (
+              <div key={category} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                {/* Group header */}
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-gray-100">
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{category}</span>
+                </div>
+                {/* Sub-cat rows */}
+                <div className="divide-y divide-gray-50">
+                  {(details || []).map((sc, i) => {
+                    const monthly = budgetMap[`${activeTab}::${sc}`] || '';
+                    const yearly  = monthly ? Math.round(parseMoney(monthly) * 12).toLocaleString('en-IN') : '—';
+                    return (
+                      <div key={sc} className={`flex items-center gap-3 px-4 py-2.5 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                        <span className="flex-1 text-sm text-gray-700">{sc}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-gray-400">₹</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={monthly}
+                            onChange={e => handleChange(activeTab, sc, e.target.value)}
+                            placeholder="0"
+                            className="w-28 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                          />
+                          <span className="text-[11px] text-gray-400 w-24 text-right">/ yr ₹{yearly}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Save bar */}
+        {!loading && (
+          <div className="sticky bottom-0 bg-white border-t border-gray-100 py-3 flex items-center justify-between gap-3">
+            <span className="text-xs text-gray-400">
+              {dirty ? 'Unsaved changes' : 'All changes saved'}
+            </span>
+            <button
+              onClick={handleSave}
+              disabled={saving || !dirty}
+              className="px-5 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              {saving ? 'Saving…' : 'Save Budgets'}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1279,7 +1481,7 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth }) {
 function DashboardPage({
   transactions, selectedMonth, setSelectedMonth,
   bulkRows, setBulkRows, activeTab, setActiveTab,
-  categoryGroups, onBulkSave, onQuickAdd,
+  categoryGroups, onBulkSave, onQuickAdd, budgets,
 }) {
   return (
     <div className="flex-1 overflow-y-auto">
@@ -1290,7 +1492,7 @@ function DashboardPage({
         </div>
 
         {/* Summary cards */}
-        <SummaryCards transactions={transactions} selectedMonth={selectedMonth} />
+        <SummaryCards transactions={transactions} selectedMonth={selectedMonth} budgets={budgets} />
 
         {/* Desktop: spreadsheet grid (md and above) */}
         <div className="hidden md:block">
@@ -1332,8 +1534,19 @@ function App() {
     Savings: initRows(),
     Payoff:  initRows(),
   });
+  const [budgets, setBudgets] = useState([]);
 
   const showToast = useCallback((msg, type = 'success') => setToast({ msg, type }), []);
+
+  // ── Backend: load budgets
+  const loadBudgets = useCallback(async () => {
+    try {
+      const res = await callBackend({ action: 'getBudgets' });
+      if (res?.success) setBudgets(res.budgets || []);
+    } catch (e) {
+      console.warn('[APP] loadBudgets failed', e);
+    }
+  }, []);
 
   // ── Backend: load dashboard data for a month
   const loadDashboardData = useCallback(async (monthStr) => {
@@ -1408,6 +1621,7 @@ function App() {
   useEffect(() => {
     if (!isInitialized) return;
     loadDashboardData(selectedMonth);
+    loadBudgets();
   }, [isInitialized]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Reload when selected month changes (after initialization)
@@ -1549,6 +1763,7 @@ function App() {
           categoryGroups={categoryGroups}
           onBulkSave={handleBulkSave}
           onQuickAdd={handleQuickAdd}
+          budgets={budgets}
         />
       )}
 
@@ -1558,6 +1773,14 @@ function App() {
           onBack={() => setCurrentPage('dashboard')}
           onLoadMonth={loadDashboardData}
           initialMonth={selectedMonth}
+        />
+      )}
+
+      {currentPage === 'budget' && (
+        <BudgetPage
+          categoryGroups={categoryGroups}
+          onBack={() => setCurrentPage('dashboard')}
+          showToast={showToast}
         />
       )}
 
