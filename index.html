@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Personal Expense Tracker - Track your daily expenses with ease">
     <title>Expense Manager</title>
-    <link rel="stylesheet" href="css/styles.css?v=4">
+    <link rel="stylesheet" href="css/styles.css?v=5">
 </head>
 <body>
     <div id="auth-gate" class="auth-gate">
@@ -411,183 +411,251 @@
                         <div class="header-spacer"></div>
                     </div>
 
-                    <!-- TABS -->
-                    <div class="add-tabs">
-                        <button class="add-tab active" data-tab="expenses" id="tabExpenses">Expenses</button>
-                        <button class="add-tab" data-tab="monthly" id="tabMonthly">Monthly</button>
-                    </div>
+                    <div class="quick-add-shell">
+                        <section class="quick-add-card">
+                            <div class="quick-add-intro">
+                                <h3>Quick Add</h3>
+                                <p>Simple daily entry with the new Type → Category → Sub-category flow.</p>
+                            </div>
 
-                    <!-- EXPENSES TAB CONTENT -->
-                    <div class="add-tab-content active" id="expensesTabContent">
-                        <div class="add-content-scroll">
-                            <!-- EXPENSE MODE SELECTOR -->
-                            <div class="form-section expense-mode-selector">
-                                <label>Add expenses by:</label>
-                                <div class="mode-options">
-                                    <label class="mode-radio">
-                                        <input type="radio" name="expenseMode" value="byDate" checked>
-                                        <span>Date</span>
-                                    </label>
-                                    <label class="mode-radio">
-                                        <input type="radio" name="expenseMode" value="byCategory">
-                                        <span>Category</span>
-                                    </label>
+                            <div class="quick-section">
+                                <label>Frequent adds</label>
+                                <div id="recentQuickAdds" class="recent-adds-list">
+                                    <span class="recent-empty">Your recent adds will show here.</span>
                                 </div>
                             </div>
 
-                            <!-- MODE 1: BY DATE (DEFAULT) -->
-                            <div id="expenseByDateMode" class="expense-mode-content">
-                                <div class="form-section">
-                                    <label for="expensesDate">Date</label>
-                                    <input type="date" id="expensesDate" class="form-input" required>
-                                </div>
-
-                                <div class="form-section">
-                                    <table class="expense-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Category</th>
-                                                <th>Amount</th>
-                                                <th>Notes</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="expenseRowsContainer">
-                                            <!-- Rows will be added by JS -->
-                                        </tbody>
-                                    </table>
-                                    <button type="button" class="btn-add-row" id="addExpenseRowBtn" disabled>+ Add another expense</button>
+                            <div class="quick-section">
+                                <label>Type</label>
+                                <div id="quickTypeSelector" class="type-chip-group">
+                                    <button type="button" class="type-chip active" data-type="Expense">Expense</button>
+                                    <button type="button" class="type-chip" data-type="Income">Income</button>
+                                    <button type="button" class="type-chip" data-type="Savings">Savings</button>
+                                    <button type="button" class="type-chip" data-type="Payoff">Payoff</button>
                                 </div>
                             </div>
 
-                            <!-- MODE 2: BY CATEGORY -->
-                            <div id="expenseByCategoryMode" class="expense-mode-content hidden">
-                                <div class="form-section">
-                                    <label for="expensesCategorySelect">Category</label>
-                                    <select id="expensesCategorySelect" class="form-input" required>
+                            <div class="quick-field-grid">
+                                <div class="quick-section">
+                                    <label for="quickParentCategory">Category</label>
+                                    <select id="quickParentCategory" class="form-input" aria-label="Select category">
                                         <option value="">Select category</option>
                                     </select>
                                 </div>
-
-                                <div class="form-section">
-                                    <table class="expense-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Amount</th>
-                                                <th>Notes</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="expenseRowsByCategoryContainer">
-                                            <!-- Rows will be added by JS -->
-                                        </tbody>
-                                    </table>
-                                    <button type="button" class="btn-add-row" id="addExpenseRowByCategoryBtn" disabled>+ Add another date</button>
+                                <div class="quick-section">
+                                    <label for="quickDetailCategory">Sub-category</label>
+                                    <select id="quickDetailCategory" class="form-input" aria-label="Select sub-category">
+                                        <option value="">Select sub-category</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <div class="form-actions-block">
-                                <button type="button" class="btn btn-primary btn-save" id="expensesSaveBtn" disabled>Save</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- MONTHLY TAB CONTENT -->
-                    <div class="add-tab-content" id="monthlyTabContent">
-                        <div class="add-content-scroll">
-                            <div class="form-section">
-                                <label for="monthlyMonthPicker">Month</label>
-                                <input type="month" id="monthlyMonthPicker" class="form-input" required>
-                            </div>
-
-                            <!-- INCOME SECTION -->
-                            <div class="collapsible-section" data-section="income">
-                                <div class="section-header-collapsible" data-section="income">
-                                    <span class="section-icon"></span>
-                                    <span class="section-title">Income</span>
-                                    <span class="collapse-arrow">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <polyline points="6 9 12 15 18 9"></polyline>
-                                        </svg>
-                                    </span>
+                            <div class="quick-field-grid">
+                                <div class="quick-section">
+                                    <label for="quickEntryDate">Date</label>
+                                    <input type="date" id="quickEntryDate" class="form-input" required>
                                 </div>
-                                <div class="section-content" id="incomeSectionContent">
-                                    <table class="monthly-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Category</th>
-                                                <th>Amount</th>
-                                                <th>Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="incomeMonthlyRows">
-                                            <!-- Rows added by JS -->
-                                        </tbody>
-                                    </table>
-                                    <button type="button" class="btn-add-row" id="addIncomeMonthlyRowBtn">+ Add income row</button>
+                                <div class="quick-section">
+                                    <label for="quickEntryAmount">Amount</label>
+                                    <input type="number" id="quickEntryAmount" class="form-input quick-amount-input" placeholder="0.00" step="0.01" min="0" required>
                                 </div>
                             </div>
 
-                            <!-- SAVINGS SECTION -->
-                            <div class="collapsible-section" data-section="savings">
-                                <div class="section-header-collapsible" data-section="savings">
-                                    <span class="section-icon"></span>
-                                    <span class="section-title">Savings</span>
-                                    <span class="collapse-arrow">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <polyline points="6 9 12 15 18 9"></polyline>
-                                        </svg>
-                                    </span>
-                                </div>
-                                <div class="section-content collapsed" id="savingsSectionContent">
-                                    <table class="monthly-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Category</th>
-                                                <th>Amount</th>
-                                                <th>Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="savingsMonthlyRows">
-                                            <!-- Rows added by JS -->
-                                        </tbody>
-                                    </table>
-                                    <button type="button" class="btn-add-row" id="addSavingsMonthlyRowBtn">+ Add savings row</button>
+                            <div class="quick-section">
+                                <label for="quickEntryNotes">Notes</label>
+                                <input type="text" id="quickEntryNotes" class="form-input" placeholder="Optional note">
+                            </div>
+
+                            <div class="form-actions-block quick-actions-block">
+                                <button type="button" class="btn btn-primary btn-save" id="quickSaveBtn" disabled>Save Entry</button>
+                            </div>
+                        </section>
+
+                        <section class="advanced-add-shell">
+                            <div class="advanced-add-header">
+                                <h3>Bulk / Advanced Entry</h3>
+                                <p>Use this on larger screens when you want to add multiple rows at once.</p>
+                            </div>
+
+                            <!-- TABS -->
+                            <div class="add-tabs">
+                                <button class="add-tab active" data-tab="expenses" id="tabExpenses">Expenses</button>
+                                <button class="add-tab" data-tab="monthly" id="tabMonthly">Monthly</button>
+                            </div>
+
+                            <!-- EXPENSES TAB CONTENT -->
+                            <div class="add-tab-content active" id="expensesTabContent">
+                                <div class="add-content-scroll">
+                                    <!-- EXPENSE MODE SELECTOR -->
+                                    <div class="form-section expense-mode-selector">
+                                        <label>Add expenses by:</label>
+                                        <div class="mode-options">
+                                            <label class="mode-radio">
+                                                <input type="radio" name="expenseMode" value="byDate" checked>
+                                                <span>Date</span>
+                                            </label>
+                                            <label class="mode-radio">
+                                                <input type="radio" name="expenseMode" value="byCategory">
+                                                <span>Category</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- MODE 1: BY DATE (DEFAULT) -->
+                                    <div id="expenseByDateMode" class="expense-mode-content">
+                                        <div class="form-section">
+                                            <label for="expensesDate">Date</label>
+                                            <input type="date" id="expensesDate" class="form-input" required>
+                                        </div>
+
+                                        <div class="form-section">
+                                            <table class="expense-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Category</th>
+                                                        <th>Amount</th>
+                                                        <th>Notes</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="expenseRowsContainer">
+                                                    <!-- Rows will be added by JS -->
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="btn-add-row" id="addExpenseRowBtn" disabled>+ Add another expense</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- MODE 2: BY CATEGORY -->
+                                    <div id="expenseByCategoryMode" class="expense-mode-content hidden">
+                                        <div class="form-section">
+                                            <label for="expensesCategorySelect">Category</label>
+                                            <select id="expensesCategorySelect" class="form-input" required>
+                                                <option value="">Select category</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="form-section">
+                                            <table class="expense-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Date</th>
+                                                        <th>Amount</th>
+                                                        <th>Notes</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="expenseRowsByCategoryContainer">
+                                                    <!-- Rows will be added by JS -->
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="btn-add-row" id="addExpenseRowByCategoryBtn" disabled>+ Add another date</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-actions-block">
+                                        <button type="button" class="btn btn-primary btn-save" id="expensesSaveBtn" disabled>Save</button>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- PAYOFF SECTION -->
-                            <div class="collapsible-section" data-section="payoff">
-                                <div class="section-header-collapsible" data-section="payoff">
-                                    <span class="section-icon"></span>
-                                    <span class="section-title">Payoffs</span>
-                                    <span class="collapse-arrow">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <polyline points="6 9 12 15 18 9"></polyline>
-                                        </svg>
-                                    </span>
-                                </div>
-                                <div class="section-content collapsed" id="payoffSectionContent">
-                                    <table class="monthly-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Category</th>
-                                                <th>Amount</th>
-                                                <th>Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="payoffMonthlyRows">
-                                            <!-- Rows added by JS -->
-                                        </tbody>
-                                    </table>
-                                    <button type="button" class="btn-add-row" id="addPayoffMonthlyRowBtn">+ Add payoff row</button>
+                            <!-- MONTHLY TAB CONTENT -->
+                            <div class="add-tab-content" id="monthlyTabContent">
+                                <div class="add-content-scroll">
+                                    <div class="form-section">
+                                        <label for="monthlyMonthPicker">Month</label>
+                                        <input type="month" id="monthlyMonthPicker" class="form-input" required>
+                                    </div>
+
+                                    <!-- INCOME SECTION -->
+                                    <div class="collapsible-section" data-section="income">
+                                        <div class="section-header-collapsible" data-section="income">
+                                            <span class="section-icon"></span>
+                                            <span class="section-title">Income</span>
+                                            <span class="collapse-arrow">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                                </svg>
+                                            </span>
+                                        </div>
+                                        <div class="section-content" id="incomeSectionContent">
+                                            <table class="monthly-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Category</th>
+                                                        <th>Amount</th>
+                                                        <th>Notes</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="incomeMonthlyRows">
+                                                    <!-- Rows added by JS -->
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="btn-add-row" id="addIncomeMonthlyRowBtn">+ Add income row</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- SAVINGS SECTION -->
+                                    <div class="collapsible-section" data-section="savings">
+                                        <div class="section-header-collapsible" data-section="savings">
+                                            <span class="section-icon"></span>
+                                            <span class="section-title">Savings</span>
+                                            <span class="collapse-arrow">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                                </svg>
+                                            </span>
+                                        </div>
+                                        <div class="section-content collapsed" id="savingsSectionContent">
+                                            <table class="monthly-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Category</th>
+                                                        <th>Amount</th>
+                                                        <th>Notes</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="savingsMonthlyRows">
+                                                    <!-- Rows added by JS -->
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="btn-add-row" id="addSavingsMonthlyRowBtn">+ Add savings row</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- PAYOFF SECTION -->
+                                    <div class="collapsible-section" data-section="payoff">
+                                        <div class="section-header-collapsible" data-section="payoff">
+                                            <span class="section-icon"></span>
+                                            <span class="section-title">Payoffs</span>
+                                            <span class="collapse-arrow">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                                </svg>
+                                            </span>
+                                        </div>
+                                        <div class="section-content collapsed" id="payoffSectionContent">
+                                            <table class="monthly-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Category</th>
+                                                        <th>Amount</th>
+                                                        <th>Notes</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="payoffMonthlyRows">
+                                                    <!-- Rows added by JS -->
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="btn-add-row" id="addPayoffMonthlyRowBtn">+ Add payoff row</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-actions-block">
+                                        <button type="button" class="btn btn-primary btn-save" id="monthlySaveBtn" disabled>Save</button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-actions-block">
-                                <button type="button" class="btn btn-primary btn-save" id="monthlySaveBtn" disabled>Save</button>
-                            </div>
-                        </div>
+                        </section>
                     </div>
 
                 </div>
@@ -603,7 +671,7 @@
     <!-- JavaScript -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="js/deployment-config.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/auth.js?v=5"></script>
+    <script src="js/app.js?v=5"></script>
 </body>
 </html>

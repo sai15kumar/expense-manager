@@ -1582,8 +1582,257 @@ let addScreenState = {
         payoff: []
     },
     rowCounter: 0,
-    rowCounterByCategory: 0
+    rowCounterByCategory: 0,
+    quickType: 'Expense',
+    quickParent: '',
+    quickDetail: '',
+    recentAdds: []
 };
+
+const RECENT_ADD_STORAGE_KEY = 'expenseManager_recentAdds';
+
+function getRecentAdds() {
+    try {
+        const raw = localStorage.getItem(RECENT_ADD_STORAGE_KEY);
+        const items = raw ? JSON.parse(raw) : [];
+        return Array.isArray(items) ? items : [];
+    } catch (error) {
+        console.warn('[QUICK_ADD] Failed to read recent adds:', error);
+        return [];
+    }
+}
+
+function rememberRecentAdd(entry) {
+    try {
+        const current = getRecentAdds();
+        const key = `${entry.type}|${entry.parentCategory}|${entry.detail}`;
+        const filtered = current.filter(item => `${item.type}|${item.parentCategory}|${item.detail}` !== key);
+        filtered.unshift({
+            type: entry.type,
+            parentCategory: entry.parentCategory,
+            detail: entry.detail,
+            amount: Number(entry.amount) || 0,
+            notes: entry.notes || ''
+        });
+        localStorage.setItem(RECENT_ADD_STORAGE_KEY, JSON.stringify(filtered.slice(0, 6)));
+    } catch (error) {
+        console.warn('[QUICK_ADD] Failed to store recent add:', error);
+    }
+}
+
+function renderRecentAdds() {
+    const container = document.getElementById('recentQuickAdds');
+    if (!container) return;
+
+    const recentAdds = getRecentAdds();
+    addScreenState.recentAdds = recentAdds;
+
+    if (!recentAdds.length) {
+        container.innerHTML = '<span class="recent-empty">Your recent adds will show here.</span>';
+        return;
+    }
+
+    container.innerHTML = recentAdds.map((item, index) => `
+        <button type="button" class="recent-add-chip" data-index="${index}">
+            <span class="recent-add-title">${item.detail}</span>
+            <span class="recent-add-meta">${item.type} · ${item.parentCategory}</span>
+        </button>
+    `).join('');
+
+    container.querySelectorAll('.recent-add-chip').forEach(btn => {
+        btn.addEventListener('click', () => applyRecentAdd(Number(btn.dataset.index)));
+    });
+}
+
+function applyRecentAdd(index) {
+    const item = addScreenState.recentAdds[index];
+    if (!item) return;
+
+    selectQuickType(item.type || 'Expense');
+    populateQuickParentOptions(item.parentCategory || '');
+    populateQuickDetailOptions(item.parentCategory || '', item.detail || '');
+
+    const amountInput = document.getElementById('quickEntryAmount');
+    const notesInput = document.getElementById('quickEntryNotes');
+    if (amountInput) amountInput.value = item.amount || '';
+    if (notesInput) notesInput.value = item.notes || '';
+
+    updateQuickAddState();
+}
+
+function selectQuickType(type) {
+    addScreenState.quickType = type || 'Expense';
+
+    document.querySelectorAll('.type-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === addScreenState.quickType);
+    });
+
+    addScreenState.quickParent = '';
+    addScreenState.quickDetail = '';
+    populateQuickParentOptions('');
+    updateQuickAddState();
+}
+
+function populateQuickParentOptions(selectedParent = '') {
+    const select = document.getElementById('quickParentCategory');
+    if (!select) return;
+
+    const groups = appState.categoryGroups?.[addScreenState.quickType] || [];
+    select.innerHTML = '<option value="">Select category</option>';
+
+    groups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.category;
+        option.textContent = group.category;
+        select.appendChild(option);
+    });
+
+    if (selectedParent && groups.some(group => group.category === selectedParent)) {
+        select.value = selectedParent;
+    } else if (groups.length === 1) {
+        select.value = groups[0].category;
+    }
+
+    addScreenState.quickParent = select.value;
+    populateQuickDetailOptions(select.value, addScreenState.quickDetail);
+}
+
+function populateQuickDetailOptions(parentCategory, selectedDetail = '') {
+    const select = document.getElementById('quickDetailCategory');
+    if (!select) return;
+
+    const groups = appState.categoryGroups?.[addScreenState.quickType] || [];
+    const match = groups.find(group => group.category === parentCategory);
+    const details = Array.isArray(match?.details) ? match.details : [];
+
+    select.innerHTML = '<option value="">Select sub-category</option>';
+
+    details.forEach(detail => {
+        const option = document.createElement('option');
+        option.value = detail;
+        option.textContent = detail;
+        select.appendChild(option);
+    });
+
+    if (selectedDetail && details.includes(selectedDetail)) {
+        select.value = selectedDetail;
+    } else if (details.length === 1) {
+        select.value = details[0];
+    }
+
+    addScreenState.quickDetail = select.value;
+}
+
+function updateQuickAddState() {
+    const dateInput = document.getElementById('quickEntryDate');
+    const amountInput = document.getElementById('quickEntryAmount');
+    const notesInput = document.getElementById('quickEntryNotes');
+    const saveBtn = document.getElementById('quickSaveBtn');
+
+    const amount = parseFloat(amountInput?.value || '');
+    addScreenState.quickParent = document.getElementById('quickParentCategory')?.value || '';
+    addScreenState.quickDetail = document.getElementById('quickDetailCategory')?.value || '';
+
+    const isValid = !!(dateInput?.value && addScreenState.quickType && addScreenState.quickParent && addScreenState.quickDetail && !isNaN(amount) && amount > 0);
+    if (saveBtn) saveBtn.disabled = !isValid;
+
+    if (notesInput) {
+        notesInput.dataset.activeType = addScreenState.quickType;
+    }
+}
+
+function resetQuickAddForm(preserveSelection = false) {
+    const dateInput = document.getElementById('quickEntryDate');
+    const amountInput = document.getElementById('quickEntryAmount');
+    const notesInput = document.getElementById('quickEntryNotes');
+
+    if (dateInput) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+    if (amountInput) amountInput.value = '';
+    if (notesInput) notesInput.value = '';
+
+    if (!preserveSelection) {
+        selectQuickType('Expense');
+    } else {
+        populateQuickParentOptions(addScreenState.quickParent);
+        populateQuickDetailOptions(addScreenState.quickParent, addScreenState.quickDetail);
+        updateQuickAddState();
+    }
+
+    renderRecentAdds();
+}
+
+async function saveQuickEntry() {
+    const dateInput = document.getElementById('quickEntryDate');
+    const amountInput = document.getElementById('quickEntryAmount');
+    const notesInput = document.getElementById('quickEntryNotes');
+    const saveBtn = document.getElementById('quickSaveBtn');
+
+    const date = dateInput?.value || '';
+    const amount = parseFloat(amountInput?.value || '');
+    const notes = notesInput?.value || '';
+    const parentCategory = document.getElementById('quickParentCategory')?.value || '';
+    const detail = document.getElementById('quickDetailCategory')?.value || '';
+
+    if (!date || !parentCategory || !detail || isNaN(amount) || amount <= 0) {
+        showToast('Please complete all quick add fields', 'error');
+        return;
+    }
+
+    try {
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+        }
+
+        const payload = {
+            action: 'saveExpenses',
+            date,
+            expenses: [{
+                type: addScreenState.quickType,
+                category: parentCategory,
+                detail,
+                amount,
+                notes
+            }]
+        };
+
+        const result = await callBackend(payload);
+        if (!checkApiAuthorization(result)) {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Entry';
+            }
+            return;
+        }
+
+        if (result?.success) {
+            showToast('Entry saved successfully', 'success');
+            if (result.savedExpenses && result.savedExpenses.length) {
+                mergeSavedExpensesIntoState({ [date]: result.savedExpenses });
+            }
+            rememberRecentAdd({
+                type: addScreenState.quickType,
+                parentCategory,
+                detail,
+                amount,
+                notes
+            });
+            resetQuickAddForm(true);
+        } else {
+            showToast(result?.message || 'Failed to save entry', 'error');
+        }
+    } catch (error) {
+        console.error('[QUICK_ADD] Error saving quick entry:', error);
+        showToast('Failed to save entry. Please try again.', 'error');
+    } finally {
+        if (saveBtn) {
+            saveBtn.textContent = 'Save Entry';
+            updateQuickAddState();
+        }
+    }
+}
 
 /**
  * Initialize Add Screen
@@ -1603,6 +1852,42 @@ function initializeAddScreen() {
         addBackBtn.addEventListener('click', closeAddScreen);
     }
     
+    const quickTypeButtons = document.querySelectorAll('.type-chip');
+    quickTypeButtons.forEach(btn => {
+        btn.addEventListener('click', () => selectQuickType(btn.dataset.type));
+    });
+
+    const quickParentCategory = document.getElementById('quickParentCategory');
+    if (quickParentCategory) {
+        quickParentCategory.addEventListener('change', () => {
+            addScreenState.quickParent = quickParentCategory.value;
+            addScreenState.quickDetail = '';
+            populateQuickDetailOptions(quickParentCategory.value);
+            updateQuickAddState();
+        });
+    }
+
+    const quickDetailCategory = document.getElementById('quickDetailCategory');
+    if (quickDetailCategory) {
+        quickDetailCategory.addEventListener('change', () => {
+            addScreenState.quickDetail = quickDetailCategory.value;
+            updateQuickAddState();
+        });
+    }
+
+    ['quickEntryDate', 'quickEntryAmount', 'quickEntryNotes'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', updateQuickAddState);
+            el.addEventListener('change', updateQuickAddState);
+        }
+    });
+
+    const quickSaveBtn = document.getElementById('quickSaveBtn');
+    if (quickSaveBtn) {
+        quickSaveBtn.addEventListener('click', saveQuickEntry);
+    }
+
     // Expense mode switching (By Date / By Category)
     const modeRadios = document.querySelectorAll('input[name="expenseMode"]');
     modeRadios.forEach(radio => {
@@ -1721,6 +2006,9 @@ function resetAddScreen() {
     addScreenState.monthlyRows = { income: [], savings: [], payoff: [] };
     addScreenState.rowCounter = 0;
     addScreenState.rowCounterByCategory = 0;
+    addScreenState.quickType = 'Expense';
+    addScreenState.quickParent = '';
+    addScreenState.quickDetail = '';
 
     const expenseContainer = document.getElementById('expenseRowsContainer');
     if (expenseContainer) expenseContainer.innerHTML = '';
@@ -1771,6 +2059,8 @@ function resetAddScreen() {
         radio.checked = radio.value === 'byDate';
     });
     switchExpenseMode('byDate');
+
+    resetQuickAddForm();
 
     // Reset save buttons text
     const expensesSaveBtn = document.getElementById('expensesSaveBtn');
