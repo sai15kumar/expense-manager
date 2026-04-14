@@ -7,12 +7,23 @@
 // ====================================================
 
 const CONFIG = {
-     BACKEND_URL: 'https://script.google.com/macros/s/AKfycbymx4EIU8POBubp2UHRcuu2DenjaoZHWM-F-dEjPcPB-pJqPhQfGUy8Yd7y_h5VUUNJCA/exec',
+     SUPABASE_URL: window.EXPENSE_SUPABASE_URL || '',
+     SUPABASE_ANON_KEY: window.EXPENSE_SUPABASE_ANON_KEY || '',
+     SUPABASE_FUNCTION_NAME: window.EXPENSE_SUPABASE_FUNCTION_NAME || 'expense-api',
      MONTH_NAMES: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
      EXPENSE_ROWS: 5,
      DATE_FORMAT: 'YYYY-MM-DD'
 };
+
+CONFIG.BACKEND_URL = CONFIG.SUPABASE_URL
+    ? `${CONFIG.SUPABASE_URL}/functions/v1/${CONFIG.SUPABASE_FUNCTION_NAME}`
+    : '';
+
+if (!CONFIG.BACKEND_URL) {
+    console.error('[CONFIG] Supabase configuration is missing. Check js/deployment-config.js.');
+}
+
 window.CONFIG = CONFIG;
 
 // Shared auth storage configuration
@@ -71,23 +82,49 @@ function getUserEmail() {
 }
 
 /**
- * Call Apps Script Web App with a JSON payload
- * Sends a simple POST request without headers to avoid CORS preflight
+ * Call the Supabase backend with a JSON payload.
  * @param {Object} payload - Request payload (must include action and userEmail)
  * @returns {Promise<Object>} - Parsed JSON response from backend
  */
-async function callAppsScript(payload) {
+async function callBackend(payload) {
     const userEmail = getUserEmail();
+    const idToken = getAuthToken();
+
+    if (!CONFIG.BACKEND_URL) {
+        throw new Error('Supabase backend URL is not configured');
+    }
+
     if (userEmail) {
         payload.userEmail = userEmail;
-        console.log('[API] Sending request with userEmail:', userEmail, 'action:', payload.action);
+        console.log('[API] Sending request with userEmail:', userEmail, 'action:', payload.action, 'provider: supabase');
     } else {
         console.warn('[API] WARNING: No userEmail found in storage');
     }
-    const response = await fetch(CONFIG.BACKEND_URL, {
+
+    const requestOptions = {
         method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Client-Info': 'expense-manager-web'
+        },
         body: JSON.stringify(payload)
-    });
+    };
+
+    if (CONFIG.SUPABASE_ANON_KEY) {
+        requestOptions.headers.apikey = CONFIG.SUPABASE_ANON_KEY;
+    }
+
+    // Keep Google Identity separate from Supabase auth. The Edge Function validates
+    // the Google token itself, so we do not send the publishable key as a Bearer token.
+    if (idToken) {
+        requestOptions.headers['X-Google-Id-Token'] = idToken;
+    }
+
+    if (userEmail) {
+        requestOptions.headers['X-User-Email'] = userEmail;
+    }
+
+    const response = await fetch(CONFIG.BACKEND_URL, requestOptions);
     return await response.json();
 }
 
@@ -108,7 +145,7 @@ async function deleteExpense(id) {
     console.log('[DELETE] Attempting delete for id:', id);
 
     try {
-        const result = await callAppsScript({ action: 'deleteExpense', id });
+        const result = await callBackend({ action: 'deleteExpense', id });
         console.log('[DELETE] API response:', result);
         if (!checkApiAuthorization(result)) return false;
 
@@ -132,7 +169,7 @@ async function deleteExpense(id) {
  */
 async function fetchCategories() {
     try {
-        const result = await callAppsScript({ action: 'getCategories' });
+        const result = await callBackend({ action: 'getCategories' });
 
         if (!checkApiAuthorization(result)) return;
 
@@ -564,7 +601,7 @@ async function loadHomeData() {
             }
 
             // Fetch dashboard data (single API call)
-            const result = await callAppsScript({
+            const result = await callBackend({
                 action: 'getDashboardData',
                 year: year,
                 month: month
@@ -599,7 +636,7 @@ async function loadHomeData() {
 async function fetchMonthlyBudget(year, month) {
     try {
         console.log('[BUDGET] Fetching budget for', year, month);
-        const result = await callAppsScript({
+        const result = await callBackend({
             action: 'getMonthlyBudget',
             year: year,
             month: month
@@ -641,7 +678,7 @@ async function fetchHomeExpensesForMonth(year, month) {
     try {
         console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
         
-        const result = await callAppsScript({
+        const result = await callBackend({
             action: 'getExpensesByMonth',
             year: year,
             month: month
@@ -683,7 +720,7 @@ async function fetchHomeExpensesForYear(year) {
         for (let month = 1; month <= 12; month += 1) {
             console.log(`[HOME] Fetching expenses for ${year}-${String(month).padStart(2, '0')}`);
 
-            const result = await callAppsScript({
+            const result = await callBackend({
                 action: 'getExpensesByMonth',
                 year: year,
                 month: month
@@ -2372,7 +2409,7 @@ async function saveExpensesByDate() {
         
         console.log('[ADD_SCREEN] Sending payload:', JSON.stringify(payload, null, 2));
         
-        const result = await callAppsScript(payload);
+        const result = await callBackend(payload);
         
         console.log('[ADD_SCREEN] Save response status: API call completed');
         
@@ -2509,7 +2546,7 @@ async function saveExpensesByCategory() {
             
             console.log('[ADD_SCREEN] Sending payload for date', date, ':', JSON.stringify(payload, null, 2));
             
-            const result = await callAppsScript(payload);
+            const result = await callBackend(payload);
             
             if (!checkApiAuthorization(result)) {
                 saveBtn.disabled = false;
@@ -2633,7 +2670,7 @@ async function saveMonthly() {
         
         console.log('[ADD_SCREEN] Sending monthly payload:', JSON.stringify(payload, null, 2));
         
-        const result = await callAppsScript(payload);
+        const result = await callBackend(payload);
         
         console.log('[ADD_SCREEN] Monthly save response status: API call completed');
         
@@ -2965,7 +3002,7 @@ async function handleBudgetSubmit(event) {
     
     console.log('[BUDGET] Saving budget data:', budgets);
     
-    // Save to Google Sheets
+    // Save to Supabase backend
     try {
         const saveBtn = form.querySelector('button[type="submit"]');
         if (saveBtn) {
@@ -2973,7 +3010,7 @@ async function handleBudgetSubmit(event) {
             saveBtn.textContent = 'Saving...';
         }
         
-        const result = await callAppsScript({
+        const result = await callBackend({
             action: 'saveBudget',
             budgets: budgets
         });
