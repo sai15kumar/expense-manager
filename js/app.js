@@ -97,7 +97,7 @@ async function callBackend(payload) {
 
     if (userEmail) {
         payload.userEmail = userEmail;
-        console.log('[API] Sending request with userEmail:', userEmail, 'action:', payload.action, 'provider: supabase');
+        console.log('[API] Sending request with userEmail:', userEmail, 'action:', payload.action, 'provider: supabase', 'url:', CONFIG.BACKEND_URL, 'build:', window.EXPENSE_BUILD_VERSION || 'unknown');
     } else {
         console.warn('[API] WARNING: No userEmail found in storage');
     }
