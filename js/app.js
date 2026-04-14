@@ -331,9 +331,20 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
         const hasBudget = budget > 0;
         const pct     = hasBudget ? Math.min((spent / budget) * 100, 100) : 0;
         const over    = hasBudget && spent > budget;
-        const barColor = over
-          ? 'bg-red-500'
-          : pct >= 80 ? 'bg-amber-400' : 'bg-green-400';
+        // For Income/Savings: higher % = good (green), lower = amber/red
+        // For Expense/Payoff: higher % = bad (red), lower = green
+        const higherIsBetter = type === 'Income' || type === 'Savings';
+        const barColor = higherIsBetter
+          ? (pct >= 100 ? 'bg-green-500' : pct >= 80 ? 'bg-green-400' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400')
+          : (over ? 'bg-red-500' : pct >= 80 ? 'bg-amber-400' : 'bg-green-400');
+        const labelColor = higherIsBetter
+          ? (pct < 50 ? 'text-red-600 font-semibold' : 'text-gray-400')
+          : (over ? 'text-red-600 font-semibold' : 'text-gray-400');
+        const labelText = higherIsBetter
+          ? `${Math.round(pct)}% of ₹${Math.round(budget).toLocaleString('en-IN')}`
+          : (over
+              ? `Over by ₹${Math.round(spent - budget).toLocaleString('en-IN')}`
+              : `${Math.round(pct)}% of ₹${Math.round(budget).toLocaleString('en-IN')}`);
         return (
           <div key={type} className={`${c.bg} ${c.border} border rounded-lg p-3`}>
             <div className="text-xs text-gray-500 mb-1">{TAB_LABEL[type]}</div>
@@ -343,10 +354,8 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                   <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
                 </div>
-                <div className={`text-[10px] mt-1 text-right ${over ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
-                  {over
-                    ? `Over by ₹${Math.round(spent - budget).toLocaleString('en-IN')}`
-                    : `${Math.round(pct)}% of ₹${Math.round(budget).toLocaleString('en-IN')}`}
+                <div className={`text-[10px] mt-1 text-right ${labelColor}`}>
+                  {labelText}
                 </div>
               </div>
             )}
