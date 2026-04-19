@@ -24,6 +24,15 @@ const TYPE_COLOR = {
   Payoff:  { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-100',  tab: 'border-amber-500 text-amber-600',  badge: 'bg-amber-100 text-amber-700'  },
 };
 
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const BAR_COLOR = {
+  Expense: '#ef4444',
+  Income:  '#22c55e',
+  Savings: '#3b82f6',
+  Payoff:  '#f59e0b',
+};
+
 const MAX_QUICK_SLOTS  = 5;
 const QUICK_SLOTS_KEY  = 'expenseManager_quickSlots';
 
@@ -100,9 +109,31 @@ function fmt(n) {
   return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function fmtK(n) {
+  if (n >= 100000) return (n / 100000).toFixed(1) + 'L';
+  if (n >= 1000)   return (n / 1000).toFixed(1) + 'K';
+  return String(Math.round(n));
+}
+
 function parseMoney(s) {
   const n = parseFloat(s);
   return isNaN(n) || n < 0 ? 0 : n;
+}
+
+// Safely evaluate a spreadsheet-style expression like "=1400+210+23" → "1633"
+function evalExpression(expr) {
+  const raw = expr.startsWith('=') ? expr.slice(1) : expr;
+  if (raw.trim() === '') return '';
+  // Whitelist: only digits, decimal points, arithmetic operators, parentheses, whitespace
+  if (!/^[0-9\s+\-*/().]+$/.test(raw)) return '';
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = new Function('return (' + raw + ')')();
+    if (typeof result !== 'number' || !isFinite(result) || result < 0) return '';
+    return String(Math.round(result * 100) / 100);
+  } catch (_) {
+    return '';
+  }
 }
 
 function fmtDate(iso) {
@@ -234,6 +265,10 @@ function TopNav({ currentPage, setCurrentPage, onLogout }) {
             className={`font-medium transition-colors ${currentPage === 'budget' ? 'text-sky-300' : 'text-slate-400 hover:text-white'}`}
           >Budget</button>
           <button
+            onClick={() => setCurrentPage('analytics')}
+            className={`font-medium transition-colors ${currentPage === 'analytics' ? 'text-sky-300' : 'text-slate-400 hover:text-white'}`}
+          >Analytics</button>
+          <button
             onClick={onLogout}
             className="text-slate-400 hover:text-red-400 font-medium transition-colors"
           >Logout</button>
@@ -268,6 +303,10 @@ function TopNav({ currentPage, setCurrentPage, onLogout }) {
               onClick={() => navigate('budget')}
               className={`text-left px-5 py-3 text-sm font-medium transition-colors ${currentPage === 'budget' ? 'text-sky-300 bg-slate-700' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
             >Budget</button>
+            <button
+              onClick={() => navigate('analytics')}
+              className={`text-left px-5 py-3 text-sm font-medium transition-colors ${currentPage === 'analytics' ? 'text-sky-300 bg-slate-700' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+            >Analytics</button>
             <button
               onClick={handleLogout}
               className="text-left px-5 py-3 text-sm font-medium text-red-400 hover:bg-slate-700 transition-colors"
@@ -646,9 +685,23 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
   }, [activeNote]);
 
   function setCell(sc, d, val) {
-    // allow only digits and a single decimal point
-    if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
+    if (val !== '') {
+      if (val.startsWith('=')) {
+        // expression mode: allow digits, operators, parentheses, decimals, spaces
+        if (!/^=[0-9\s+\-*/().]*$/.test(val)) return;
+      } else {
+        // plain number mode
+        if (!/^\d*\.?\d*$/.test(val)) return;
+      }
+    }
     setGrid(prev => ({ ...prev, [sc]: { ...(prev[sc] || {}), [d]: val } }));
+  }
+
+  function commitCell(sc, d) {
+    const val = (grid[sc] || {})[d] || '';
+    if (!val.startsWith('=')) return;
+    const result = evalExpression(val);
+    setGrid(prev => ({ ...prev, [sc]: { ...(prev[sc] || {}), [d]: result } }));
   }
 
   function setNote(sc, d, val) {
@@ -857,9 +910,12 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
                                     inputMode="decimal"
                                     value={val}
                                     onChange={e => setCell(sc, d, e.target.value)}
-                                    className={`block w-full h-full px-1.5 text-right text-[11px] bg-transparent outline-none
+                                    onBlur={() => commitCell(sc, d)}
+                                    className={`block w-full h-full px-1.5 text-[11px] bg-transparent outline-none
                                       focus:bg-sky-50 focus:ring-inset focus:ring-1 focus:ring-sky-300
-                                      ${filled ? 'text-gray-800 font-semibold' : 'text-gray-200 placeholder-gray-200'}`}
+                                      ${val.startsWith('=') ? 'text-left text-violet-600 font-normal' : ''}
+                                      ${filled && !val.startsWith('=') ? 'text-right text-gray-800 font-semibold' : ''}
+                                      ${!filled ? 'text-right text-gray-200 placeholder-gray-200' : ''}`}
                                     placeholder="·"
                                     style={{ width: CELL_W, height: 36, paddingBottom: hasNote ? 10 : undefined }}
                                   />
@@ -1485,6 +1541,325 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth }) {
   );
 }
 
+// ── ANALYTICS PAGE ─────────────────────────────────────────────────────────
+
+function AnalyticsPage({ onBack }) {
+  const currentYear = new Date().getFullYear();
+  const [year, setYear]               = useState(currentYear);
+  const [mode, setMode]               = useState('year'); // 'year' | 'custom'
+  const [customMonths, setCustomMonths] = useState([]);
+  const [activeType, setActiveType]   = useState('Expense');
+  const [monthData, setMonthData]     = useState({}); // 'YYYY-MM' → tx[]
+  const [fetchedYears, setFetchedYears] = useState(() => new Set());
+  const [loading, setLoading]         = useState(false);
+  const [expandedCat, setExpandedCat] = useState(null);
+
+  async function fetchYear(y) {
+    if (fetchedYears.has(y)) return;
+    setLoading(true);
+    try {
+      const res = await callBackend({ action: 'getExpensesByYear', year: y });
+      if (res.success) {
+        setMonthData(prev => ({ ...prev, ...res.expensesByMonth }));
+        setFetchedYears(prev => new Set([...prev, y]));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { fetchYear(year); }, [year]);
+
+  // Which months to show
+  const displayMonths = useMemo(() => {
+    if (mode === 'year')
+      return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
+    return [...customMonths].sort();
+  }, [mode, year, customMonths]);
+
+  // Flat filtered transactions
+  const filteredTxs = useMemo(() =>
+    displayMonths.flatMap(m => (monthData[m] || []).filter(t => t.type === activeType)),
+    [displayMonths, monthData, activeType]
+  );
+
+  // Monthly totals for trend chart
+  const monthTotals = useMemo(() =>
+    displayMonths.map(m => ({
+      month: m,
+      total: (monthData[m] || [])
+        .filter(t => t.type === activeType)
+        .reduce((s, t) => s + t.amount, 0),
+    })),
+    [displayMonths, monthData, activeType]
+  );
+  const maxTotal = Math.max(...monthTotals.map(m => m.total), 1);
+
+  // Category breakdown (parent → subs)
+  const catBreakdown = useMemo(() => {
+    const map = {};
+    for (const t of filteredTxs) {
+      const p = t.parentCategory || t.category;
+      if (!map[p]) map[p] = { total: 0, subs: {} };
+      map[p].total += t.amount;
+      const s = t.category || p;
+      map[p].subs[s] = (map[p].subs[s] || 0) + t.amount;
+    }
+    const grand = Object.values(map).reduce((s, v) => s + v.total, 0) || 1;
+    return Object.entries(map)
+      .map(([cat, v]) => ({
+        cat,
+        total: v.total,
+        pct: (v.total / grand * 100).toFixed(1),
+        subs: Object.entries(v.subs)
+          .map(([s, a]) => ({ s, a, pct: (a / grand * 100).toFixed(1) }))
+          .sort((a, b) => b.a - a.a),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredTxs]);
+
+  // MoM table
+  const momCats = useMemo(() => {
+    const set = new Set(filteredTxs.map(t => t.parentCategory || t.category));
+    return [...set];
+  }, [filteredTxs]);
+
+  const momData = useMemo(() =>
+    momCats.map(cat => ({
+      cat,
+      values: displayMonths.map(m =>
+        (monthData[m] || [])
+          .filter(t => t.type === activeType && (t.parentCategory || t.category) === cat)
+          .reduce((s, t) => s + t.amount, 0)
+      ),
+    })).sort((a, b) =>
+      b.values.reduce((s, v) => s + v, 0) - a.values.reduce((s, v) => s + v, 0)
+    ),
+    [momCats, displayMonths, monthData, activeType]
+  );
+
+  const barColor = BAR_COLOR[activeType] || '#94a3b8';
+  // For Income/Savings: rising = good (green ↑); for Expense/Payoff: rising = bad (red ↑)
+  const goodUp   = activeType === 'Income' || activeType === 'Savings';
+
+  function toggleCustomMonth(m) {
+    const y = parseInt(m.split('-')[0], 10);
+    fetchYear(y);
+    setCustomMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+  }
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 bg-gray-50">
+
+      {/* ── Controls bar ── */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex flex-wrap items-center gap-3">
+        <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-700">&#8592; Back</button>
+        <span className="text-sm font-semibold text-gray-700">Analytics</span>
+
+        {/* Year / Custom toggle */}
+        <div className="flex items-center ml-auto">
+          <button
+            onClick={() => setMode('year')}
+            className={`text-xs px-3 py-1.5 rounded-l border ${mode === 'year' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-gray-300 hover:border-slate-400'}`}
+          >Year</button>
+          <button
+            onClick={() => setMode('custom')}
+            className={`text-xs px-3 py-1.5 rounded-r border-t border-b border-r ${mode === 'custom' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-gray-300 hover:border-slate-400'}`}
+          >Custom</button>
+        </div>
+
+        {/* Year stepper (year mode) */}
+        {mode === 'year' && (
+          <div className="flex items-center gap-1">
+            <button onClick={() => setYear(y => y - 1)} className="px-2 py-1 text-gray-400 hover:text-gray-700">&#8249;</button>
+            <span className="text-sm font-medium w-12 text-center text-gray-700">{year}</span>
+            <button onClick={() => setYear(y => y + 1)} disabled={year >= currentYear} className="px-2 py-1 text-gray-400 hover:text-gray-700 disabled:opacity-30">&#8250;</button>
+          </div>
+        )}
+
+        {/* Type tabs */}
+        <div className="flex gap-1 flex-wrap">
+          {TABS.map(t => (
+            <button
+              key={t}
+              onClick={() => { setActiveType(t); setExpandedCat(null); }}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${activeType === t ? 'text-white border-transparent' : 'bg-white text-slate-500 border-gray-300 hover:border-slate-400'}`}
+              style={activeType === t ? { backgroundColor: BAR_COLOR[t] } : {}}
+            >{t}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Custom month picker ── */}
+      {mode === 'custom' && (
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-gray-500 font-medium">Pick months:</span>
+            <button onClick={() => setYear(y => y - 1)} className="text-gray-400 hover:text-gray-700 px-1 text-sm">&#8249;</button>
+            <span className="text-xs font-medium text-gray-700">{year}</span>
+            <button onClick={() => setYear(y => y + 1)} disabled={year >= currentYear} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 px-1 text-sm">&#8250;</button>
+            {customMonths.length > 0 && (
+              <button onClick={() => setCustomMonths([])} className="text-xs text-red-400 hover:text-red-600 ml-auto">Clear all</button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {MONTH_NAMES.map((n, i) => {
+              const m   = `${year}-${String(i + 1).padStart(2, '0')}`;
+              const sel = customMonths.includes(m);
+              return (
+                <button
+                  key={m}
+                  onClick={() => toggleCustomMonth(m)}
+                  className={`text-xs px-2.5 py-1 rounded border transition-colors ${sel ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-gray-300 hover:border-slate-400'}`}
+                >{n} {year}</button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Main content ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+
+        {loading && (
+          <div className="text-center py-12 text-gray-400 text-sm">Loading…</div>
+        )}
+
+        {!loading && displayMonths.length === 0 && (
+          <div className="text-center py-12 text-gray-400 text-sm">Select months to view analytics.</div>
+        )}
+
+        {!loading && displayMonths.length > 0 && (
+          <>
+            {/* MONTHLY TREND */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4">{activeType} — Monthly Trend</h3>
+              {monthTotals.every(m => m.total === 0) ? (
+                <p className="text-sm text-gray-400 text-center py-6">No data for this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="flex items-end gap-1.5 min-w-max pb-1" style={{ height: '180px' }}>
+                    {monthTotals.map(({ month, total }) => {
+                      const barH = total > 0 ? Math.max((total / maxTotal) * 140, 4) : 0;
+                      const label = MONTH_NAMES[parseInt(month.split('-')[1], 10) - 1];
+                      return (
+                        <div key={month} className="relative group flex flex-col items-center justify-end gap-1" style={{ width: '44px', height: '180px' }}>
+                          <span className="absolute top-0 left-0 right-0 text-center text-gray-500" style={{ fontSize: '9px' }}>
+                            {total > 0 ? fmtK(total) : ''}
+                          </span>
+                          <div className="w-8 rounded-t mx-auto" style={{ height: `${barH}px`, backgroundColor: barColor }} />
+                          <span className="text-gray-500 shrink-0" style={{ fontSize: '10px' }}>{label}</span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
+                            {label}: {fmt(total)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* CATEGORY BREAKDOWN */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Category Breakdown</h3>
+              {catBreakdown.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">No data for this period.</p>
+              ) : (
+                <div className="space-y-2">
+                  {catBreakdown.map(({ cat, total, pct, subs }) => (
+                    <div key={cat}>
+                      <button className="w-full text-left" onClick={() => setExpandedCat(expandedCat === cat ? null : cat)}>
+                        <div className="flex items-center gap-2 py-1">
+                          <span className="text-sm text-gray-700 shrink-0 w-32 truncate">{cat}</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                          </div>
+                          <span className="text-xs text-gray-500 shrink-0 w-28 text-right">
+                            {fmt(total)} <span className="text-gray-400">({pct}%)</span>
+                          </span>
+                          <span className="text-gray-400 text-xs shrink-0">{expandedCat === cat ? '▲' : '▼'}</span>
+                        </div>
+                      </button>
+                      {expandedCat === cat && (
+                        <div className="ml-4 mt-1 mb-2 space-y-1.5">
+                          {subs.map(({ s, a, pct: sp }) => (
+                            <div key={s} className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500 shrink-0 w-28 truncate">{s}</span>
+                              <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${sp}%`, backgroundColor: barColor, opacity: 0.65 }} />
+                              </div>
+                              <span className="text-xs text-gray-400 shrink-0 w-16 text-right">{fmt(a)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* MONTH-OVER-MONTH TABLE */}
+            {displayMonths.length > 1 && momData.length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-x-auto">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Month-over-Month</h3>
+                <table className="text-xs w-full min-w-max">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-1.5 pr-4 font-medium text-gray-600 sticky left-0 bg-white min-w-[120px]">Category</th>
+                      {displayMonths.map(m => (
+                        <th key={m} className="text-right py-1.5 px-2 font-medium text-gray-600 whitespace-nowrap">
+                          {MONTH_NAMES[parseInt(m.split('-')[1], 10) - 1]} {m.split('-')[0]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {momData.map(({ cat, values }) => (
+                      <tr key={cat} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                        <td className="py-1.5 pr-4 text-gray-700 sticky left-0 bg-white">{cat}</td>
+                        {values.map((v, i) => {
+                          const prev  = i > 0 ? values[i - 1] : null;
+                          const diff  = prev !== null && prev > 0 ? v - prev : 0;
+                          const up    = diff > 0;
+                          const arrowCls = up
+                            ? (goodUp ? 'text-green-500' : 'text-red-500')
+                            : (goodUp ? 'text-red-500'   : 'text-green-500');
+                          return (
+                            <td key={i} className="py-1.5 px-2 text-right text-gray-700 whitespace-nowrap">
+                              {v > 0 ? fmt(v) : <span className="text-gray-300">—</span>}
+                              {diff !== 0 && <span className={`ml-0.5 ${arrowCls}`}>{up ? '↑' : '↓'}</span>}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                    {/* Totals row */}
+                    <tr className="border-t-2 border-gray-200 font-semibold">
+                      <td className="py-2 pr-4 text-gray-700 sticky left-0 bg-white">Total</td>
+                      {displayMonths.map(m => {
+                        const total = (monthData[m] || [])
+                          .filter(t => t.type === activeType)
+                          .reduce((s, t) => s + t.amount, 0);
+                        return (
+                          <td key={m} className="py-2 px-2 text-right text-gray-700 whitespace-nowrap">
+                            {total > 0 ? fmt(total) : <span className="text-gray-300">—</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── DASHBOARD PAGE ─────────────────────────────────────────────────────────
 
 function DashboardPage({
@@ -1790,6 +2165,12 @@ function App() {
           categoryGroups={categoryGroups}
           onBack={() => setCurrentPage('dashboard')}
           showToast={showToast}
+        />
+      )}
+
+      {currentPage === 'analytics' && (
+        <AnalyticsPage
+          onBack={() => setCurrentPage('dashboard')}
         />
       )}
 

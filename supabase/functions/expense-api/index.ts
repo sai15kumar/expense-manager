@@ -269,6 +269,47 @@ async function getExpensesByMonth(supabase: ReturnType<typeof createClient>, pay
   return { success: true, expensesByDate };
 }
 
+async function getExpensesByYear(supabase: ReturnType<typeof createClient>, payload: Payload) {
+  const year = Number(payload.year);
+  if (!year) return { success: false, message: 'Missing year' };
+
+  const startDate = `${year}-01-01`;
+  const endDate   = `${year}-12-31`;
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('id, entry_date, type, category, detail, amount, notes, created_at, status')
+    .neq('status', 'DELETED')
+    .gte('entry_date', startDate)
+    .lte('entry_date', endDate)
+    .order('entry_date', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  // Group by YYYY-MM
+  const expensesByMonth: Record<string, unknown[]> = {};
+  for (const row of data || []) {
+    const dateKey = formatDateKey(row.entry_date);
+    if (!dateKey) continue;
+    const monthKey = dateKey.substring(0, 7); // 'YYYY-MM'
+    if (!expensesByMonth[monthKey]) expensesByMonth[monthKey] = [];
+    expensesByMonth[monthKey].push({
+      id: row.id,
+      date: dateKey,
+      type: normalizeType(row.type),
+      category: (row.detail || row.category || '').toString().trim(),
+      parentCategory: (row.category || '').toString().trim(),
+      detail: (row.detail || '').toString().trim(),
+      amount: Number(row.amount || 0),
+      notes: row.notes || '',
+      status: row.status || 'ACTIVE'
+    });
+  }
+
+  return { success: true, expensesByMonth };
+}
+
 async function getDashboardData(supabase: ReturnType<typeof createClient>, payload: Payload) {
   const [categoriesResult, budgetResult, expensesResult] = await Promise.all([
     getCategories(supabase),
@@ -484,6 +525,8 @@ serve(async (request) => {
         return jsonResponse(await getDashboardData(supabase, payload));
       case 'getExpensesByMonth':
         return jsonResponse(await getExpensesByMonth(supabase, payload));
+      case 'getExpensesByYear':
+        return jsonResponse(await getExpensesByYear(supabase, payload));
       case 'saveExpenses':
         return jsonResponse(await saveExpenses(supabase, payload, userEmail));
       case 'saveBudget':
