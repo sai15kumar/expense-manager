@@ -371,7 +371,7 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
         const spent   = totals[type];
         const budget  = budgetTotals[type];
         const hasBudget = budget > 0;
-        const pct     = hasBudget ? Math.min((spent / budget) * 100, 100) : 0;
+        const pct     = hasBudget ? (spent / budget) * 100 : 0;
         const over    = hasBudget && spent > budget;
         // For Income/Savings: higher % = good (green), lower = amber/red
         // For Expense/Payoff: higher % = bad (red), lower = green
@@ -385,7 +385,7 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
         const labelText = higherIsBetter
           ? `${Math.round(pct)}% of ₹${Math.round(budget).toLocaleString('en-IN')}`
           : (over
-              ? `Over by ₹${Math.round(spent - budget).toLocaleString('en-IN')}`
+              ? `${Math.round(pct)}% · over by ₹${Math.round(spent - budget).toLocaleString('en-IN')}`
               : `${Math.round(pct)}% of ₹${Math.round(budget).toLocaleString('en-IN')}`);
         return (
           <div key={type} className={`${c.bg} ${c.border} border rounded-lg p-3`}>
@@ -394,7 +394,7 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
             {hasBudget && (
               <div className="mt-2">
                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                  <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
                 </div>
                 <div className={`text-[10px] mt-1 text-right ${labelColor}`}>
                   {labelText}
