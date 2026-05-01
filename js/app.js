@@ -348,7 +348,10 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
     const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
     transactions
       .filter(tx => tx.date.startsWith(selectedMonth))
-      .forEach(tx => { t[tx.type] = (t[tx.type] || 0) + tx.amount; });
+      .forEach(tx => {
+        if (tx.type === 'Payoff' && (tx.subCategory || '').toLowerCase().includes('credit card')) return;
+        t[tx.type] = (t[tx.type] || 0) + tx.amount;
+      });
     return t;
   }, [transactions, selectedMonth]);
 
@@ -1164,8 +1167,7 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
   function addToPending() {
     const amt = parseMoney(amount);
     if (!amt) return;
-    setPending(prev => [...prev, { _id: uid(), type: txnType, parentCat, subCategory: subCat, amount: amt, notes }]);
-    setSubCat('');
+    setPending(prev => [...prev, { _id: uid(), date, type: txnType, parentCat, subCategory: subCat, amount: amt, notes }]);
     setAmount('');
     setNotes('');
     setTimeout(() => amountRef.current?.focus(), 80);
@@ -1178,7 +1180,7 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
     const snapshot = [...pending];
     setPending([]);
     snapshot.forEach(entry => onAdd({
-      id: String(uid()), date,
+      id: String(uid()), date: entry.date,
       type: entry.type, subCategory: entry.subCategory,
       amount: entry.amount, notes: entry.notes,
     }));
@@ -1328,7 +1330,7 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
           <div className="border-t border-gray-100">
             <div className="px-4 py-2 bg-gray-50 flex items-center justify-between">
               <span className="text-xs font-medium text-gray-500">
-                {pending.length} pending · {fmtDate(date)}
+                {pending.length} pending
               </span>
               <span className="text-xs font-semibold text-gray-700">{fmt(pendingTotal)}</span>
             </div>
@@ -1337,7 +1339,7 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
                 <li key={e._id} className="flex items-center justify-between px-4 py-2.5">
                   <div className="min-w-0">
                     <span className="text-sm text-gray-800 truncate block">{e.subCategory || e.parentCat || e.type}</span>
-                    {e.notes && <span className="text-xs text-gray-400">{e.notes}</span>}
+                    <span className="text-xs text-gray-400">{fmtDate(e.date)}{e.notes ? ` · ${e.notes}` : ''}</span>
                   </div>
                   <div className="flex items-center gap-3 ml-3 shrink-0">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${TYPE_COLOR[e.type]?.badge || ''}`}>{e.type}</span>
@@ -1363,7 +1365,7 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
 
 // ── TRANSACTIONS PAGE ──────────────────────────────────────────────────────
 
-function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth }) {
+function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onDelete }) {
   // ── Period filter state ─────────────────────────────────────────────────
   const [periodMode, setPeriodMode] = useState('month');  // 'month' | 'range'
   const [filterMonth, setFilterMonth] = useState(() => initialMonth || currentMonthStr());
@@ -1516,18 +1518,31 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth }) {
                   <th className="px-4 py-2 font-medium">Sub-category</th>
                   <th className="px-4 py-2 text-right font-medium">Amount</th>
                   <th className="px-4 py-2 font-medium">Head</th>
+                  <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(t => {
                   const c = TYPE_COLOR[t.type] || TYPE_COLOR.Expense;
                   return (
-                    <tr key={t.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                    <tr key={t.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 group">
                       <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.date)}</td>
-                      <td className="px-4 py-2.5 text-gray-800">{t.subCategory || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2.5 text-gray-800">
+                        <div>{t.subCategory || <span className="text-gray-300">—</span>}</div>
+                        {t.notes && <div className="text-xs text-gray-400">{t.notes}</div>}
+                      </td>
                       <td className="px-4 py-2.5 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
                       <td className="px-4 py-2.5">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${c.badge}`}>{t.type}</span>
+                      </td>
+                      <td className="px-2 py-2.5 text-right">
+                        {onDelete && (
+                          <button
+                            onClick={() => onDelete(t)}
+                            className="text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1"
+                            aria-label="Delete"
+                          >✕</button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -2082,6 +2097,25 @@ function App() {
   }, [categoryGroups, showToast]);
 
   // ── Quick add (Phase 4 + 6)
+  const handleDelete = useCallback(async (transaction) => {
+    if (!window.confirm(`Delete "${transaction.subCategory || transaction.type}" — ${fmt(transaction.amount)}?`)) return;
+    // Optimistic remove
+    setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+    try {
+      const result = await callBackend({ action: 'deleteExpense', id: transaction.id });
+      if (result?.error === 'UNAUTHORIZED') { window.appAuth?.handleUnauthorized?.(); return; }
+      if (result?.success) {
+        showToast('Deleted');
+      } else {
+        setTransactions(prev => [...prev, transaction]);
+        showToast('Delete failed', 'error');
+      }
+    } catch (e) {
+      setTransactions(prev => [...prev, transaction]);
+      showToast('Delete failed', 'error');
+    }
+  }, [showToast]);
+
   const handleQuickAdd = useCallback(async (transaction) => {
     // Optimistic local add
     setTransactions(prev => [...prev, transaction]);
@@ -2157,6 +2191,7 @@ function App() {
           onBack={() => setCurrentPage('dashboard')}
           onLoadMonth={loadDashboardData}
           initialMonth={selectedMonth}
+          onDelete={handleDelete}
         />
       )}
 
