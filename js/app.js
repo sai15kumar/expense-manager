@@ -98,6 +98,18 @@ function makeRow(prevDate) {
   return { _id: uid(), date: prevDate || todayStr(), subCategory: '', amount: '', notes: '' };
 }
 
+function makeQuickRow(prevDate, type, parentCat, subCategory) {
+  return {
+    _id:         uid(),
+    date:        prevDate    || todayStr(),
+    type:        type        || 'Expense',
+    parentCat:   parentCat   || '',
+    subCategory: subCategory || '',
+    amount:      '',
+    notes:       '',
+  };
+}
+
 function initRows() {
   const rows = [];
   for (let i = 0; i < 5; i++) rows.push(makeRow(rows[i - 1]?.date));
@@ -1106,22 +1118,120 @@ function QuickSlotsConfig({ categoryGroups, quickSlots, onToggle, onClose }) {
   );
 }
 
-// ── MOBILE QUICK ENTRY (redesigned) ───────────────────────────────────────
+// ── ROW CARD (one editable row in the multi-row quick entry) ─────────────
+
+function RowCard({ row, categoryGroups, onChange, onRemove }) {
+  const parentCats = useMemo(
+    () => (categoryGroups[row.type] || []).map(g => g.category),
+    [categoryGroups, row.type]
+  );
+  const subCats = useMemo(
+    () => (categoryGroups[row.type] || []).find(g => g.category === row.parentCat)?.details || [],
+    [categoryGroups, row.type, row.parentCat]
+  );
+
+  function set(field, val) {
+    const patch = { [field]: val };
+    if (field === 'type')      { patch.parentCat = ''; patch.subCategory = ''; }
+    if (field === 'parentCat') { patch.subCategory = ''; }
+    onChange({ ...row, ...patch });
+  }
+
+  const c   = TYPE_COLOR[row.type];
+  const amt = parseMoney(row.amount);
+
+  return (
+    <div className={`rounded-xl border p-3 space-y-2 ${c.border} ${c.bg}`}>
+
+      {/* Line 1: date · type tabs · remove */}
+      <div className="flex items-center gap-2">
+        <input
+          type="date" value={row.date}
+          onChange={e => set('date', e.target.value)}
+          className="flex-shrink-0 border border-gray-200 rounded px-2 py-1.5 text-xs bg-white"
+          style={{ width: 130 }}
+        />
+        <div className="flex gap-1 flex-1">
+          {TABS.map(t => (
+            <button
+              key={t}
+              onClick={() => set('type', t)}
+              className={`flex-1 py-1 text-[10px] rounded-md font-semibold leading-none transition-colors ${
+                row.type === t
+                  ? TYPE_COLOR[t].badge
+                  : 'bg-white border border-gray-200 text-gray-400 hover:border-gray-400'
+              }`}
+            >{t.slice(0, 3)}</button>
+          ))}
+        </div>
+        <button
+          onClick={onRemove}
+          className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors text-base leading-none"
+          aria-label="Remove row"
+        >✕</button>
+      </div>
+
+      {/* Line 2: category · sub-category */}
+      <div className="flex gap-2">
+        <select
+          value={row.parentCat}
+          onChange={e => set('parentCat', e.target.value)}
+          className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs bg-white min-w-0"
+        >
+          <option value="">Category…</option>
+          {parentCats.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {subCats.length > 0 ? (
+          <select
+            value={row.subCategory}
+            onChange={e => set('subCategory', e.target.value)}
+            className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs bg-white min-w-0"
+          >
+            <option value="">Sub-cat…</option>
+            {subCats.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        ) : (
+          <input
+            type="text" value={row.subCategory}
+            onChange={e => set('subCategory', e.target.value)}
+            placeholder={row.parentCat ? 'Sub-cat…' : 'Select category first'}
+            className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs bg-white min-w-0"
+          />
+        )}
+      </div>
+
+      {/* Line 3: amount · notes */}
+      <div className="flex gap-2">
+        <div className="relative flex-shrink-0" style={{ width: 110 }}>
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">₹</span>
+          <input
+            type="number" value={row.amount}
+            onChange={e => set('amount', e.target.value)}
+            placeholder="0" min="0" step="0.01" inputMode="decimal"
+            className={`w-full border rounded pl-5 pr-2 py-1.5 text-xs text-right bg-white ${
+              amt > 0 ? 'border-gray-300 text-gray-800 font-semibold' : 'border-gray-200 text-gray-500'
+            }`}
+          />
+        </div>
+        <input
+          type="text" value={row.notes}
+          onChange={e => set('notes', e.target.value)}
+          placeholder="Notes (optional)"
+          className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs bg-white min-w-0"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── MOBILE QUICK ENTRY (multi-row) ────────────────────────────────────────
 
 function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
   const today = todayStr();
-  const [date, setDate]           = useState(today);
-  const [txnType, setTxnType]     = useState('Expense');
-  const [parentCat, setParentCat] = useState('');
-  const [subCat, setSubCat]       = useState('');
-  const [amount, setAmount]       = useState('');
-  const [notes, setNotes]         = useState('');
-  const [pending, setPending]     = useState([]);
+  const [rows, setRows]             = useState(() => [makeQuickRow(today)]);
   const [configOpen, setConfigOpen] = useState(false);
   const [quickSlots, setQuickSlots] = useState(loadQuickSlots);
-  const amountRef = useRef(null);
 
-  // Pad slots to always show MAX_QUICK_SLOTS tiles
   const slotTiles = useMemo(() => {
     const tiles = [...quickSlots];
     while (tiles.length < MAX_QUICK_SLOTS) tiles.push(null);
@@ -1139,56 +1249,60 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
     });
   }
 
-  // Parent categories for the selected type
-  const parentCats = useMemo(
-    () => (categoryGroups[txnType] || []).map(g => g.category),
-    [categoryGroups, txnType]
-  );
+  function addRow() {
+    const lastDate = rows[rows.length - 1]?.date || today;
+    setRows(prev => [...prev, makeQuickRow(lastDate)]);
+  }
 
-  // Sub-categories for the selected parent
-  const subCats = useMemo(
-    () => (categoryGroups[txnType] || []).find(g => g.category === parentCat)?.details || [],
-    [categoryGroups, txnType, parentCat]
-  );
+  function removeRow(id) {
+    setRows(prev => {
+      if (prev.length === 1) return [makeQuickRow(today)];
+      return prev.filter(r => r._id !== id);
+    });
+  }
 
-  function handleTypeChange(t) { setTxnType(t); setParentCat(''); setSubCat(''); }
-  function handleParentChange(p) { setParentCat(p); setSubCat(''); }
+  function updateRow(id, updated) {
+    setRows(prev => prev.map(r => r._id === id ? updated : r));
+  }
 
+  // Tap a quick-slot: fill last empty row or append a new one
   function tapSlot(slot) {
-    setTxnType(slot.type || 'Expense');
-    setParentCat(slot.parentCategory || '');
-    setSubCat(slot.subCategory || '');
-    setAmount('');
-    setTimeout(() => amountRef.current?.focus(), 80);
+    setRows(prev => {
+      const last = prev[prev.length - 1];
+      const isLastEmpty = !last.subCategory && !parseMoney(last.amount);
+      const filled = makeQuickRow(
+        last?.date || today,
+        slot.type || 'Expense',
+        slot.parentCategory || '',
+        slot.subCategory || ''
+      );
+      if (isLastEmpty) {
+        return [...prev.slice(0, -1), { ...filled, _id: last._id }];
+      }
+      return [...prev, filled];
+    });
   }
 
-  const canAdd = parseMoney(amount) > 0;
-
-  function addToPending() {
-    const amt = parseMoney(amount);
-    if (!amt) return;
-    setPending(prev => [...prev, { _id: uid(), date, type: txnType, parentCat, subCategory: subCat, amount: amt, notes }]);
-    setAmount('');
-    setNotes('');
-    setTimeout(() => amountRef.current?.focus(), 80);
-  }
-
-  function removePending(id) { setPending(prev => prev.filter(e => e._id !== id)); }
+  const filledRows   = useMemo(() => rows.filter(r => parseMoney(r.amount) > 0), [rows]);
+  const pendingTotal = filledRows.reduce((s, r) => s + parseMoney(r.amount), 0);
+  const canSave      = filledRows.length > 0;
 
   function saveAll() {
-    if (pending.length === 0) return;
-    const snapshot = [...pending];
-    setPending([]);
-    snapshot.forEach(entry => onAdd({
-      id: String(uid()), date: entry.date,
-      type: entry.type, subCategory: entry.subCategory,
-      amount: entry.amount, notes: entry.notes,
+    if (!canSave) return;
+    const snapshot = filledRows;
+    setRows([makeQuickRow(today)]);
+    snapshot.forEach(r => onAdd({
+      id:          String(uid()),
+      date:        r.date,
+      type:        r.type,
+      subCategory: r.subCategory,
+      amount:      parseMoney(r.amount),
+      notes:       r.notes,
     }));
   }
 
-  const todayTxns = useMemo(() => transactions.filter(t => t.date === today), [transactions]);
+  const todayTxns  = useMemo(() => transactions.filter(t => t.date === today), [transactions]);
   const todayTotal = todayTxns.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
-  const pendingTotal = pending.reduce((s, e) => s + e.amount, 0);
 
   return (
     <div className="space-y-3">
@@ -1211,31 +1325,25 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
             onClick={() => setConfigOpen(true)}
             className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1"
             aria-label="Configure shortcuts"
-          >
-            <span>✎</span><span>Edit</span>
-          </button>
+          ><span>✎</span><span>Edit</span></button>
         </div>
-
-        {/* 5 equal icon tiles */}
-        <div className="grid gap-2" style={{gridTemplateColumns: 'repeat(5, 1fr)'}}>
+        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
           {slotTiles.map((slot, i) => slot ? (
             <button
               key={slot.subCategory}
               onClick={() => tapSlot(slot)}
-              className="flex flex-col items-center gap-1 py-3 bg-white border border-gray-200 rounded-xl active:bg-gray-50 transition-colors min-w-0"
+              className="flex flex-col items-center gap-1 py-2.5 bg-white border border-gray-200 rounded-xl active:bg-gray-50 transition-colors min-w-0"
             >
-              <span className="text-2xl leading-none">{catEmoji(slot.subCategory)}</span>
+              <span className="text-xl leading-none">{catEmoji(slot.subCategory)}</span>
               <span className="text-[10px] text-gray-600 truncate w-full text-center px-0.5 leading-tight">{slot.subCategory}</span>
             </button>
           ) : (
             <button
               key={`empty-${i}`}
               onClick={() => setConfigOpen(true)}
-              className="flex flex-col items-center justify-center py-3 border border-dashed border-gray-200 rounded-xl text-gray-300 hover:border-gray-400 hover:text-gray-400 transition-colors"
+              className="flex flex-col items-center justify-center py-2.5 border border-dashed border-gray-200 rounded-xl text-gray-300 hover:border-gray-400 hover:text-gray-400 transition-colors"
               aria-label="Add shortcut"
-            >
-              <span className="text-xl leading-none">+</span>
-            </button>
+            ><span className="text-xl leading-none">+</span></button>
           ))}
         </div>
       </div>
@@ -1246,119 +1354,44 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
         {todayTotal > 0 ? ` · ${fmt(todayTotal)} spent` : ''}
       </div>
 
-      {/* Add Entry card */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="px-4 pt-3 pb-2 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700">Add Entry</h3>
+      {/* Multi-row entry cards */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-600">
+            Entries
+            {rows.length > 1 && <span className="ml-1.5 font-normal text-gray-400">({rows.length} rows)</span>}
+          </p>
+          {filledRows.length > 0 && (
+            <span className="text-xs text-gray-400 font-medium">{fmt(pendingTotal)} ready</span>
+          )}
         </div>
 
-        <div className="px-4 py-3 space-y-3">
+        {rows.map(row => (
+          <RowCard
+            key={row._id}
+            row={row}
+            categoryGroups={categoryGroups}
+            onChange={updated => updateRow(row._id, updated)}
+            onRemove={() => removeRow(row._id)}
+          />
+        ))}
 
-          {/* 1. Date */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
-          </div>
-
-          {/* 2. Type */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Type</label>
-            <div className="grid grid-cols-4 gap-1">
-              {TABS.map(t => (
-                <button key={t} onClick={() => handleTypeChange(t)}
-                  className={`py-1.5 text-xs rounded font-medium transition-colors ${
-                    txnType === t ? TYPE_COLOR[t].badge : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}>{t}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. Category */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Category</label>
-            <select value={parentCat} onChange={e => handleParentChange(e.target.value)}
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm">
-              <option value="">-- select category --</option>
-              {parentCats.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {/* 4. Sub-category */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Sub-category</label>
-            {subCats.length > 0 ? (
-              <select value={subCat} onChange={e => setSubCat(e.target.value)}
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm">
-                <option value="">-- select sub-category --</option>
-                {subCats.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            ) : (
-              <input type="text" value={subCat} onChange={e => setSubCat(e.target.value)}
-                placeholder={parentCat ? 'Enter sub-category' : 'Select category first'}
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
-            )}
-          </div>
-
-          {/* 5. Amount */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Amount (₹)</label>
-            <input ref={amountRef} type="number" value={amount}
-              onChange={e => setAmount(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && canAdd) addToPending(); }}
-              placeholder="0" min="0" step="0.01" inputMode="decimal"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
-          </div>
-
-          {/* 6. Notes */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Notes</label>
-            <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && canAdd) addToPending(); }}
-              placeholder="Optional"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm" />
-          </div>
-
-          <button onClick={addToPending} disabled={!canAdd}
-            className="w-full py-2 border border-gray-300 text-gray-700 text-sm rounded font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            + Add to list
-          </button>
-        </div>
-
-        {/* Pending entries */}
-        {pending.length > 0 && (
-          <div className="border-t border-gray-100">
-            <div className="px-4 py-2 bg-gray-50 flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-500">
-                {pending.length} pending
-              </span>
-              <span className="text-xs font-semibold text-gray-700">{fmt(pendingTotal)}</span>
-            </div>
-            <ul className="divide-y divide-gray-50">
-              {pending.map(e => (
-                <li key={e._id} className="flex items-center justify-between px-4 py-2.5">
-                  <div className="min-w-0">
-                    <span className="text-sm text-gray-800 truncate block">{e.subCategory || e.parentCat || e.type}</span>
-                    <span className="text-xs text-gray-400">{fmtDate(e.date)}{e.notes ? ` · ${e.notes}` : ''}</span>
-                  </div>
-                  <div className="flex items-center gap-3 ml-3 shrink-0">
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${TYPE_COLOR[e.type]?.badge || ''}`}>{e.type}</span>
-                    <span className="text-sm font-medium text-gray-700">{fmt(e.amount)}</span>
-                    <button onClick={() => removePending(e._id)}
-                      className="text-gray-300 hover:text-red-400 text-xs leading-none" aria-label="Remove">✕</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="px-4 py-3 border-t border-gray-100">
-              <button onClick={saveAll}
-                className="w-full py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700 font-medium">
-                Save {pending.length} {pending.length === 1 ? 'entry' : 'entries'}
-              </button>
-            </div>
-          </div>
-        )}
+        <button
+          onClick={addRow}
+          className="w-full py-2 border border-dashed border-gray-300 rounded-xl text-sm text-gray-400 hover:border-gray-500 hover:text-gray-600 transition-colors"
+        >+ Add row</button>
       </div>
+
+      {/* Save button */}
+      <button
+        onClick={saveAll}
+        disabled={!canSave}
+        className="w-full py-3 bg-gray-800 text-white text-sm rounded-xl font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        {canSave
+          ? `Save ${filledRows.length} ${filledRows.length === 1 ? 'entry' : 'entries'} · ${fmt(pendingTotal)}`
+          : 'Fill at least one amount to save'}
+      </button>
     </div>
   );
 }
