@@ -258,7 +258,7 @@ function TopNav({ currentPage, setCurrentPage, onLogout }) {
   }
 
   return (
-    <header className="shrink-0 bg-slate-800 border-b border-slate-700 relative z-50">
+    <header className="shrink-0 bg-slate-800 border-b border-slate-700 relative z-50 md:hidden">
       <div className="h-11 flex items-center justify-between px-4">
         <span className="font-bold text-sm text-white tracking-tight">Expense Manager</span>
 
@@ -330,24 +330,94 @@ function TopNav({ currentPage, setCurrentPage, onLogout }) {
   );
 }
 
+// ── SIDE NAV (desktop only, md+) ──────────────────────────────────────────
+
+function SideNav({ currentPage, setCurrentPage, onLogout }) {
+  const NAV_ITEMS = [
+    {
+      page: 'dashboard', label: 'Home',
+      icon: <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+    },
+    {
+      page: 'analytics', label: 'Analytics',
+      icon: <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+    },
+    {
+      page: 'transactions', label: 'Transactions',
+      icon: <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+    },
+    {
+      page: 'budget', label: 'Budget',
+      icon: <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    },
+  ];
+
+  const userEmail = window.appAuth?.getUserEmail?.() || '';
+
+  return (
+    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-30 md:flex flex-col w-14 bg-slate-800 text-white shrink-0 h-screen">
+      {/* Brand icon */}
+      <div className="flex items-center justify-center h-14 border-b border-slate-700 shrink-0">
+        <svg className="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+
+      {/* Nav items — icons only */}
+      <nav className="flex-1 py-3 flex flex-col items-center gap-1">
+        {NAV_ITEMS.map(({ page, label, icon }) => {
+          const isActive = currentPage === page;
+          return (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              title={label}
+              className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors border-l-2 ${
+                isActive
+                  ? 'bg-slate-700 text-sky-300 border-sky-400'
+                  : 'text-slate-400 hover:bg-slate-700 hover:text-white border-transparent'
+              }`}
+            >
+              {icon}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Bottom: logout icon */}
+      <div className="flex items-center justify-center pb-4 border-t border-slate-700 pt-3 shrink-0">
+        <button
+          onClick={onLogout}
+          title="Logout"
+          className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </div>
+    </aside>
+  );
+}
+
 // Month selector
-function MonthSelector({ selectedMonth, onChange }) {
+function MonthSelector({ selectedMonth, onChange, compact = false }) {
   return (
     <div className="flex items-center gap-1">
       <button
         onClick={() => onChange(prevMonth(selectedMonth))}
-        className="px-2 py-1 text-gray-400 hover:text-gray-700 text-lg leading-none"
+        className={`${compact ? 'px-1.5 py-0.5 text-base' : 'px-2 py-1 text-lg'} text-gray-400 hover:text-gray-700 leading-none`}
         aria-label="Previous month"
       >&#8249;</button>
       <input
         type="month"
         value={selectedMonth}
         onChange={e => onChange(e.target.value)}
-        className="border border-gray-200 rounded px-2 py-1 text-sm text-gray-700 bg-white"
+        className={`border border-gray-200 rounded text-gray-700 bg-white ${compact ? 'px-2 py-0.5 text-xs' : 'px-2 py-1 text-sm'}`}
       />
       <button
         onClick={() => onChange(nextMonth(selectedMonth))}
-        className="px-2 py-1 text-gray-400 hover:text-gray-700 text-lg leading-none"
+        className={`${compact ? 'px-1.5 py-0.5 text-base' : 'px-2 py-1 text-lg'} text-gray-400 hover:text-gray-700 leading-none`}
         aria-label="Next month"
       >&#8250;</button>
     </div>
@@ -355,7 +425,7 @@ function MonthSelector({ selectedMonth, onChange }) {
 }
 
 // Summary cards
-function SummaryCards({ transactions, selectedMonth, budgets }) {
+function SummaryCards({ transactions, selectedMonth, budgets, onCardClick, compact = false }) {
   const totals = useMemo(() => {
     const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
     transactions
@@ -377,7 +447,7 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
   }, [budgets]);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className={`grid grid-cols-2 md:grid-cols-4 ${compact ? 'gap-2' : 'gap-3'}`}>
       {TABS.map(type => {
         const c       = TYPE_COLOR[type];
         const spent   = totals[type];
@@ -400,20 +470,36 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
               ? `${Math.round(pct)}% · over by ₹${Math.round(spent - budget).toLocaleString('en-IN')}`
               : `${Math.round(pct)}% of ₹${Math.round(budget).toLocaleString('en-IN')}`);
         return (
-          <div key={type} className={`${c.bg} ${c.border} border rounded-lg p-3`}>
-            <div className="text-xs text-gray-500 mb-1">{TAB_LABEL[type]}</div>
-            <div className={`text-xl font-bold text-right ${c.text}`}>{'₹' + Math.round(spent).toLocaleString('en-IN')}</div>
-            {hasBudget && (
-              <div className="mt-2">
-                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                  <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                </div>
-                <div className={`text-[10px] mt-1 text-right ${labelColor}`}>
-                  {labelText}
-                </div>
-              </div>
+          <button
+            key={type}
+            onClick={() => onCardClick && onCardClick(type)}
+            className={`${c.bg} ${c.border} border rounded-lg text-left w-full cursor-pointer hover:shadow-md transition-shadow ${compact ? 'h-9 px-2 py-1 flex items-center gap-2' : 'p-3'}`}
+          >
+            {compact ? (
+              <>
+                <div className="text-[10px] text-gray-500 truncate">{TAB_LABEL[type]}</div>
+                {hasBudget && (
+                  <div className={`text-[10px] leading-none ${labelColor}`}>{Math.round(pct)}%</div>
+                )}
+                <div className={`text-sm md:text-base font-bold ml-auto leading-none ${c.text}`}>{'₹' + Math.round(spent).toLocaleString('en-IN')}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-xs mb-1 text-gray-500">{TAB_LABEL[type]}</div>
+                <div className={`text-xl font-bold text-right ${c.text}`}>{'₹' + Math.round(spent).toLocaleString('en-IN')}</div>
+                {hasBudget && (
+                  <div className="mt-2">
+                    <div className="w-full bg-gray-200 rounded-full overflow-hidden h-1.5">
+                      <div className={`rounded-full transition-all ${barColor} h-1.5`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                    <div className={`text-[9px] leading-tight mt-1 text-right ${labelColor}`}>
+                      {labelText}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-          </div>
+          </button>
         );
       })}
     </div>
@@ -423,7 +509,6 @@ function SummaryCards({ transactions, selectedMonth, budgets }) {
 // ── BUDGET PAGE ───────────────────────────────────────────────────────────
 
 function BudgetPage({ categoryGroups, onBack, showToast }) {
-  const [activeTab, setActiveTab] = useState('Expense');
   const [budgetMap, setBudgetMap] = useState({}); // key: subCat name → monthly amount string
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -487,16 +572,94 @@ function BudgetPage({ categoryGroups, onBack, showToast }) {
     }
   }
 
-  const groups = categoryGroups[activeTab] || [];
+  const groupsByType = TABS.map(type => ({
+    type,
+    groups: categoryGroups[type] || [],
+  }));
+
+  const budgetSummary = useMemo(() => {
+    const totals = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
+    Object.entries(budgetMap).forEach(([key, value]) => {
+      const [type] = key.split('::');
+      if (type in totals) totals[type] += parseMoney(value || '0');
+    });
+    return totals;
+  }, [budgetMap]);
+
+  function renderBudgetColumnCard(types) {
+    const sections = types
+      .map(type => ({ type, groups: categoryGroups[type] || [] }))
+      .filter(section => section.groups.length > 0);
+
+    if (!sections.length) return null;
+
+    return (
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+        <div>
+          {sections.map(({ type, groups }, sectionIndex) => {
+            const c = TYPE_COLOR[type];
+            const monthlyTotal = budgetSummary[type] || 0;
+            const yearlyTotal = monthlyTotal * 12;
+            return (
+              <section key={type} className={sectionIndex > 0 ? 'border-t border-gray-200' : ''}>
+                <div className="px-3 py-1.5 flex items-center gap-2 bg-white">
+                  <span className={`inline-block w-2 h-2 rounded-full ${c.badge.split(' ')[0]}`} />
+                  <h3 className="text-xs font-semibold text-gray-700">{TAB_LABEL[type]}</h3>
+                  <div className="ml-auto text-right leading-tight">
+                    <div className="text-xs font-semibold text-gray-700">{fmt(monthlyTotal)}</div>
+                    <div className="text-[10px] text-gray-400">yr {fmt(yearlyTotal)}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[140px_minmax(0,1fr)_128px_112px] text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-y border-gray-100 bg-gray-50 px-3 py-1">
+                  <div>Category</div>
+                  <div>Sub-category</div>
+                  <div className="text-right">Monthly</div>
+                  <div className="text-right">Yearly</div>
+                </div>
+
+                <div className="divide-y divide-gray-50">
+                  {groups.flatMap(({ category, details }) =>
+                    (details || []).map((sc, i) => {
+                      const monthly = budgetMap[`${type}::${sc}`] || '';
+                      const yearly = monthly ? Math.round(parseMoney(monthly) * 12).toLocaleString('en-IN') : '—';
+                      return (
+                        <div key={`${type}::${category}::${sc}`} className={`grid grid-cols-[140px_minmax(0,1fr)_128px_112px] items-center gap-3 px-3 py-1 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                          <div className="text-xs text-slate-600 truncate">{i === 0 ? category : ''}</div>
+                          <div className="text-xs text-gray-700 truncate">{sc}</div>
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-xs text-gray-400">₹</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={monthly}
+                              onChange={e => handleChange(type, sc, e.target.value)}
+                              placeholder="0"
+                              className="w-20 border border-gray-200 rounded-md px-2 py-0.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                            />
+                          </div>
+                          <div className="text-[10px] text-gray-400 text-right">₹{yearly}</div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto p-4 space-y-4">
+      <div className="w-full px-4 md:px-6 py-3 space-y-3">
 
         {/* Header */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button onClick={onBack}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
+            className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -505,77 +668,31 @@ function BudgetPage({ categoryGroups, onBack, showToast }) {
           <span className="ml-auto text-xs text-gray-400">Monthly limits per sub-category</span>
         </div>
 
-        {/* Tab bar */}
-        <div className="flex border-b border-gray-200">
-          {TABS.map(type => {
-            const c = TYPE_COLOR[type];
-            return (
-              <button key={type}
-                onClick={() => setActiveTab(type)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === type
-                    ? `${c.tab} border-b-2`
-                    : 'border-transparent text-gray-400 hover:text-gray-600'
-                }`}>
-                {TAB_LABEL[type]}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Content */}
         {loading ? (
           <div className="text-center py-16 text-gray-400 text-sm">Loading budgets…</div>
         ) : (
-          <div className="space-y-4">
-            {groups.length === 0 && (
+          <div className="space-y-3">
+            {groupsByType.every(({ groups }) => groups.length === 0) && (
               <div className="text-center py-12 text-gray-400 text-sm">No categories found.</div>
             )}
-            {groups.map(({ category, details }) => (
-              <div key={category} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                {/* Group header */}
-                <div className="px-4 py-2.5 bg-slate-50 border-b border-gray-100">
-                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{category}</span>
-                </div>
-                {/* Sub-cat rows */}
-                <div className="divide-y divide-gray-50">
-                  {(details || []).map((sc, i) => {
-                    const monthly = budgetMap[`${activeTab}::${sc}`] || '';
-                    const yearly  = monthly ? Math.round(parseMoney(monthly) * 12).toLocaleString('en-IN') : '—';
-                    return (
-                      <div key={sc} className={`flex items-center gap-3 px-4 py-2.5 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                        <span className="flex-1 text-sm text-gray-700">{sc}</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-gray-400">₹</span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={monthly}
-                            onChange={e => handleChange(activeTab, sc, e.target.value)}
-                            placeholder="0"
-                            className="w-28 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                          />
-                          <span className="text-[11px] text-gray-400 w-24 text-right">/ yr ₹{yearly}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 items-start">
+              <div>{renderBudgetColumnCard(['Expense'])}</div>
+              <div>{renderBudgetColumnCard(['Income', 'Payoff', 'Savings'])}</div>
+            </div>
           </div>
         )}
 
         {/* Save bar */}
         {!loading && (
-          <div className="sticky bottom-0 bg-white border-t border-gray-100 py-3 flex items-center justify-between gap-3">
+          <div className="sticky bottom-0 bg-white border-t border-gray-100 py-2 flex items-center justify-between gap-3">
             <span className="text-xs text-gray-400">
               {dirty ? 'Unsaved changes' : 'All changes saved'}
             </span>
             <button
               onClick={handleSave}
               disabled={saving || !dirty}
-              className="px-5 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              className="px-4 py-1.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
               {saving ? 'Saving…' : 'Save Budgets'}
             </button>
           </div>
@@ -598,12 +715,6 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
     () => catGroups.flatMap(g => g.details || []),
     [catGroups]
   );
-  // Accordion: track which single category is open
-  const [openGroup, setOpenGroup] = useState(() => catGroups[0]?.category ?? null);
-  function toggleGroup(cat) {
-    setOpenGroup(prev => prev === cat ? null : cat);
-  }
-
   const { days, dayLabels, weekendSet } = useMemo(() => {
     const [y, m] = selectedMonth.split('-').map(Number);
     const count = new Date(y, m, 0).getDate();
@@ -616,6 +727,12 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
       return { d, label: date.toLocaleDateString('en-IN', { weekday: 'short' }).slice(0, 2) };
     });
     return { days, dayLabels, weekendSet };
+  }, [selectedMonth]);
+
+  // Highlight today's column when viewing the current month
+  const todayDay = useMemo(() => {
+    if (selectedMonth !== currentMonthStr()) return null;
+    return new Date().getDate();
   }, [selectedMonth]);
 
   // grid[sc][d] = amount string,  notesGrid[sc][d] = note string
@@ -655,7 +772,6 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
     setToDay(defaultToDay(selectedMonth));
     setActiveNote(null);
     setDraftSavedAt(null);
-    setOpenGroup(catGroups[0]?.category ?? null);
     try {
       const raw = localStorage.getItem(draftKey);
       if (raw) {
@@ -781,7 +897,8 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
     clearDraft();
   }
 
-  const LABEL_W = 170;
+  const GROUP_W = 120;
+  const DETAIL_W = 160;
   const TOTAL_W  = 82;
   const MIN_CELL = 52;
 
@@ -798,7 +915,7 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
 
   const CELL_W = useMemo(() => {
     if (!containerW || visibleDays.length === 0) return MIN_CELL;
-    const available = containerW - LABEL_W - TOTAL_W - 2;
+    const available = containerW - GROUP_W - DETAIL_W - TOTAL_W - 2;
     return Math.max(MIN_CELL, Math.floor(available / visibleDays.length));
   }, [containerW, visibleDays.length]);
 
@@ -819,7 +936,7 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
 
       {/* Day-range filter bar */}
       {subCats.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 bg-gray-50/60">
+        <div className="flex items-center gap-3 px-4 py-1.5 border-b border-gray-100 bg-gray-50/60">
           <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">Show days</span>
           <div className="flex items-center gap-2">
             <input type="number" min={1} max={toDay} value={fromDay}
@@ -845,15 +962,18 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
       {subCats.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-400">No sub-categories loaded for this head.</div>
       ) : (
-        <div ref={containerRef} className="overflow-auto" style={{ maxHeight: '62vh' }}>
-          <table className="border-collapse w-full" style={{ tableLayout: 'fixed', minWidth: LABEL_W + visibleDays.length * MIN_CELL + TOTAL_W }}>
+        <div ref={containerRef} className="overflow-auto">
+          <table className="border-collapse w-full" style={{ tableLayout: 'fixed', minWidth: GROUP_W + DETAIL_W + visibleDays.length * MIN_CELL + TOTAL_W }}>
             <thead>
               <tr>
-                <th className="sticky top-0 left-0 z-20 bg-gray-50 border-b border-r border-gray-200 px-3 py-2 text-left text-[11px] text-gray-400 font-medium"
-                  style={{ minWidth: LABEL_W, width: LABEL_W }}>Sub-category</th>
+                <th className="sticky top-0 left-0 z-30 bg-gray-50 border-b border-r border-gray-200 px-3 py-2 text-left text-[11px] text-gray-400 font-medium"
+                  style={{ minWidth: GROUP_W, width: GROUP_W }}>Sub-category</th>
+                <th className="sticky top-0 z-30 bg-gray-50 border-b border-r border-gray-200 px-3 py-2 text-left text-[11px] text-gray-400 font-medium"
+                  style={{ left: GROUP_W, minWidth: DETAIL_W, width: DETAIL_W }}>Details</th>
                 {visibleDayLabels.map(({ d, label }) => (
                   <th key={d}
                     className={`sticky top-0 z-10 border-b border-gray-200 py-1.5 text-center text-[11px] font-medium ${
+                      d === todayDay ? 'bg-blue-100 text-blue-700' :
                       weekendSet.has(d) ? 'bg-slate-100 text-slate-400' : 'bg-gray-50 text-gray-400'
                     }`}
                     style={{ minWidth: CELL_W, width: CELL_W }}>
@@ -867,58 +987,35 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
             </thead>
             <tbody>
               {catGroups.map(({ category, details }) => {
-                const isCollapsed = openGroup !== category;
                 const groupSubCats = details || [];
-                const groupTotal = visibleDays.reduce((s, d) =>
-                  s + groupSubCats.reduce((ss, sc) => ss + parseMoney((grid[sc] || {})[d] || ''), 0), 0);
-                const colCount = visibleDays.length + 2; // label + days + total
-                return (
-                  <React.Fragment key={category}>
-                    {/* Group header row */}
-                    <tr className="bg-slate-50 border-y border-slate-200">
-                      <td
-                        className="sticky left-0 z-10 border-r border-slate-200 px-3 text-[11px] font-semibold text-slate-600 whitespace-nowrap bg-slate-50 cursor-pointer select-none"
-                        style={{ minWidth: LABEL_W, height: 30 }}
-                        onClick={() => toggleGroup(category)}
-                      >
-                        <span className="mr-1.5 text-slate-400">{isCollapsed ? '▶' : '▼'}</span>
-                        {category}
-                        {isCollapsed && groupTotal > 0 && (
-                          <span className="ml-2 text-slate-400 font-normal">{Math.round(groupTotal).toLocaleString('en-IN')}</span>
-                        )}
-                      </td>
-                      {isCollapsed
-                        ? <td colSpan={visibleDays.length + 1} className="bg-slate-50" />
-                        : visibleDays.map(d => (
-                            <td key={d} className={`border-r border-slate-100 bg-slate-50 ${weekendSet.has(d) ? 'bg-slate-100' : ''}`}
-                              style={{ width: CELL_W, height: 30 }} />
-                          ))
-                      }
-                      {!isCollapsed && (
-                        <td className="sticky right-0 z-10 border-l border-slate-200 bg-slate-50"
-                          style={{ minWidth: TOTAL_W, height: 30 }} />
+                return groupSubCats.map((sc, si) => {
+                  const rowBg = si % 2 === 0 ? 'bg-white' : 'bg-gray-50/40';
+                  return (
+                    <tr key={`${category}::${sc}`}>
+                      {si === 0 && (
+                        <td
+                          rowSpan={groupSubCats.length}
+                          className="sticky left-0 z-20 border-r border-b border-gray-200 px-3 align-top text-[11px] font-semibold text-slate-600 bg-slate-50"
+                          style={{ minWidth: GROUP_W, width: GROUP_W, height: 30 }}
+                        >
+                          <div className="pt-2">{category}</div>
+                        </td>
                       )}
-                    </tr>
-
-                    {/* Sub-category rows */}
-                    {!isCollapsed && groupSubCats.map((sc, si) => {
-                      const rowBg = si % 2 === 0 ? 'bg-white' : 'bg-gray-50/40';
-                      return (
-                        <tr key={sc}>
-                          <td className={`sticky left-0 z-10 border-r border-gray-100 pl-7 pr-3 text-[11px] text-gray-700 font-medium whitespace-nowrap ${rowBg}`}
-                            style={{ minWidth: LABEL_W, height: 36 }}>{sc}</td>
-                          {visibleDays.map(d => {
+                      <td className={`sticky z-20 border-r border-b border-gray-100 px-3 text-[11px] text-gray-700 font-medium ${rowBg}`}
+                        style={{ left: GROUP_W, minWidth: DETAIL_W, width: DETAIL_W, height: 30 }}>{sc}</td>
+                      {visibleDays.map(d => {
                             const val      = (grid[sc] || {})[d] || '';
                             const note     = (notesGrid[sc] || {})[d] || '';
                             const filled   = parseMoney(val) > 0;
                             const hasNote  = note.trim().length > 0;
                             const isActive = activeNote && activeNote.sc === sc && activeNote.d === d;
-                            const cellBg   = weekendSet.has(d)
-                              ? 'bg-slate-50' : si % 2 === 0 ? 'bg-white' : 'bg-gray-50/40';
+                            const cellBg   = d === todayDay ? 'bg-blue-50'
+                              : weekendSet.has(d) ? 'bg-slate-50'
+                              : si % 2 === 0 ? 'bg-white' : 'bg-gray-50/40';
                             return (
                               <td key={d}
                                 className={`p-0 border border-gray-100 ${cellBg}`}
-                                style={{ width: CELL_W, height: 36 }}>
+                                style={{ width: CELL_W, height: 30 }}>
                                 <div className="relative group w-full h-full">
                                   <input
                                     type="text"
@@ -932,7 +1029,7 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
                                       ${filled && !val.startsWith('=') ? 'text-right text-gray-800 font-semibold' : ''}
                                       ${!filled ? 'text-right text-gray-200 placeholder-gray-200' : ''}`}
                                     placeholder="·"
-                                    style={{ width: CELL_W, height: 36, paddingBottom: hasNote ? 10 : undefined }}
+                                    style={{ width: CELL_W, height: 30, paddingBottom: hasNote ? 8 : undefined }}
                                   />
                                   {hasNote && (
                                     <span className="absolute bottom-1 left-1 w-1.5 h-1.5 rounded-full bg-amber-400 pointer-events-none" />
@@ -948,22 +1045,24 @@ function SpreadsheetGrid({ activeTab, setActiveTab, categoryGroups, selectedMont
                               </td>
                             );
                           })}
-                          <td className={`sticky right-0 z-10 border-l border-gray-100 px-2 text-right text-[11px] font-semibold ${rowBg}`}
-                            style={{ minWidth: TOTAL_W, height: 36 }}>
+                      <td className={`sticky right-0 z-10 border-l border-b border-gray-100 px-2 text-right text-[11px] font-semibold ${rowBg}`}
+                        style={{ minWidth: TOTAL_W, height: 30 }}>
                             {rowTotals[sc] > 0
                               ? <span className="text-gray-700">{Math.round(rowTotals[sc]).toLocaleString('en-IN')}</span>
                               : <span className="text-gray-200">—</span>}
                           </td>
-                        </tr>
-                      );
-                    })}
-                  </React.Fragment>
-                );
+                    </tr>
+                  );
+                });
               })}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-gray-300">
-                <td className="sticky left-0 z-10 border-r border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-500 bg-gray-100">
+                <td className="sticky left-0 z-20 border-r border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-500 bg-gray-100"
+                  style={{ minWidth: GROUP_W, width: GROUP_W }}>
+                  </td>
+                <td className="sticky z-20 border-r border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-500 bg-gray-100"
+                  style={{ left: GROUP_W, minWidth: DETAIL_W, width: DETAIL_W }}>
                   Day total</td>
                 {visibleDays.map(d => {
                   const t = colTotals[d];
@@ -1402,16 +1501,13 @@ function QuickEntrySection({ categoryGroups, onAdd, transactions }) {
 
 // ── TRANSACTIONS PAGE ──────────────────────────────────────────────────────
 
-function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onDelete }) {
+function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onDelete, initialHeadFilter }) {
   // ── Period filter state ─────────────────────────────────────────────────
   const [periodMode, setPeriodMode] = useState('month');  // 'month' | 'range'
   const [filterMonth, setFilterMonth] = useState(() => initialMonth || currentMonthStr());
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate]     = useState('');
   const [loading, setLoading]   = useState(false);
-
-  // ── Head (type) filter state — independent of period ───────────────────
-  const [headFilter, setHeadFilter] = useState('All'); // 'All' | 'Expense' | 'Income' | 'Savings' | 'Payoff'
 
   // Load month whenever month mode + filterMonth changes
   useEffect(() => {
@@ -1436,7 +1532,7 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
     finally { setLoading(false); }
   }
 
-  // ── Apply both filters independently ───────────────────────────────────
+  // ── Apply period filter ─────────────────────────────────────────────────
   const periodFiltered = useMemo(() => {
     if (periodMode === 'month') {
       return transactions.filter(t => t.date.startsWith(filterMonth));
@@ -1448,22 +1544,67 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
   }, [transactions, periodMode, filterMonth, fromDate, toDate]);
 
   const filtered = useMemo(() => {
-    const list = headFilter === 'All'
-      ? periodFiltered
-      : periodFiltered.filter(t => t.type === headFilter);
-    return [...list].sort((a, b) => b.date.localeCompare(a.date));
-  }, [periodFiltered, headFilter]);
-
-  // Totals across the period (all heads), so head pills show useful numbers
-  const periodTotals = useMemo(() => {
-    const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
-    periodFiltered.forEach(tx => { t[tx.type] = (t[tx.type] || 0) + tx.amount; });
-    return t;
+    return [...periodFiltered].sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
   }, [periodFiltered]);
+
+  const grouped = useMemo(() => ({
+    Expense: filtered.filter(t => t.type === 'Expense'),
+    Income: filtered.filter(t => t.type === 'Income'),
+    Savings: filtered.filter(t => t.type === 'Savings'),
+    Payoff: filtered.filter(t => t.type === 'Payoff'),
+  }), [filtered]);
+
+  function TransactionSection({ title, items, accent }) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
+            <span className="text-sm font-semibold text-gray-700">{title}</span>
+          </div>
+          <span className="text-xs text-gray-400">{items.length} entries</span>
+        </div>
+        {items.length === 0 ? (
+          <div className="px-4 py-10 text-sm text-gray-400 text-center">No transactions.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs text-gray-500">
+                <th className="px-4 py-1.5 font-medium">Date</th>
+                <th className="px-4 py-1.5 font-medium">Sub-category</th>
+                <th className="px-4 py-1.5 font-medium">Comments</th>
+                <th className="px-4 py-1.5 text-right font-medium">Amount</th>
+                <th className="px-2 py-1.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(t => (
+                <tr key={t.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 group">
+                  <td className="px-4 py-1.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.date)}</td>
+                  <td className="px-4 py-1.5 text-gray-800 whitespace-nowrap">{t.subCategory || t.category || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-1.5 text-xs text-gray-400 max-w-[220px] truncate">{t.notes || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-1.5 text-right font-medium text-gray-800 whitespace-nowrap">{fmt(t.amount)}</td>
+                  <td className="px-2 py-1.5 text-right">
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(t)}
+                        className="text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1"
+                        aria-label="Delete"
+                      >✕</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
+      <div className="w-full px-4 md:px-6 py-4 space-y-4">
 
         {/* ── Header ── */}
         <div className="flex items-center gap-3">
@@ -1473,12 +1614,11 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
           <span className="ml-auto text-xs text-gray-400">{filtered.length} entries</span>
         </div>
 
-        {/* ── Filter card ── */}
-        <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        <div className="md:hidden bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
 
           {/* Period row */}
           <div className="px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Period</span>
               <div className="flex gap-1">
                 {['month', 'range'].map(m => (
@@ -1491,7 +1631,7 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
             </div>
 
             {periodMode === 'month' && (
-              <div className="flex justify-center pt-1">
+              <div className="flex justify-start pt-1">
                 <MonthSelector selectedMonth={filterMonth} onChange={setFilterMonth} />
               </div>
             )}
@@ -1516,78 +1656,79 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
             )}
           </div>
 
-          {/* Head row */}
-          <div className="px-4 py-3 space-y-2">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Head</span>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button onClick={() => setHeadFilter('All')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                  headFilter === 'All' ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}>All</button>
-              {TABS.map(type => {
-                const c = TYPE_COLOR[type];
-                const amt = periodTotals[type];
-                return (
-                  <button key={type} onClick={() => setHeadFilter(type)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1.5 ${
-                      headFilter === type ? c.badge : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    }`}>
-                    <span>{type}</span>
-                    {amt > 0 && <span className="opacity-70">{fmt(amt)}</span>}
-                  </button>
-                );
-              })}
+        </div>
+
+        <div className="hidden md:grid md:grid-cols-[240px_minmax(0,1fr)] gap-4 items-start">
+          <div className="bg-white border border-gray-200 rounded-lg sticky top-4">
+            <div className="px-4 py-3 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Period</span>
+                <div className="flex gap-1">
+                  {['month', 'range'].map(m => (
+                    <button key={m} onClick={() => setPeriodMode(m)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                        periodMode === m ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}>{m === 'month' ? 'Month' : 'Range'}</button>
+                  ))}
+                </div>
+              </div>
+
+              {periodMode === 'month' && (
+                <div className="pt-1">
+                  <MonthSelector selectedMonth={filterMonth} onChange={setFilterMonth} />
+                </div>
+              )}
+
+              {periodMode === 'range' && (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">From</label>
+                    <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                      className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">To</label>
+                    <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                      className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm" />
+                  </div>
+                  <button onClick={loadRange}
+                    disabled={!fromDate || !toDate || fromDate > toDate || loading}
+                    className="w-full px-4 py-1.5 bg-slate-700 text-white text-sm rounded hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >{loading ? 'Loading…' : 'Load'}</button>
+                </div>
+              )}
             </div>
+          </div>
+
+          <div>
+            {/* ── Content ── */}
+            {filtered.length === 0 ? (
+              <div className="text-center py-20 text-gray-400 text-sm">
+                {loading ? 'Loading…' : 'No transactions for this period.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(340px,1fr)] gap-4 items-start">
+                <TransactionSection title="Expenses" items={grouped.Expense} accent="#ef4444" />
+                <div className="space-y-4">
+                  <TransactionSection title="Income" items={grouped.Income} accent="#22c55e" />
+                  <TransactionSection title="Savings" items={grouped.Savings} accent="#3b82f6" />
+                  <TransactionSection title="Payoff" items={grouped.Payoff} accent="#f59e0b" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Table ── */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 text-sm">
-            {loading ? 'Loading…' : 'No transactions for this period.'}
-          </div>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs text-gray-500">
-                  <th className="px-4 py-2 font-medium">Date</th>
-                  <th className="px-4 py-2 font-medium">Sub-category</th>
-                  <th className="px-4 py-2 text-right font-medium">Amount</th>
-                  <th className="px-4 py-2 font-medium">Head</th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(t => {
-                  const c = TYPE_COLOR[t.type] || TYPE_COLOR.Expense;
-                  return (
-                    <tr key={t.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 group">
-                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.date)}</td>
-                      <td className="px-4 py-2.5 text-gray-800">
-                        <div>{t.subCategory || <span className="text-gray-300">—</span>}</div>
-                        {t.notes && <div className="text-xs text-gray-400">{t.notes}</div>}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${c.badge}`}>{t.type}</span>
-                      </td>
-                      <td className="px-2 py-2.5 text-right">
-                        {onDelete && (
-                          <button
-                            onClick={() => onDelete(t)}
-                            className="text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1"
-                            aria-label="Delete"
-                          >✕</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* ── Mobile content ── */}
+        <div className="md:hidden">
+          {filtered.length === 0 ? (
+            <div className="text-center py-20 text-gray-400 text-sm">
+              {loading ? 'Loading…' : 'No transactions for this period.'}
+            </div>
+          ) : (
+            <TransactionSection title="All Transactions" items={filtered} accent="#64748b" />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1595,26 +1736,62 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
 
 // ── ANALYTICS PAGE ─────────────────────────────────────────────────────────
 
-function AnalyticsPage({ onBack }) {
+function AnalyticsPage({ onBack, transactions: dashboardTxns, selectedMonth, budgets = [] }) {
   const currentYear = new Date().getFullYear();
   const [year, setYear]               = useState(currentYear);
+  const [analyticsView, setAnalyticsView] = useState('chart');
   const [mode, setMode]               = useState('year'); // 'year' | 'custom'
   const [customMonths, setCustomMonths] = useState([]);
-  const [activeType, setActiveType]   = useState('Expense');
+  const [activeTypes, setActiveTypes] = useState(new Set(TABS)); // all selected by default
   const [monthData, setMonthData]     = useState({}); // 'YYYY-MM' → tx[]
   const [fetchedYears, setFetchedYears] = useState(() => new Set());
   const [loading, setLoading]         = useState(false);
+  const [fetchError, setFetchError]   = useState(null);
   const [expandedCat, setExpandedCat] = useState(null);
+
+  const fmt = (n) => {
+    if (n === null || n === undefined) return '₹0';
+    return '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+  };
+
+  const fmtK = (n) => {
+    const value = Number(n) || 0;
+    if (value >= 100000) return Math.round(value / 100000) + 'L';
+    if (value >= 1000) return Math.round(value / 1000) + 'K';
+    return String(Math.round(value));
+  };
+
+  // Seed current month's data from already-loaded dashboard transactions
+  useEffect(() => {
+    if (!dashboardTxns || !selectedMonth) return;
+    setMonthData(prev => ({ ...prev, [selectedMonth]: dashboardTxns }));
+  }, [dashboardTxns, selectedMonth]);
 
   async function fetchYear(y) {
     if (fetchedYears.has(y)) return;
     setLoading(true);
+    setFetchError(null);
     try {
-      const res = await callBackend({ action: 'getExpensesByYear', year: y });
-      if (res.success) {
-        setMonthData(prev => ({ ...prev, ...res.expensesByMonth }));
-        setFetchedYears(prev => new Set([...prev, y]));
-      }
+      // Fetch all 12 months in parallel using the proven getExpensesByMonth action
+      const months = Array.from({ length: 12 }, (_, i) => i + 1);
+      const results = await Promise.all(
+        months.map(m => callBackend({ action: 'getExpensesByMonth', year: y, month: m }))
+      );
+      const newMonthData = {};
+      results.forEach((res, i) => {
+        const monthKey = `${y}-${String(i + 1).padStart(2, '0')}`;
+        if (res?.success && res.expensesByDate) {
+          // Flatten date-keyed object → flat array
+          newMonthData[monthKey] = Object.values(res.expensesByDate).flat();
+        } else {
+          newMonthData[monthKey] = [];
+        }
+      });
+      setMonthData(prev => ({ ...prev, ...newMonthData }));
+      setFetchedYears(prev => new Set([...prev, y]));
+    } catch (e) {
+      console.error('[Analytics] fetch error:', e);
+      setFetchError('Network error loading analytics data.');
     } finally {
       setLoading(false);
     }
@@ -1629,70 +1806,129 @@ function AnalyticsPage({ onBack }) {
     return [...customMonths].sort();
   }, [mode, year, customMonths]);
 
+  function toggleType(t) {
+    setActiveTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(t)) { if (next.size > 1) next.delete(t); } // keep at least one
+      else next.add(t);
+      return next;
+    });
+    setExpandedCat(null);
+  }
+  function selectAllTypes() { setActiveTypes(new Set(TABS)); setExpandedCat(null); }
+  const isAllTypes = activeTypes.size === TABS.length;
+
   // Flat filtered transactions
   const filteredTxs = useMemo(() =>
-    displayMonths.flatMap(m => (monthData[m] || []).filter(t => t.type === activeType)),
-    [displayMonths, monthData, activeType]
+    displayMonths.flatMap(m => (monthData[m] || []).filter(t => activeTypes.has(t.type))),
+    [displayMonths, monthData, activeTypes]
   );
 
-  // Monthly totals for trend chart
-  const monthTotals = useMemo(() =>
-    displayMonths.map(m => ({
-      month: m,
-      total: (monthData[m] || [])
-        .filter(t => t.type === activeType)
-        .reduce((s, t) => s + t.amount, 0),
-    })),
-    [displayMonths, monthData, activeType]
+  // Income vs Exp+Payoff(ex-CCD) vs Savings grouped chart
+  const incomeExpChart = useMemo(() =>
+    displayMonths.map(m => {
+      const txns = monthData[m] || [];
+      const income    = txns.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+      const expPayoff = txns
+        .filter(t => t.type === 'Expense' ||
+          (t.type === 'Payoff' && !(t.subCategory || t.category || '').toLowerCase().includes('credit card')))
+        .reduce((s, t) => s + t.amount, 0);
+      const savings   = txns.filter(t => t.type === 'Savings').reduce((s, t) => s + t.amount, 0);
+      return { month: m, income, expPayoff, savings };
+    }),
+    [displayMonths, monthData]
   );
-  const maxTotal = Math.max(...monthTotals.map(m => m.total), 1);
+  const maxIES = Math.max(...incomeExpChart.map(m => Math.max(m.income, m.expPayoff, m.savings)), 1);
 
-  // Category breakdown (parent → subs)
-  const catBreakdown = useMemo(() => {
+  const topItemsByType = useMemo(() => {
+    const types = ['Expense', 'Savings', 'Payoff'];
+    return types.map(tp => {
+      const totals = {};
+      filteredTxs.forEach(t => {
+        if (t.type !== tp) return;
+        if (tp === 'Payoff' && (t.subCategory || t.category || '').toLowerCase().includes('credit card')) return;
+        const key = t.parentCategory || t.category;
+        totals[key] = (totals[key] || 0) + t.amount;
+      });
+      const items = Object.entries(totals)
+        .map(([cat, total]) => ({ cat, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+      const max = Math.max(...items.map(i => i.total), 1);
+      return { type: tp, items, max };
+    });
+  }, [filteredTxs]);
+
+  // Budget aggregated to parent-category level (yearly) using transaction data to resolve detail→parent
+  const budgetByParent = useMemo(() => {
+    const detailToParent = {};
+    Object.values(monthData).flat().forEach(t => {
+      const key = `${t.type}::${t.category}`;
+      if (!detailToParent[key]) detailToParent[key] = t.parentCategory || t.category;
+    });
+    const result = {};
+    (budgets || []).forEach(b => {
+      // Exclude credit card from Payoff budget
+      if (b.type === 'Payoff' && b.category.toLowerCase().includes('credit card')) return;
+      const parent = detailToParent[`${b.type}::${b.category}`] || b.category;
+      if (!result[b.type]) result[b.type] = {};
+      result[b.type][parent] = (result[b.type][parent] || 0) + b.yearlyBudget;
+    });
+    return result;
+  }, [monthData, budgets]);
+
+  // Per-type breakdown: actual vs yearly budget, per parent category
+  const typeBreakdown = useMemo(() => {
     const map = {};
     for (const t of filteredTxs) {
-      const p = t.parentCategory || t.category;
-      if (!map[p]) map[p] = { total: 0, subs: {} };
-      map[p].total += t.amount;
-      const s = t.category || p;
-      map[p].subs[s] = (map[p].subs[s] || 0) + t.amount;
+      const tp = t.type;
+      // Exclude credit card from Payoff chart
+      if (tp === 'Payoff' && (t.subCategory || t.category || '').toLowerCase().includes('credit card')) continue;
+      const parent = t.parentCategory || t.category;
+      const detail = t.category || parent;
+      if (!map[tp]) map[tp] = {};
+      if (!map[tp][parent]) map[tp][parent] = { total: 0, subs: {} };
+      map[tp][parent].total += t.amount;
+      map[tp][parent].subs[detail] = (map[tp][parent].subs[detail] || 0) + t.amount;
     }
-    const grand = Object.values(map).reduce((s, v) => s + v.total, 0) || 1;
-    return Object.entries(map)
-      .map(([cat, v]) => ({
+    return TABS.filter(tp => map[tp]).map(tp => {
+      const typeTotal = Object.values(map[tp]).reduce((s, v) => s + v.total, 0);
+      const typeBudget = Object.values(budgetByParent[tp] || {}).reduce((s, v) => s + v, 0);
+      const cats = Object.entries(map[tp]).map(([cat, v]) => ({
         cat,
         total: v.total,
-        pct: (v.total / grand * 100).toFixed(1),
-        subs: Object.entries(v.subs)
-          .map(([s, a]) => ({ s, a, pct: (a / grand * 100).toFixed(1) }))
-          .sort((a, b) => b.a - a.a),
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [filteredTxs]);
+        budget: budgetByParent[tp]?.[cat] || 0,
+        subs: Object.entries(v.subs).map(([s, a]) => ({ s, a })).sort((a, b) => b.a - a.a),
+      })).sort((a, b) => b.total - a.total);
+      return { type: tp, typeTotal, typeBudget, cats };
+    });
+  }, [filteredTxs, budgetByParent]);
 
-  // MoM table
-  const momCats = useMemo(() => {
-    const set = new Set(filteredTxs.map(t => t.parentCategory || t.category));
-    return [...set];
-  }, [filteredTxs]);
+  // MoM table — grouped by type
+  const momData = useMemo(() => {
+    return TABS.filter(tp => activeTypes.has(tp)).map(tp => {
+      const cats = new Set(
+        filteredTxs.filter(t => t.type === tp).map(t => t.parentCategory || t.category)
+      );
+      const rows = [...cats].map(cat => ({
+        cat,
+        values: displayMonths.map(m =>
+          (monthData[m] || [])
+            .filter(t => t.type === tp && (t.parentCategory || t.category) === cat)
+            .reduce((s, t) => s + t.amount, 0)
+        ),
+      })).sort((a, b) =>
+        b.values.reduce((s, v) => s + v, 0) - a.values.reduce((s, v) => s + v, 0)
+      );
+      const totals = displayMonths.map((m, i) => rows.reduce((s, r) => s + r.values[i], 0));
+      return { type: tp, rows, totals };
+    }).filter(g => g.rows.length > 0);
+  }, [filteredTxs, displayMonths, monthData, activeTypes]);
 
-  const momData = useMemo(() =>
-    momCats.map(cat => ({
-      cat,
-      values: displayMonths.map(m =>
-        (monthData[m] || [])
-          .filter(t => t.type === activeType && (t.parentCategory || t.category) === cat)
-          .reduce((s, t) => s + t.amount, 0)
-      ),
-    })).sort((a, b) =>
-      b.values.reduce((s, v) => s + v, 0) - a.values.reduce((s, v) => s + v, 0)
-    ),
-    [momCats, displayMonths, monthData, activeType]
-  );
-
-  const barColor = BAR_COLOR[activeType] || '#94a3b8';
-  // For Income/Savings: rising = good (green ↑); for Expense/Payoff: rising = bad (red ↑)
-  const goodUp   = activeType === 'Income' || activeType === 'Savings';
+  // Single active type for coloring (use first selected, or neutral when multiple)
+  const singleType = activeTypes.size === 1 ? [...activeTypes][0] : null;
+  const barColor = singleType ? (BAR_COLOR[singleType] || '#94a3b8') : '#64748b';
+  const goodUp   = singleType === 'Income' || singleType === 'Savings';
 
   function toggleCustomMonth(m) {
     const y = parseInt(m.split('-')[0], 10);
@@ -1729,16 +1965,23 @@ function AnalyticsPage({ onBack }) {
           </div>
         )}
 
-        {/* Type tabs */}
-        <div className="flex gap-1 flex-wrap">
-          {TABS.map(t => (
-            <button
-              key={t}
-              onClick={() => { setActiveType(t); setExpandedCat(null); }}
-              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${activeType === t ? 'text-white border-transparent' : 'bg-white text-slate-500 border-gray-300 hover:border-slate-400'}`}
-              style={activeType === t ? { backgroundColor: BAR_COLOR[t] } : {}}
-            >{t}</button>
-          ))}
+        {/* Type multi-select pills */}
+        <div className="flex gap-1 flex-wrap items-center">
+          <button
+            onClick={selectAllTypes}
+            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${isAllTypes ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-gray-300 hover:border-slate-400'}`}
+          >All</button>
+          {TABS.map(t => {
+            const active = activeTypes.has(t) && !isAllTypes;
+            return (
+              <button
+                key={t}
+                onClick={() => { if (isAllTypes) { setActiveTypes(new Set([t])); setExpandedCat(null); } else toggleType(t); }}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? 'text-white border-transparent' : 'bg-white text-slate-500 border-gray-300 hover:border-slate-400'}`}
+                style={active ? { backgroundColor: BAR_COLOR[t] } : {}}
+              >{t}</button>
+            );
+          })}
         </div>
       </div>
 
@@ -1777,89 +2020,283 @@ function AnalyticsPage({ onBack }) {
           <div className="text-center py-12 text-gray-400 text-sm">Loading…</div>
         )}
 
+        {fetchError && !loading && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">
+            {fetchError}
+          </div>
+        )}
+
         {!loading && displayMonths.length === 0 && (
           <div className="text-center py-12 text-gray-400 text-sm">Select months to view analytics.</div>
         )}
 
         {!loading && displayMonths.length > 0 && (
           <>
-            {/* MONTHLY TREND */}
+            {/* INCOME vs OUTFLOWS vs SAVINGS */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">{activeType} — Monthly Trend</h3>
-              {monthTotals.every(m => m.total === 0) ? (
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700">Income vs Outflows vs Savings</h3>
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1 text-xs text-gray-500">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#22c55e' }}/> Income
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-gray-500">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#ef4444' }}/> Exp+Payoff
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-gray-500">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#3b82f6' }}/> Savings
+                  </span>
+                </div>
+              </div>
+              {incomeExpChart.every(m => m.income === 0 && m.expPayoff === 0 && m.savings === 0) ? (
                 <p className="text-sm text-gray-400 text-center py-6">No data for this period.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <div className="flex items-end gap-1.5 min-w-max pb-1" style={{ height: '180px' }}>
-                    {monthTotals.map(({ month, total }) => {
-                      const barH = total > 0 ? Math.max((total / maxTotal) * 140, 4) : 0;
-                      const label = MONTH_NAMES[parseInt(month.split('-')[1], 10) - 1];
-                      return (
-                        <div key={month} className="relative group flex flex-col items-center justify-end gap-1" style={{ width: '44px', height: '180px' }}>
-                          <span className="absolute top-0 left-0 right-0 text-center text-gray-500" style={{ fontSize: '9px' }}>
-                            {total > 0 ? fmtK(total) : ''}
-                          </span>
-                          <div className="w-8 rounded-t mx-auto" style={{ height: `${barH}px`, backgroundColor: barColor }} />
-                          <span className="text-gray-500 shrink-0" style={{ fontSize: '10px' }}>{label}</span>
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
-                            {label}: {fmt(total)}
+                <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+                  <div className="lg:w-[760px] lg:max-w-[760px] max-w-full overflow-x-auto">
+                    <div className="inline-flex items-end gap-2 pb-1">
+                      {incomeExpChart.map(({ month, income, expPayoff, savings }) => {
+                        const CHART_H = 140;
+                        const inH  = income    > 0 ? Math.max((income    / maxIES) * CHART_H, 3) : 0;
+                        const epH  = expPayoff > 0 ? Math.max((expPayoff / maxIES) * CHART_H, 3) : 0;
+                        const svH  = savings   > 0 ? Math.max((savings   / maxIES) * CHART_H, 3) : 0;
+                        const epPct = income > 0 && expPayoff > 0 ? Math.round(expPayoff / income * 100) : null;
+                        const svPct = income > 0 && savings   > 0 ? Math.round(savings   / income * 100) : null;
+                        const label = MONTH_NAMES[parseInt(month.split('-')[1], 10) - 1];
+                        return (
+                          <div key={month} className="relative group flex flex-col items-center" style={{ minWidth: '52px' }}>
+                            <div className="flex items-end gap-1" style={{ height: '160px' }}>
+                              <div className="flex flex-col items-center justify-end" style={{ height: '160px' }}>
+                                {income > 0 && <span className="mb-0.5" style={{ fontSize: '8px', color: '#15803d' }}>{fmtK(income)}</span>}
+                                <div style={{ width: '10px', height: `${inH}px`, backgroundColor: '#22c55e', borderRadius: '2px 2px 0 0' }} />
+                              </div>
+                              <div className="flex flex-col items-center justify-end" style={{ height: '160px' }}>
+                                {epPct !== null && <span className="mb-0.5 font-semibold" style={{ fontSize: '8px', color: '#dc2626' }}>{epPct}%</span>}
+                                {epH > 0 && <div style={{ width: '10px', height: `${epH}px`, backgroundColor: '#ef4444', borderRadius: '2px 2px 0 0' }} />}
+                              </div>
+                              <div className="flex flex-col items-center justify-end" style={{ height: '160px' }}>
+                                {svPct !== null && <span className="mb-0.5 font-semibold" style={{ fontSize: '8px', color: '#2563eb' }}>{svPct}%</span>}
+                                {svH > 0 && <div style={{ width: '10px', height: `${svH}px`, backgroundColor: '#3b82f6', borderRadius: '2px 2px 0 0' }} />}
+                              </div>
+                            </div>
+                            <span className="text-gray-500 mt-1 shrink-0" style={{ fontSize: '10px' }}>{label}</span>
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 text-left">
+                              <div className="font-medium">{label}</div>
+                              {income > 0 && <div>Income: {fmt(income)}</div>}
+                              {expPayoff > 0 && <div>Exp+Payoff: {fmt(expPayoff)}{epPct !== null ? ` (${epPct}% of inc)` : ''}</div>}
+                              {savings > 0 && <div>Savings: {fmt(savings)}{svPct !== null ? ` (${svPct}% of inc)` : ''}</div>}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-w-0 border-t lg:border-t-0 lg:border-l border-gray-100 pt-4 lg:pt-0 lg:pl-5">
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Top 5 Items</h4>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch w-full lg:divide-x lg:divide-gray-200">
+                        {topItemsByType.map(({ type, items, max }) => {
+                          const color = type === 'Expense' ? '#ef4444' : type === 'Savings' ? '#3b82f6' : '#f59e0b';
+                          const paddedItems = [...items, ...Array.from({ length: Math.max(0, 5 - items.length) }, (_, idx) => ({ cat: '', total: 0, isPlaceholder: true, key: `${type}-empty-${idx}` }))].slice(0, 5);
+                          return (
+                            <div key={type} className="min-w-0 flex flex-col lg:px-4 first:lg:pl-0 last:lg:pr-0">
+                              <div className="text-xs font-medium text-gray-700 mb-2">{type}</div>
+                              {items.length === 0 ? (
+                                <div className="text-xs text-gray-300">No data</div>
+                              ) : (
+                                <div className="w-full">
+                                  <div className="grid grid-cols-5 gap-2.5 h-[198px] w-full">
+                                    {paddedItems.map(({ cat, total, isPlaceholder, key }) => {
+                                      const height = max > 0 ? Math.max(total / max * 110, 8) : 0;
+                                      return (
+                                        <div key={key || cat} className="min-w-0 h-full flex flex-col items-center">
+                                          <div className="h-8 mb-1 px-0.5 text-[9px] font-medium text-gray-700 text-center leading-tight break-all w-full flex items-end justify-center overflow-hidden">
+                                            {!isPlaceholder && total > 0 ? fmt(total) : ''}
+                                          </div>
+                                          <div className="flex-1 w-full flex items-end">
+                                            <div
+                                              className="w-full rounded-t"
+                                              style={{ height: isPlaceholder ? '0px' : `${height}px`, backgroundColor: color, opacity: isPlaceholder ? 0 : 1 }}
+                                              title={!isPlaceholder ? `${cat}: ${fmt(total)}` : ''}
+                                            />
+                                          </div>
+                                          <div className="mt-1 h-8 text-[9px] text-gray-500 text-center leading-tight overflow-hidden w-full">
+                                            {!isPlaceholder ? cat : ''}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* CATEGORY BREAKDOWN */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Category Breakdown</h3>
-              {catBreakdown.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-6">No data for this period.</p>
-              ) : (
-                <div className="space-y-2">
-                  {catBreakdown.map(({ cat, total, pct, subs }) => (
-                    <div key={cat}>
-                      <button className="w-full text-left" onClick={() => setExpandedCat(expandedCat === cat ? null : cat)}>
-                        <div className="flex items-center gap-2 py-1">
-                          <span className="text-sm text-gray-700 shrink-0 w-32 truncate">{cat}</span>
-                          <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
-                          </div>
-                          <span className="text-xs text-gray-500 shrink-0 w-28 text-right">
-                            {fmt(total)} <span className="text-gray-400">({pct}%)</span>
-                          </span>
-                          <span className="text-gray-400 text-xs shrink-0">{expandedCat === cat ? '▲' : '▼'}</span>
-                        </div>
-                      </button>
-                      {expandedCat === cat && (
-                        <div className="ml-4 mt-1 mb-2 space-y-1.5">
-                          {subs.map(({ s, a, pct: sp }) => (
-                            <div key={s} className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500 shrink-0 w-28 truncate">{s}</span>
-                              <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: `${sp}%`, backgroundColor: barColor, opacity: 0.65 }} />
-                              </div>
-                              <span className="text-xs text-gray-400 shrink-0 w-16 text-right">{fmt(a)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="flex justify-end">
+              <div className="flex items-center">
+                <button
+                  onClick={() => setAnalyticsView('chart')}
+                  className={`text-xs px-3 py-1.5 rounded-l border ${analyticsView === 'chart' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-gray-300 hover:border-slate-400'}`}
+                >Chart</button>
+                <button
+                  onClick={() => setAnalyticsView('table')}
+                  className={`text-xs px-3 py-1.5 rounded-r border-t border-b border-r ${analyticsView === 'table' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-gray-300 hover:border-slate-400'}`}
+                >Table</button>
+              </div>
             </div>
 
+            {/* PER-TYPE STACKED HORIZONTAL BAR vs BUDGET */}
+            {analyticsView === 'chart' && (() => {
+              const CAT_PALETTE = ['#3b82f6','#f59e0b','#10b981','#8b5cf6','#f97316','#06b6d4','#ec4899','#84cc16','#6366f1','#14b8a6','#ef4444','#a3a3a3'];
+              if (typeBreakdown.length === 0)
+                return (
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm text-gray-400 text-center py-6">No data for this period.</p>
+                  </div>
+                );
+              const monthsWithData = displayMonths.filter(m => (monthData[m] || []).length > 0).length || 1;
+              return (
+                <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-6">
+                  {typeBreakdown.map(({ type: tp, typeTotal, typeBudget, cats }) => {
+                    const hasBudget = typeBudget > 0;
+                    const prorated = hasBudget ? typeBudget * monthsWithData / 12 : 0;
+                    // For Income/Savings: being UNDER budget is bad. For Expense/Payoff: being OVER is bad.
+                    const isTargetType = tp === 'Income' || tp === 'Savings';
+                    const badYearly  = hasBudget && (isTargetType ? typeTotal < typeBudget : typeTotal > typeBudget);
+                    const badMonthly = hasBudget && (isTargetType ? typeTotal < prorated   : typeTotal > prorated);
+                    const scale = hasBudget ? Math.max(typeTotal, typeBudget) : typeTotal;
+                    const actualBarPct  = scale > 0 ? typeTotal  / scale * 100 : 100;
+                    const monthMarkerPct = hasBudget && scale > 0 ? prorated / scale * 100 : 0;
+                    return (
+                      <div key={tp}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-semibold text-gray-700">{tp}</span>
+                          <div className="text-xs text-right">
+                            <span className={badYearly ? 'font-semibold text-red-500' : 'font-semibold text-gray-700'}>{fmt(typeTotal)}</span>
+                            {hasBudget && (() => {
+                              const pct = Math.round(typeTotal / typeBudget * 100);
+                              const diff = Math.abs(typeTotal - typeBudget);
+                              const monthDiff = Math.abs(typeTotal - prorated);
+                              const yearlyLabel = isTargetType
+                                ? (badYearly ? `${pct}% of target · ${fmt(diff)} short ↓` : `${pct}% of target · ${fmt(diff)} ahead ↑`)
+                                : (badYearly ? `${pct}% used · ${fmt(diff)} over ↑`        : `${pct}% used · ${fmt(diff)} remaining ↓`);
+                              const monthLabel = isTargetType
+                                ? (badMonthly ? `${fmt(monthDiff)} short month ↓` : `${fmt(monthDiff)} ahead month ↑`)
+                                : (badMonthly ? `${fmt(monthDiff)} over month ↑`  : `${fmt(monthDiff)} under month ↓`);
+                              return (
+                                <span className="ml-1">
+                                  <span className="text-gray-400">of {fmt(typeBudget)} yearly — </span>
+                                  <span className={badYearly ? 'text-red-500 font-medium' : 'text-emerald-600 font-medium'}>
+                                    {yearlyLabel}
+                                  </span>
+                                  <span className={`ml-1 ${badMonthly ? 'text-orange-500 font-medium' : 'text-emerald-600 font-medium'}`}>
+                                    · {monthLabel}
+                                  </span>
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Stacked bar */}
+                        <div className="relative mb-1 overflow-hidden rounded" style={{ height: '28px', backgroundColor: '#f3f4f6' }}>
+                          <div
+                            className="absolute top-0 left-0 h-full flex"
+                            style={{ width: `${actualBarPct}%`, minWidth: typeTotal > 0 ? '2px' : '0' }}
+                          >
+                            {cats.map(({ cat, total }, idx) => (
+                              <div
+                                key={cat}
+                                title={`${cat}: ${fmt(total)}`}
+                                className="h-full cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{
+                                  width: `${typeTotal > 0 ? total/typeTotal*100 : 0}%`,
+                                  backgroundColor: badYearly ? `${CAT_PALETTE[idx % CAT_PALETTE.length]}cc` : CAT_PALETTE[idx % CAT_PALETTE.length],
+                                  minWidth: total > 0 ? '2px' : '0',
+                                }}
+                                onClick={() => setExpandedCat(expandedCat === cat ? null : cat)}
+                              />
+                            ))}
+                          </div>
+                          {hasBudget && (
+                            <div className="absolute top-0 bottom-0 w-0.5 bg-gray-500 z-10" style={{ left: `${monthMarkerPct}%`, transform: 'translateX(-1px)' }} />
+                          )}
+                        </div>
+
+                        {/* Scale labels */}
+                        {hasBudget && (
+                          <div className="relative text-gray-400 mb-3" style={{ fontSize: '10px' }}>
+                            <span className="absolute left-0">₹0</span>
+                            <span className="absolute" style={{ left: `${monthMarkerPct}%`, transform: 'translateX(-50%)' }}>
+                              {fmt(prorated)} ← {monthsWithData}M budget
+                            </span>
+                          </div>
+                        )}
+                        <div className={hasBudget ? 'mt-4' : 'mt-1'} />
+
+                        {/* Legend — 4 columns */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200 border border-gray-100 rounded">
+                          {cats.map(({ cat, total, budget, subs }, idx) => {
+                            const clr = CAT_PALETTE[idx % CAT_PALETTE.length];
+                            const isOpen = expandedCat === cat;
+                            const over = budget > 0 && total > budget;
+                            return (
+                              <div key={cat} className="px-3 py-1 border-b border-gray-100">
+                                <button
+                                  className="flex items-center gap-1.5 hover:opacity-70 transition-opacity w-full text-left py-1"
+                                  onClick={() => setExpandedCat(isOpen ? null : cat)}>
+                                  <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: clr }} />
+                                  <span className="text-xs text-gray-700 truncate font-medium flex-1 min-w-0">{cat}</span>
+                                  <div className="text-right shrink-0">
+                                    <div className={`text-xs ${over ? 'text-red-500 font-semibold' : 'text-gray-600'}`}>{fmt(total)}</div>
+                                    {budget > 0 && (
+                                      <div className={`text-xs ${over ? 'text-red-400' : 'text-gray-400'}`}>
+                                        / {fmt(budget)} ({Math.round(total/budget*100)}%)
+                                      </div>
+                                    )}
+                                    {budget === 0 && typeTotal > 0 && (
+                                      <div className="text-xs text-gray-400">{Math.round(total/typeTotal*100)}% of total</div>
+                                    )}
+                                  </div>
+                                  <span className="text-gray-300 text-xs shrink-0">{isOpen ? '▲' : '▼'}</span>
+                                </button>
+                                {isOpen && (
+                                  <div className="mb-2 pl-4 border-l-2 border-gray-100 space-y-0.5">
+                                    {subs.map(({ s, a }) => (
+                                      <div key={s} className="flex items-center gap-1.5 text-xs">
+                                        <span className="text-gray-500 truncate flex-1 min-w-0">{s}</span>
+                                        <span className="text-gray-400 shrink-0 text-right">{fmt(a)} ({total > 0 ? Math.round(a/total*100) : 0}%)</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {/* MONTH-OVER-MONTH TABLE */}
-            {displayMonths.length > 1 && momData.length > 0 && (
+            {analyticsView === 'table' && displayMonths.length > 1 && momData.length > 0 && (
               <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-x-auto">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Month-over-Month</h3>
                 <table className="text-xs w-full min-w-max">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-1.5 pr-4 font-medium text-gray-600 sticky left-0 bg-white min-w-[120px]">Category</th>
+                      <th className="text-left py-1.5 pr-4 font-medium text-gray-600 sticky left-0 bg-white min-w-[140px]">Category</th>
                       {displayMonths.map(m => (
                         <th key={m} className="text-right py-1.5 px-2 font-medium text-gray-600 whitespace-nowrap">
                           {MONTH_NAMES[parseInt(m.split('-')[1], 10) - 1]} {m.split('-')[0]}
@@ -1868,39 +2305,48 @@ function AnalyticsPage({ onBack }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {momData.map(({ cat, values }) => (
-                      <tr key={cat} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                        <td className="py-1.5 pr-4 text-gray-700 sticky left-0 bg-white">{cat}</td>
-                        {values.map((v, i) => {
-                          const prev  = i > 0 ? values[i - 1] : null;
-                          const diff  = prev !== null && prev > 0 ? v - prev : 0;
-                          const up    = diff > 0;
-                          const arrowCls = up
-                            ? (goodUp ? 'text-green-500' : 'text-red-500')
-                            : (goodUp ? 'text-red-500'   : 'text-green-500');
-                          return (
-                            <td key={i} className="py-1.5 px-2 text-right text-gray-700 whitespace-nowrap">
-                              {v > 0 ? fmt(v) : <span className="text-gray-300">—</span>}
-                              {diff !== 0 && <span className={`ml-0.5 ${arrowCls}`}>{up ? '↑' : '↓'}</span>}
+                    {momData.map(({ type: tp, rows, totals }, gi) => {
+                      const isIncomeSavings = tp === 'Income' || tp === 'Savings';
+                      return (
+                        <React.Fragment key={tp}>
+                          {/* Type header row */}
+                          <tr className={gi > 0 ? 'border-t-2 border-gray-300' : ''}>
+                            <td colSpan={displayMonths.length + 1} className="pt-3 pb-1 sticky left-0 bg-white">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-400">{tp}</span>
                             </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                    {/* Totals row */}
-                    <tr className="border-t-2 border-gray-200 font-semibold">
-                      <td className="py-2 pr-4 text-gray-700 sticky left-0 bg-white">Total</td>
-                      {displayMonths.map(m => {
-                        const total = (monthData[m] || [])
-                          .filter(t => t.type === activeType)
-                          .reduce((s, t) => s + t.amount, 0);
-                        return (
-                          <td key={m} className="py-2 px-2 text-right text-gray-700 whitespace-nowrap">
-                            {total > 0 ? fmt(total) : <span className="text-gray-300">—</span>}
-                          </td>
-                        );
-                      })}
-                    </tr>
+                          </tr>
+                          {/* Category rows */}
+                          {rows.map(({ cat, values }) => (
+                            <tr key={cat} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                              <td className="py-1.5 pr-4 text-gray-700 sticky left-0 bg-white pl-3">{cat}</td>
+                              {values.map((v, i) => {
+                                const prev = i > 0 ? values[i - 1] : null;
+                                const diff = prev !== null && prev > 0 ? v - prev : 0;
+                                const up   = diff > 0;
+                                const arrowCls = up
+                                  ? (isIncomeSavings ? 'text-green-500' : 'text-red-500')
+                                  : (isIncomeSavings ? 'text-red-500'   : 'text-green-500');
+                                return (
+                                  <td key={i} className="py-1.5 px-2 text-right text-gray-700 whitespace-nowrap">
+                                    {v > 0 ? fmt(v) : <span className="text-gray-300">—</span>}
+                                    {diff !== 0 && <span className={`ml-0.5 ${arrowCls}`}>{up ? '↑' : '↓'}</span>}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                          {/* Type subtotal row */}
+                          <tr className="border-t border-gray-200 bg-gray-50 font-semibold">
+                            <td className="py-1.5 pr-4 text-gray-600 sticky left-0 bg-gray-50 pl-3">{tp} Total</td>
+                            {totals.map((v, i) => (
+                              <td key={i} className="py-1.5 px-2 text-right text-gray-700 whitespace-nowrap">
+                                {v > 0 ? fmt(v) : <span className="text-gray-300">—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1912,26 +2358,440 @@ function AnalyticsPage({ onBack }) {
   );
 }
 
+// ── CALENDAR DAY PANEL ─────────────────────────────────────────────────────
+
+function CalendarDayPanel({ day, isOpen, onClose, transactions, categoryGroups, onSave, onDelete }) {
+  const [txnType, setTxnType]     = useState('Expense');
+  const [parentCat, setParentCat] = useState('');
+  const [subCat, setSubCat]       = useState('');
+  const [amount, setAmount]       = useState('');
+  const [notes, setNotes]         = useState('');
+  const [saving, setSaving]       = useState(false);
+
+  // Reset form when day or type changes
+  useEffect(() => {
+    setAmount('');
+    setNotes('');
+  }, [day]);
+
+  useEffect(() => {
+    const firstCat = (categoryGroups[txnType] || [])[0]?.category || '';
+    const firstSub = (categoryGroups[txnType] || [])[0]?.details?.[0] || '';
+    setParentCat(firstCat);
+    setSubCat(firstSub);
+  }, [txnType, categoryGroups, day]);
+
+  const parentCats = (categoryGroups[txnType] || []).map(g => g.category);
+  const subCats    = (categoryGroups[txnType] || []).find(g => g.category === parentCat)?.details || [];
+
+  function handleParentChange(p) {
+    const firstSub = (categoryGroups[txnType] || []).find(g => g.category === p)?.details?.[0] || '';
+    setParentCat(p);
+    setSubCat(firstSub);
+  }
+
+  const dayTxns = useMemo(
+    () => (day ? transactions.filter(t => t.date === day) : []),
+    [day, transactions]
+  );
+
+  const dayTotals = useMemo(() => {
+    const t = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
+    dayTxns.forEach(tx => { t[tx.type] = (t[tx.type] || 0) + tx.amount; });
+    return t;
+  }, [dayTxns]);
+
+  const formattedDay = useMemo(() => {
+    if (!day) return '';
+    const [y, m, d] = day.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  }, [day]);
+
+  const canSave = parseMoney(amount) > 0 && subCat && day;
+
+  async function handleSave() {
+    const amt = parseMoney(amount);
+    if (!amt || !day) return;
+    setSaving(true);
+    try {
+      await onSave({
+        id: String(uid()),
+        date: day,
+        type: txnType,
+        subCategory: subCat,
+        amount: amt,
+        notes,
+      });
+      setAmount('');
+      setNotes('');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
+      )}
+
+      {/* Slide-in panel */}
+      <div
+        className="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-50 flex flex-col"
+        style={{ transform: isOpen ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 200ms ease-in-out' }}
+      >
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-800">{formattedDay}</div>
+              <div className="flex gap-1.5 mt-1 flex-wrap">
+                {TABS.map(type => {
+                  const amt = dayTotals[type];
+                  if (!amt) return null;
+                  const c = TYPE_COLOR[type];
+                  return (
+                    <span key={type} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${c.badge}`}>
+                      {type} {fmt(amt)}
+                    </span>
+                  );
+                })}
+                {Object.values(dayTotals).every(v => !v) && (
+                  <span className="text-[11px] text-gray-400">No entries</span>
+                )}
+              </div>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none ml-2">✕</button>
+          </div>
+        </div>
+
+        {/* Transaction list */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {dayTxns.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-xs">No entries for this day</div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {dayTxns.map(t => {
+                const c = TYPE_COLOR[t.type] || TYPE_COLOR.Expense;
+                return (
+                  <li key={t.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 group">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${c.badge}`}>{t.type}</span>
+                        <span className="text-xs text-gray-800 truncate">{catEmoji(t.subCategory)}&nbsp;{t.subCategory || t.type}</span>
+                      </div>
+                      {t.notes && <div className="text-[10px] text-gray-400 mt-0.5 pl-0.5">{t.notes}</div>}
+                    </div>
+                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                      <span className="text-xs font-semibold text-gray-800">{fmt(t.amount)}</span>
+                      {onDelete && (
+                        <button
+                          onClick={() => onDelete(t)}
+                          className="text-gray-300 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Delete"
+                        >✕</button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Add entry section */}
+        <div className="shrink-0 border-t border-gray-100">
+          <div className="px-4 py-2 bg-gray-50">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Add Entry</span>
+          </div>
+          <div className="px-4 py-3 space-y-2 bg-white">
+            {/* Type */}
+            <div className="grid grid-cols-4 gap-1">
+              {TABS.map(t => (
+                <button key={t} onClick={() => setTxnType(t)}
+                  className={`py-1 text-[10px] rounded font-medium transition-colors ${
+                    txnType === t ? TYPE_COLOR[t].badge : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}>{t}</button>
+              ))}
+            </div>
+            {/* Category */}
+            <select value={parentCat} onChange={e => handleParentChange(e.target.value)}
+              className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-300">
+              <option value="">-- Category --</option>
+              {parentCats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {/* Sub-category */}
+            {subCats.length > 0 ? (
+              <select value={subCat} onChange={e => setSubCat(e.target.value)}
+                className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-300">
+                <option value="">-- Sub-category --</option>
+                {subCats.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            ) : (
+              <input type="text" value={subCat} onChange={e => setSubCat(e.target.value)}
+                placeholder="Sub-category"
+                className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-300" />
+            )}
+            {/* Amount */}
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && canSave) handleSave(); }}
+              placeholder="Amount (₹)" min="0" step="0.01" inputMode="decimal"
+              className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-300" />
+            {/* Notes */}
+            <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-300" />
+            {/* Save */}
+            <button onClick={handleSave} disabled={!canSave || saving}
+              className="w-full py-2 bg-gray-800 text-white text-xs rounded font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              {saving ? 'Saving…' : 'Save Entry'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── CALENDAR PAGE (desktop only) ───────────────────────────────────────────
+
+const DOW_LABELS   = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const TYPE_DOT_CLR = { Expense: 'bg-red-400', Income: 'bg-green-400', Savings: 'bg-blue-400', Payoff: 'bg-amber-400' };
+
+function CalendarPage({ transactions, selectedMonth, setSelectedMonth, categoryGroups, onSave, onDelete }) {
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [panelOpen, setPanelOpen]     = useState(false);
+
+  function openDay(dateStr) { setSelectedDay(dateStr); setPanelOpen(true); }
+
+  const { cells, todayIso } = useMemo(() => {
+    const [y, m]      = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDow    = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Mon-start
+    const todayIso    = new Date().toISOString().slice(0, 10);
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return { cells, todayIso };
+  }, [selectedMonth]);
+
+  const dayAgg = useMemo(() => {
+    const agg = {};
+    transactions.filter(t => t.date.startsWith(selectedMonth)).forEach(t => {
+      if (!agg[t.date]) agg[t.date] = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
+      agg[t.date][t.type] = (agg[t.date][t.type] || 0) + t.amount;
+    });
+    return agg;
+  }, [transactions, selectedMonth]);
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4 shrink-0">
+        <h2 className="text-sm font-semibold text-gray-800">Calendar</h2>
+        <MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+      </div>
+
+      {/* Grid */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        {/* Day-of-week headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {DOW_LABELS.map(d => (
+            <div key={d} className={`text-center text-[11px] font-semibold pb-1.5 ${d === 'Sa' || d === 'Su' ? 'text-slate-400' : 'text-gray-500'}`}>{d}</div>
+          ))}
+        </div>
+        {/* Calendar cells */}
+        <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden border border-gray-200">
+          {cells.map((day, idx) => {
+            if (!day) return <div key={`blank-${idx}`} className="bg-gray-50 min-h-[90px]" />;
+            const dateStr   = `${selectedMonth}-${String(day).padStart(2, '0')}`;
+            const isToday   = dateStr === todayIso;
+            const isSelected = dateStr === selectedDay && panelOpen;
+            const isWeekend = idx % 7 >= 5;
+            const agg       = dayAgg[dateStr] || {};
+            const expTotal  = agg.Expense || 0;
+            const hasData   = TABS.some(t => (agg[t] || 0) > 0);
+            return (
+              <button
+                key={dateStr}
+                onClick={() => openDay(dateStr)}
+                className={`relative min-h-[90px] p-2 flex flex-col text-left transition-colors ${
+                  isSelected ? 'bg-blue-50' :
+                  isWeekend  ? 'bg-gray-50 hover:bg-gray-100' : 'bg-white hover:bg-gray-50'
+                } ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+              >
+                <span className={`text-xs font-semibold ${isToday ? 'text-blue-600' : isWeekend ? 'text-slate-400' : 'text-gray-700'}`}>{day}</span>
+                {hasData && (
+                  <div className="flex gap-0.5 mt-1">
+                    {TABS.map(t => agg[t] > 0 ? <span key={t} className={`w-1.5 h-1.5 rounded-full ${TYPE_DOT_CLR[t]}`} /> : null)}
+                  </div>
+                )}
+                {expTotal > 0 && (
+                  <span className="mt-auto text-[10px] font-medium text-red-500 self-end">{fmtK(expTotal)}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <CalendarDayPanel
+        day={selectedDay}
+        isOpen={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        transactions={transactions}
+        categoryGroups={categoryGroups}
+        onSave={onSave}
+        onDelete={onDelete}
+      />
+    </div>
+  );
+}
+
+// ── MINI CALENDAR (dashboard, desktop only) ────────────────────────────────
+
+function MiniCalendar({ transactions, selectedMonth, selectedDay, onDayClick }) {
+  const { cells, todayIso } = useMemo(() => {
+    const [y, m]      = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDow    = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+    const todayIso    = new Date().toISOString().slice(0, 10);
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return { cells, todayIso };
+  }, [selectedMonth]);
+
+  const dayAgg = useMemo(() => {
+    const agg = {};
+    transactions.filter(t => t.date.startsWith(selectedMonth)).forEach(t => {
+      if (!agg[t.date]) agg[t.date] = { Expense: 0, Income: 0, Savings: 0, Payoff: 0 };
+      agg[t.date][t.type] = (agg[t.date][t.type] || 0) + t.amount;
+    });
+    return agg;
+  }, [transactions, selectedMonth]);
+
+  function intensityBg(total) {
+    if (total <= 0)   return '';
+    if (total < 1000) return 'bg-slate-50';
+    if (total < 5000) return 'bg-slate-100';
+    return 'bg-slate-200';
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="px-3 py-2 border-b border-gray-100">
+        <span className="text-xs font-semibold text-gray-500">Monthly Overview</span>
+      </div>
+      {/* DOW headers */}
+      <div className="grid grid-cols-7 border-b border-gray-100">
+        {DOW_LABELS.map(d => (
+          <div key={d} className={`text-center text-[10px] font-semibold py-1.5 ${d === 'Sa' || d === 'Su' ? 'text-slate-400' : 'text-gray-400'}`}>{d}</div>
+        ))}
+      </div>
+      {/* Day cells */}
+      <div className="grid grid-cols-7 gap-px bg-gray-100">
+        {cells.map((day, idx) => {
+          if (!day) return <div key={`b-${idx}`} className="bg-gray-50 h-12" />;
+          const dateStr   = `${selectedMonth}-${String(day).padStart(2, '0')}`;
+          const isToday      = dateStr === todayIso;
+          const isSelected   = dateStr === selectedDay;
+          const isWeekend    = idx % 7 >= 5;
+          const agg          = dayAgg[dateStr] || {};
+          const dayTotal     = TABS.reduce((sum, type) => sum + (agg[type] || 0), 0);
+          const iBg          = isSelected ? '' : intensityBg(dayTotal);
+          return (
+            <button
+              key={dateStr}
+              onClick={() => onDayClick(dateStr)}
+              className={`h-12 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                isSelected ? 'bg-slate-700' :
+                iBg || (isWeekend ? 'bg-gray-50' : 'bg-white')
+              } ${isToday && !isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+            >
+              <span className={`text-[10px] font-medium leading-none ${
+                isSelected ? 'text-white' : isToday ? 'text-blue-600' : isWeekend ? 'text-slate-400' : 'text-gray-600'
+              }`}>{day}</span>
+              {TABS.some(t => (agg[t] || 0) > 0) && (
+                <div className="flex gap-0.5 leading-none">
+                  {TABS.map(t => agg[t] > 0 ? <span key={t} className={`w-1 h-1 rounded-full ${TYPE_DOT_CLR[t]}`} /> : null)}
+                </div>
+              )}
+              {dayTotal > 0 && (
+                <span className={`text-[9px] font-medium leading-none ${isSelected ? 'text-slate-300' : 'text-slate-600'}`}>{fmtK(dayTotal)}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── DASHBOARD PAGE ─────────────────────────────────────────────────────────
 
 function DashboardPage({
   transactions, selectedMonth, setSelectedMonth,
   bulkRows, setBulkRows, activeTab, setActiveTab,
-  categoryGroups, onBulkSave, onQuickAdd, budgets,
+  categoryGroups, onBulkSave, onQuickAdd, onDelete, budgets, onCardClick,
 }) {
+  const lastEntryDay = useMemo(() => {
+    const dates = transactions
+      .filter(t => t.date.startsWith(selectedMonth))
+      .map(t => t.date)
+      .sort();
+    return dates.length ? dates[dates.length - 1] : null;
+  }, [transactions, selectedMonth]);
+
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState(null);
+
+  // Auto-select the last entry day whenever it changes (month switch or data load)
+  useEffect(() => {
+    setSelectedCalendarDay(lastEntryDay);
+  }, [lastEntryDay]);
+
+  function handleDayClick(dateStr) {
+    setSelectedCalendarDay(prev => prev === dateStr ? null : dateStr);
+  }
+
+  const dayTxns = useMemo(
+    () => selectedCalendarDay
+      ? transactions
+          .filter(t => t.date === selectedCalendarDay)
+          .sort((a, b) => TABS.indexOf(a.type) - TABS.indexOf(b.type) || b.amount - a.amount)
+      : [],
+    [selectedCalendarDay, transactions]
+  );
+
+  const formattedSelectedDay = useMemo(() => {
+    if (!selectedCalendarDay) return '';
+    const [y, m, d] = selectedCalendarDay.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' });
+  }, [selectedCalendarDay]);
+
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-5xl mx-auto p-4 space-y-4">
-        {/* Month selector */}
-        <div className="flex items-center justify-center">
-          <MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} />
-        </div>
-
-        {/* Summary cards */}
-        <SummaryCards transactions={transactions} selectedMonth={selectedMonth} budgets={budgets} />
-
-        {/* Desktop: spreadsheet grid (md and above) */}
-        <div className="hidden md:block">
+      {/* ── DESKTOP: two-column layout ── */}
+      <div className="hidden md:flex gap-4 px-6 py-4 items-start">
+        {/* Left: main content */}
+        <div className="flex-1 min-w-0 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 pt-0.5">
+              <MonthSelector compact selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <SummaryCards
+                compact
+                transactions={transactions}
+                selectedMonth={selectedMonth}
+                budgets={budgets}
+                onCardClick={onCardClick}
+              />
+            </div>
+          </div>
           <SpreadsheetGrid
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -1941,14 +2801,64 @@ function DashboardPage({
           />
         </div>
 
-        {/* Mobile: quick entry (below md) */}
-        <div className="md:hidden">
-          <QuickEntrySection
-            categoryGroups={categoryGroups}
-            onAdd={onQuickAdd}
+        {/* Right: mini calendar + day transactions — sticky */}
+        <div className="w-64 shrink-0 sticky top-4 space-y-2">
+          <MiniCalendar
             transactions={transactions}
+            selectedMonth={selectedMonth}
+            selectedDay={selectedCalendarDay}
+            onDayClick={handleDayClick}
           />
+
+          {/* Day transactions list */}
+          {selectedCalendarDay && (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600">{formattedSelectedDay}</span>
+                <button onClick={() => setSelectedCalendarDay(null)} className="text-gray-300 hover:text-gray-500 text-sm leading-none">✕</button>
+              </div>
+              {dayTxns.length === 0 ? (
+                <div className="px-3 py-4 text-center text-xs text-gray-400">No entries</div>
+              ) : (
+                <ul className="divide-y divide-gray-50">
+                  {dayTxns.map(t => {
+                    const c = TYPE_COLOR[t.type] || TYPE_COLOR.Expense;
+                    return (
+                      <li key={t.id} className="flex items-center justify-between px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${c.badge}`}>{t.type}</span>
+                            <span className="text-xs text-gray-700 truncate">{t.subCategory || t.category || t.type}</span>
+                          </div>
+                          {t.notes && <div className="text-[10px] text-gray-400 mt-0.5 truncate">{t.notes}</div>}
+                        </div>
+                        <span className="text-xs font-semibold text-gray-800 ml-2 shrink-0">{fmt(t.amount)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* ── MOBILE: stacked layout ── */}
+      <div className="md:hidden px-4 py-4 space-y-4">
+        <div className="flex items-center justify-center">
+          <MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+        </div>
+        <SummaryCards
+          transactions={transactions}
+          selectedMonth={selectedMonth}
+          budgets={budgets}
+          onCardClick={onCardClick}
+        />
+        <QuickEntrySection
+          categoryGroups={categoryGroups}
+          onAdd={onQuickAdd}
+          transactions={transactions}
+        />
       </div>
     </div>
   );
@@ -1971,8 +2881,14 @@ function App() {
     Payoff:  initRows(),
   });
   const [budgets, setBudgets] = useState([]);
+  const [initialTypeFilter, setInitialTypeFilter] = useState(null);
 
   const showToast = useCallback((msg, type = 'success') => setToast({ msg, type }), []);
+
+  function navigateToTransactions(type) {
+    setInitialTypeFilter(type);
+    setCurrentPage('transactions');
+  }
 
   // ── Backend: load budgets
   const loadBudgets = useCallback(async () => {
@@ -2199,54 +3115,82 @@ function App() {
   if (!isInitialized) return null;
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-gray-50">
-      <TopNav
+    <div className="flex min-h-screen w-full bg-gray-50 overflow-x-hidden">
+      {/* Desktop sidebar — hidden on mobile */}
+      <SideNav
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         onLogout={() => window.appAuth?.logout?.()}
       />
 
-      {currentPage === 'dashboard' && (
-        <DashboardPage
-          transactions={transactions}
-          selectedMonth={selectedMonth}
-          setSelectedMonth={setSelectedMonth}
-          bulkRows={bulkRows}
-          setBulkRows={setBulkRows}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          categoryGroups={categoryGroups}
-          onBulkSave={handleBulkSave}
-          onQuickAdd={handleQuickAdd}
-          budgets={budgets}
+      {/* Main content column */}
+      <div className="flex-1 flex flex-col min-h-screen min-w-0 md:ml-14">
+        {/* Mobile top nav — hidden on desktop */}
+        <TopNav
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          onLogout={() => window.appAuth?.logout?.()}
         />
-      )}
 
-      {currentPage === 'transactions' && (
-        <TransactionsPage
-          transactions={transactions}
-          onBack={() => setCurrentPage('dashboard')}
-          onLoadMonth={loadDashboardData}
-          initialMonth={selectedMonth}
-          onDelete={handleDelete}
-        />
-      )}
+        {currentPage === 'dashboard' && (
+          <DashboardPage
+            transactions={transactions}
+            selectedMonth={selectedMonth}
+            setSelectedMonth={setSelectedMonth}
+            bulkRows={bulkRows}
+            setBulkRows={setBulkRows}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            categoryGroups={categoryGroups}
+            onBulkSave={handleBulkSave}
+            onQuickAdd={handleQuickAdd}
+            onDelete={handleDelete}
+            budgets={budgets}
+            onCardClick={navigateToTransactions}
+          />
+        )}
 
-      {currentPage === 'budget' && (
-        <BudgetPage
-          categoryGroups={categoryGroups}
-          onBack={() => setCurrentPage('dashboard')}
-          showToast={showToast}
-        />
-      )}
+        {currentPage === 'calendar' && (
+          <CalendarPage
+            transactions={transactions}
+            selectedMonth={selectedMonth}
+            setSelectedMonth={setSelectedMonth}
+            categoryGroups={categoryGroups}
+            onSave={handleQuickAdd}
+            onDelete={handleDelete}
+          />
+        )}
 
-      {currentPage === 'analytics' && (
-        <AnalyticsPage
-          onBack={() => setCurrentPage('dashboard')}
-        />
-      )}
+        {currentPage === 'transactions' && (
+          <TransactionsPage
+            transactions={transactions}
+            onBack={() => setCurrentPage('dashboard')}
+            onLoadMonth={loadDashboardData}
+            initialMonth={selectedMonth}
+            onDelete={handleDelete}
+            initialHeadFilter={initialTypeFilter}
+          />
+        )}
 
-      <AppToast toast={toast} onClear={() => setToast(null)} />
+        {currentPage === 'budget' && (
+          <BudgetPage
+            categoryGroups={categoryGroups}
+            onBack={() => setCurrentPage('dashboard')}
+            showToast={showToast}
+          />
+        )}
+
+        {currentPage === 'analytics' && (
+          <AnalyticsPage
+            onBack={() => setCurrentPage('dashboard')}
+            transactions={transactions}
+            selectedMonth={selectedMonth}
+            budgets={budgets}
+          />
+        )}
+
+        <AppToast toast={toast} onClear={() => setToast(null)} />
+      </div>
     </div>
   );
 }
