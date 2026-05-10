@@ -513,6 +513,22 @@ function BudgetPage({ categoryGroups, onBack, showToast }) {
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [dirty, setDirty]         = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  function applyBudgetsResponse(res) {
+    if (!res?.success) return;
+    const map = {};
+    (res.budgets || []).forEach(b => {
+      map[`${b.type}::${b.category}`] = b.monthlyBudget > 0 ? String(b.monthlyBudget) : '';
+    });
+    setBudgetMap(map);
+
+    // Derive latest update time from row-level updatedAt values
+    const dates = (res.budgets || [])
+      .map(b => b.updatedAt ? new Date(b.updatedAt) : null)
+      .filter(d => d && !isNaN(d.getTime()));
+    setLastUpdated(dates.length ? dates.reduce((a, b) => b > a ? b : a) : null);
+  }
 
   // Load budgets from Supabase on mount
   useEffect(() => {
@@ -520,12 +536,7 @@ function BudgetPage({ categoryGroups, onBack, showToast }) {
     callBackend({ action: 'getBudgets' })
       .then(res => {
         if (res?.success) {
-          const map = {};
-          (res.budgets || []).forEach(b => {
-            // Key by type::subCat to avoid collisions across types
-            map[`${b.type}::${b.category}`] = b.monthlyBudget > 0 ? String(b.monthlyBudget) : '';
-          });
-          setBudgetMap(map);
+          applyBudgetsResponse(res);
         } else {
           showToast('Failed to load budgets', 'error');
         }
@@ -562,6 +573,9 @@ function BudgetPage({ categoryGroups, onBack, showToast }) {
       if (res?.success) {
         showToast('Budgets saved');
         setDirty(false);
+        // Reload to get the latest row-level timestamps from the backend
+        const refreshed = await callBackend({ action: 'getBudgets' });
+        applyBudgetsResponse(refreshed);
       } else {
         showToast('Save failed', 'error');
       }
@@ -686,9 +700,20 @@ function BudgetPage({ categoryGroups, onBack, showToast }) {
         {/* Save bar */}
         {!loading && (
           <div className="sticky bottom-0 bg-white border-t border-gray-100 py-2 flex items-center justify-between gap-3">
-            <span className="text-xs text-gray-400">
-              {dirty ? 'Unsaved changes' : 'All changes saved'}
-            </span>
+            <div className="text-xs text-gray-400 leading-tight">
+              <div>{dirty ? 'Unsaved changes' : 'All changes saved'}</div>
+              {lastUpdated && (
+                <div className="text-[10px] text-gray-300">
+                  Last saved/updated {lastUpdated.toLocaleString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleSave}
               disabled={saving || !dirty}

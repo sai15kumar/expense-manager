@@ -58,6 +58,6 @@ set role = excluded.role,
     updated_at = now();
 
 comment on table public.category_master is 'Master list of supported entry categories and optional details for expense, income, savings, and payoff flows.';
-comment on table public.transactions is 'Transaction log migrated from Google Sheets Expense_Log.';
+comment on table public.transactions is 'Transaction log for expense, income, savings, and payoff entries.';
 comment on column public.transactions.detail is 'Optional fine-grained descriptor such as Electricity Bill or Internet. Leave blank for legacy records.';
 comment on column public.category_master.detail is 'Optional dependent dropdown value used after the broad category is selected.';

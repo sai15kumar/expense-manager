@@ -230,6 +230,9 @@ otp_expiry = 3600
 # port = 587
 # user = "apikey"
 # pass = "env(SENDGRID_API_KEY)"
+
+[functions.expense-api]
+verify_jwt = false
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 

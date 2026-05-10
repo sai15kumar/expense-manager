@@ -178,7 +178,7 @@ async function getCategories(supabase: ReturnType<typeof createClient>) {
 async function getBudgets(supabase: ReturnType<typeof createClient>) {
   const { data, error } = await supabase
     .from('category_master')
-    .select('type, category, detail, budget_monthly, budget_yearly')
+    .select('type, category, detail, budget_monthly, budget_yearly, updated_at')
     .eq('active', true)
     .order('type', { ascending: true })
     .order('category', { ascending: true });
@@ -191,7 +191,8 @@ async function getBudgets(supabase: ReturnType<typeof createClient>) {
       type: normalizeType(row.type),
       category: (row.detail || row.category || '').toString().trim(),
       monthlyBudget: Number(row.budget_monthly || 0),
-      yearlyBudget: Number(row.budget_yearly || 0)
+      yearlyBudget: Number(row.budget_yearly || 0),
+      updatedAt: row.updated_at ? new Date(row.updated_at as string).toISOString() : null
     }))
   };
 }
@@ -363,6 +364,8 @@ async function saveExpenses(supabase: ReturnType<typeof createClient>, payload: 
 async function saveBudget(supabase: ReturnType<typeof createClient>, payload: Payload) {
   const budgets = Array.isArray(payload.budgets) ? payload.budgets : [];
 
+  const normalizeBudgetLabel = (value: unknown) => (value || '').toString().trim().toLowerCase();
+
   for (const budget of budgets) {
     const incomingCategory = (budget.category || '').toString().trim();
     if (!incomingCategory) continue;
@@ -370,16 +373,20 @@ async function saveBudget(supabase: ReturnType<typeof createClient>, payload: Pa
     const monthlyBudget = Number(budget.monthlyBudget || 0);
     const yearlyBudget = Number(budget.yearlyBudget || monthlyBudget * 12);
     const budgetType = (budget.type || '').toString().trim();
+    const incomingLabel = normalizeBudgetLabel(incomingCategory);
 
-    // Look up the row by detail name, scoped by type
+    // Look up the row by either detail or category, scoped by type
     let query = supabase
       .from('category_master')
-      .select('id')
-      .eq('active', true)
-      .ilike('detail', incomingCategory);
+      .select('id, category, detail')
+      .eq('active', true);
     if (budgetType) query = query.ilike('type', budgetType);
-    const { data: existing, error: lookupError } = await query.limit(1).maybeSingle();
+    const { data: existingRows, error: lookupError } = await query;
     if (lookupError) throw lookupError;
+
+    const existing = (existingRows || []).find((row) => {
+      return normalizeBudgetLabel(row.detail) === incomingLabel || normalizeBudgetLabel(row.category) === incomingLabel;
+    });
 
     if (existing?.id) {
       const { error: updateError } = await supabase
