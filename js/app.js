@@ -180,6 +180,9 @@ function flattenExpensesByDate(expensesByDate) {
       id: e.id || String(uid()),
       date: e.date || date,
       type: e.type || 'Expense',
+      parentCategory: e.parentCategory || e.category || '',
+      category: e.category || e.parentCategory || '',
+      detail: e.detail || '',
       subCategory: e.detail || e.name || e.category || '',
       amount: parseMoney(e.amount),
       notes: e.notes || '',
@@ -1533,6 +1536,21 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate]     = useState('');
   const [loading, setLoading]   = useState(false);
+  const [selectedHeads, setSelectedHeads] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedSubCategories, setSelectedSubCategories] = useState([]);
+
+  const getHeadValue = useCallback(transaction => (
+    (transaction.type || '').trim()
+  ), []);
+
+  const getCategoryValue = useCallback(transaction => (
+    (transaction.parentCategory || transaction.category || '').trim()
+  ), []);
+
+  const getSubCategoryValue = useCallback(transaction => (
+    (transaction.subCategory || transaction.detail || transaction.category || '').trim()
+  ), []);
 
   // Load month whenever month mode + filterMonth changes
   useEffect(() => {
@@ -1568,9 +1586,57 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
     return transactions;
   }, [transactions, periodMode, filterMonth, fromDate, toDate]);
 
+  const headOptions = useMemo(() => {
+    return [...new Set(periodFiltered.map(getHeadValue).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+  }, [periodFiltered, getHeadValue]);
+
+  const categoryOptions = useMemo(() => {
+    return [...new Set(
+      periodFiltered
+        .filter(transaction => selectedHeads.length === 0 || selectedHeads.includes(getHeadValue(transaction)))
+        .map(getCategoryValue)
+        .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b));
+  }, [periodFiltered, selectedHeads, getHeadValue, getCategoryValue]);
+
+  const subCategoryOptions = useMemo(() => {
+    return [...new Set(
+      periodFiltered
+        .filter(transaction => {
+          if (selectedHeads.length > 0 && !selectedHeads.includes(getHeadValue(transaction))) return false;
+          if (selectedCategories.length > 0 && !selectedCategories.includes(getCategoryValue(transaction))) return false;
+          return true;
+        })
+        .map(getSubCategoryValue)
+        .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b));
+  }, [periodFiltered, selectedHeads, selectedCategories, getHeadValue, getCategoryValue, getSubCategoryValue]);
+
+  useEffect(() => {
+    const validHeads = new Set(headOptions);
+    const validCategories = new Set(categoryOptions);
+    const validSubs = new Set(subCategoryOptions);
+
+    setSelectedHeads(prev => prev.filter(head => validHeads.has(head)));
+    setSelectedCategories(prev => prev.filter(category => validCategories.has(category)));
+    setSelectedSubCategories(prev => prev.filter(subCategory => validSubs.has(subCategory)));
+  }, [headOptions, categoryOptions, subCategoryOptions]);
+
   const filtered = useMemo(() => {
-    return [...periodFiltered].sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
-  }, [periodFiltered]);
+    return [...periodFiltered]
+      .filter(transaction => {
+        const head = getHeadValue(transaction);
+        const category = getCategoryValue(transaction);
+        const subCategory = getSubCategoryValue(transaction);
+
+        if (selectedHeads.length > 0 && !selectedHeads.includes(head)) return false;
+        if (selectedCategories.length > 0 && !selectedCategories.includes(category)) return false;
+        if (selectedSubCategories.length > 0 && !selectedSubCategories.includes(subCategory)) return false;
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
+  }, [periodFiltered, selectedHeads, selectedCategories, selectedSubCategories, getHeadValue, getCategoryValue, getSubCategoryValue]);
 
   const grouped = useMemo(() => ({
     Expense: filtered.filter(t => t.type === 'Expense'),
@@ -1579,7 +1645,13 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
     Payoff: filtered.filter(t => t.type === 'Payoff'),
   }), [filtered]);
 
+  function toggleSelectedValue(setter, value) {
+    setter(prev => prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]);
+  }
+
   function TransactionSection({ title, items, accent }) {
+    const sectionTotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
     return (
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
@@ -1587,7 +1659,7 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
             <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
             <span className="text-sm font-semibold text-gray-700">{title}</span>
           </div>
-          <span className="text-xs text-gray-400">{items.length} entries</span>
+          <span className="text-xs text-gray-400">{items.length} entries · {fmt(sectionTotal)}</span>
         </div>
         {items.length === 0 ? (
           <div className="px-4 py-10 text-sm text-gray-400 text-center">No transactions.</div>
@@ -1722,6 +1794,108 @@ function TransactionsPage({ transactions, onBack, onLoadMonth, initialMonth, onD
                   >{loading ? 'Loading…' : 'Load'}</button>
                 </div>
               )}
+
+              <div className="border-t border-gray-100 pt-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Filters</span>
+                  {(selectedHeads.length > 0 || selectedCategories.length > 0 || selectedSubCategories.length > 0) && (
+                    <button
+                      onClick={() => {
+                        setSelectedHeads([]);
+                        setSelectedCategories([]);
+                        setSelectedSubCategories([]);
+                      }}
+                      className="text-[11px] text-slate-500 hover:text-slate-700"
+                    >Clear</button>
+                  )}
+                </div>
+
+                {headOptions.length === 0 ? (
+                  <div className="text-xs text-gray-400">No category filters for this period.</div>
+                ) : (
+                  <div className="space-y-3 max-h-[54vh] overflow-y-auto pr-1">
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Head</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {headOptions.map(head => (
+                          <button
+                            key={head}
+                            onClick={() => toggleSelectedValue(setSelectedHeads, head)}
+                            className={`px-2 py-1 rounded-full text-[11px] border transition-colors ${
+                              selectedHeads.includes(head)
+                                ? 'border-slate-600 bg-slate-700 text-white'
+                                : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                            }`}
+                          >
+                            {head}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Category</div>
+                      {categoryOptions.length === 0 ? (
+                        <div className="text-xs text-gray-300">No categories for the current head selection.</div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {categoryOptions.map(category => (
+                            <button
+                              key={category}
+                              onClick={() => toggleSelectedValue(setSelectedCategories, category)}
+                              className={`px-2 py-1 rounded-full text-[11px] border transition-colors ${
+                                selectedCategories.includes(category)
+                                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                              }`}
+                            >
+                              {category}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Sub-category</div>
+                      {subCategoryOptions.length === 0 ? (
+                        <div className="text-xs text-gray-300">No sub-categories for the current selection.</div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {subCategoryOptions.map(subCategory => (
+                            <button
+                              key={subCategory}
+                              onClick={() => toggleSelectedValue(setSelectedSubCategories, subCategory)}
+                              className={`px-2 py-1 rounded-full text-[11px] border transition-colors ${
+                                selectedSubCategories.includes(subCategory)
+                                  ? 'border-sky-600 bg-sky-50 text-sky-700'
+                                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                              }`}
+                            >
+                              {subCategory}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {(selectedHeads.length > 0 || selectedCategories.length > 0 || selectedSubCategories.length > 0) && (
+                      <div className="pt-1">
+                        <button
+                          onClick={() => {
+                            setSelectedHeads([]);
+                            setSelectedCategories([]);
+                            setSelectedSubCategories([]);
+                          }}
+                          className="text-[11px] text-slate-500 hover:text-slate-700"
+                        >
+                          Clear all filters
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -3046,6 +3220,9 @@ function App() {
         if (result?.success) {
           const savedItems = result.savedExpenses || dateRows.map(r => ({
             id: String(uid()), date, type,
+            category: (lookup[r.subCategory] || {}).parentCategory || r.subCategory,
+            parentCategory: (lookup[r.subCategory] || {}).parentCategory || r.subCategory,
+            detail: r.subCategory,
             subCategory: r.subCategory,
             amount: parseMoney(r.amount),
             notes: r.notes,
@@ -3054,6 +3231,9 @@ function App() {
             id: e.id || String(uid()),
             date: e.date || date,
             type: e.type || type,
+            parentCategory: e.parentCategory || e.category || e.detail || e.subCategory || '',
+            category: e.category || e.parentCategory || e.detail || e.subCategory || '',
+            detail: e.detail || e.subCategory || '',
             subCategory: e.detail || e.subCategory || '',
             amount: parseMoney(e.amount),
             notes: e.notes || '',
